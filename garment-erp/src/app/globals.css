@@ -1,0 +1,95 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+    --primary: 221.2 83.2% 53.3%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 222.2 47.4% 11.2%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 221.2 83.2% 53.3%;
+    --radius: 0.5rem;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+  /* Large touch targets for shop-floor tablets */
+  button, [role="button"] {
+    @apply min-h-[44px];
+  }
+  input, select, textarea {
+    @apply min-h-[44px];
+  }
+}
+
+/* Amharic / Ethiopic script support */
+[lang="am"], .font-ethiopic {
+  font-family: var(--font-noto-sans-ethiopic), 'Noto Sans Ethiopic', sans-serif;
+  line-height: 1.8; /* Ethiopic script needs more line height */
+}
+
+/* Number pad inputs — large and clear for shop floor */
+.numpad-input {
+  @apply text-3xl font-bold text-center rounded-xl border-2 border-primary
+    focus:ring-4 focus:ring-primary/30 min-h-[64px] min-w-[80px];
+}
+
+/* Status badges */
+.badge-draft     { @apply bg-gray-100 text-gray-700 text-xs px-2 py-0.5 rounded-full; }
+.badge-submitted { @apply bg-blue-100 text-blue-700 text-xs px-2 py-0.5 rounded-full; }
+.badge-verified  { @apply bg-green-100 text-green-700 text-xs px-2 py-0.5 rounded-full; }
+.badge-locked    { @apply bg-purple-100 text-purple-700 text-xs px-2 py-0.5 rounded-full; }
+.badge-pending   { @apply bg-yellow-100 text-yellow-700 text-xs px-2 py-0.5 rounded-full; }
+.badge-approved  { @apply bg-emerald-100 text-emerald-700 text-xs px-2 py-0.5 rounded-full; }
+
+/* Alert colours */
+.alert-warning  { @apply bg-amber-50 border-l-4 border-amber-500 text-amber-800 p-4 rounded; }
+.alert-error    { @apply bg-red-50 border-l-4 border-red-500 text-red-800 p-4 rounded; }
+.alert-info     { @apply bg-blue-50 border-l-4 border-blue-500 text-blue-800 p-4 rounded; }
+.alert-success  { @apply bg-green-50 border-l-4 border-green-500 text-green-800 p-4 rounded; }
+
+/* Table styles */
+.data-table {
+  @apply w-full border-collapse text-sm;
+}
+.data-table th {
+  @apply bg-gray-50 text-gray-600 font-semibold p-3 text-right border-b border-gray-200;
+}
+.data-table td {
+  @apply p-3 text-right border-b border-gray-100;
+}
+.data-table tr:hover td {
+  @apply bg-gray-50;
+}
+/* Numbers right-aligned; names left-aligned */
+.data-table .col-name { @apply text-right; }
+.data-table .col-num  { @apply text-right tabular-nums; }
+
+/* Print styles — match the sample PDF layouts */
+@media print {
+  nav, aside, .no-print { display: none !important; }
+  body { background: white; }
+  .print-page { page-break-after: always; }
+}

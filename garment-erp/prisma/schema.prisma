@@ -1,0 +1,727 @@
+// Garment ERP - Prisma Schema
+// Database: PostgreSQL (remote)
+// Money: Decimal(10,2) — never Float
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────────────────────
+// ENUMS
+// ─────────────────────────────────────────────
+
+enum Role {
+  ADMIN           // አስተዳዳሪ - controls system, users, settings
+  SUPER_MANAGER   // ሱፐር ማኔጀር - manages all departments, approves pay
+  STORE_KEEPER    // የመጋዘን ኃላፊ
+  CUTTING_MANAGER // የቆረጣ ኃላፊ
+  PRODUCTION_MANAGER // የምርት ኃላፊ
+  QC_INSPECTOR    // የጥራት ተቆጣጣሪ
+  FINISHED_GOODS_MANAGER // የተጠናቀቀ እቃ ኃላፊ
+  HR_CLERK        // የሰው ሀብት / ጸሐፊ
+  OPERATOR        // የስራ ቦታ ኦፕሬተር
+}
+
+enum EntryStatus {
+  DRAFT
+  SUBMITTED
+  VERIFIED
+  LOCKED
+}
+
+enum IncentiveStatementStatus {
+  DRAFT
+  PENDING_APPROVAL
+  APPROVED
+  LOCKED
+}
+
+enum OffenceLevel {
+  FIRST   // 2x mistake deduction from incentive
+  SECOND  // incentive suspended for 2 months (4 periods)
+  THIRD   // written warning + HR case
+  FOURTH  // up to termination
+}
+
+enum AlertType {
+  LOW_STOCK
+  WASTAGE
+  DELAYED_ORDER
+  REPORT_FAILED
+  DAY_NOT_CLOSED
+  UNUSUAL_COUNT
+}
+
+enum StockMovementType {
+  RECEIVE
+  ISSUE
+  RETURN
+  ADJUST
+}
+
+enum BundleStage {
+  RECEIVING     // 1
+  CUTTING       // 2
+  SEWING        // 3
+  TRIMMING      // 4
+  QUALITY_CONTROL // 5
+  STYLING_HITPRESS // 6
+  IRONING       // 7
+  PACKING       // 8
+  DELIVERY      // 9
+}
+
+enum ReportType {
+  DAILY_SUMMARY
+  DAILY_PRODUCTION_SHEET
+  DAILY_PIECE_COUNT
+  RUNNING_INCENTIVE
+  INCENTIVE_STATEMENT
+  MONTHLY_INCENTIVE_SUMMARY
+  MONTHLY_SALARY_SCHEDULE
+  DAILY_INVENTORY
+  CUTTING_WASTAGE
+  EMPLOYEE_PRODUCTIVITY
+  ORDER_STATUS
+}
+
+// ─────────────────────────────────────────────
+// USERS & ROLES
+// ─────────────────────────────────────────────
+
+model AppUser {
+  id            String    @id @default(cuid())
+  employeeCode  String    @unique // e.g. "EMP-001"
+  pinHash       String    // bcrypt hash of 4-6 digit PIN
+  role          Role
+  isActive      Boolean   @default(true)
+  lastLoginAt   DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  employee      Employee? @relation(fields: [employeeId], references: [id])
+  employeeId    String?   @unique
+
+  auditLogs     AuditLog[]
+  telegramRecipient TelegramRecipient?
+
+  @@index([role])
+}
+
+// ─────────────────────────────────────────────
+// DEPARTMENTS & EMPLOYEES
+// ─────────────────────────────────────────────
+
+model Department {
+  id          String   @id @default(cuid())
+  nameAm      String   // Amharic name (authoritative)
+  nameEn      String   // English name (approximate)
+  stage       BundleStage // which factory stage this dept belongs to
+  isActive    Boolean  @default(true)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+
+  employees       Employee[]
+  incentiveCards  IncentiveCard[]
+  operationMappings OperationDeptMapping[]
+  hourlyCountLines HourlyCountLine[]
+
+  @@index([stage])
+}
+
+model Employee {
+  id            String    @id @default(cuid())
+  serialNumber  Int       @unique // auto-assigned sequential number
+  nameAm        String    // Full name in Amharic
+  nameEn        String?   // Optional English name
+  departmentId  String
+  department    Department @relation(fields: [departmentId], references: [id])
+  isActive      Boolean   @default(true)
+  hiredAt       DateTime? // Ethiopian calendar date stored as Gregorian
+  notes         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  user          AppUser?
+  salaryRecords SalaryRecord[]
+  attendances   Attendance[]
+  hourlyCounts  HourlyCountLine[]
+  incentiveLines IncentiveLine[]
+  offences      Offence[]
+  suspensions   Suspension[]
+
+  @@index([departmentId])
+  @@index([isActive])
+}
+
+// ─────────────────────────────────────────────
+// SALARY (fixed, no arithmetic)
+// ─────────────────────────────────────────────
+
+model SalaryRecord {
+  id           String    @id @default(cuid())
+  employeeId   String
+  employee     Employee  @relation(fields: [employeeId], references: [id])
+  amount       Decimal   @db.Decimal(10, 2) // ETB, exact
+  effectiveFrom DateTime
+  effectiveTo  DateTime? // null = current
+  setByUserId  String    // Super Manager or Admin who set it
+  createdAt    DateTime  @default(now())
+
+  @@index([employeeId, effectiveFrom])
+}
+
+// ─────────────────────────────────────────────
+// INCENTIVE CARD (rate table, effective-dated)
+// ─────────────────────────────────────────────
+
+model IncentiveCard {
+  id             String     @id @default(cuid())
+  departmentId   String
+  department     Department @relation(fields: [departmentId], references: [id])
+  targetPerHour  Int        // pieces per hour (0 for helpers/support)
+  ratePerPiece   Decimal    @db.Decimal(6, 4) // ETB per piece (e.g. 1.00, 0.90)
+  effectiveFrom  DateTime
+  effectiveTo    DateTime?  // null = current
+  setByUserId    String
+  createdAt      DateTime   @default(now())
+
+  incentiveLines IncentiveLine[] // rate copied at period close
+
+  @@index([departmentId, effectiveFrom])
+}
+
+// ─────────────────────────────────────────────
+// OPERATIONS (reporting groups for daily sheet)
+// ─────────────────────────────────────────────
+
+model Operation {
+  id          String   @id @default(cuid())
+  nameAm      String
+  nameEn      String
+  sortOrder   Int
+  isActive    Boolean  @default(true)
+
+  deptMappings OperationDeptMapping[]
+  hourlyCountSheets HourlyCountSheet[]
+}
+
+model OperationDeptMapping {
+  id           String     @id @default(cuid())
+  operationId  String
+  operation    Operation  @relation(fields: [operationId], references: [id])
+  departmentId String
+  department   Department @relation(fields: [departmentId], references: [id])
+  confidence   String?    // "clear", "likely", "ask"
+
+  @@unique([operationId, departmentId])
+}
+
+// ─────────────────────────────────────────────
+// ATTENDANCE
+// ─────────────────────────────────────────────
+
+model Attendance {
+  id           String    @id @default(cuid())
+  employeeId   String
+  employee     Employee  @relation(fields: [employeeId], references: [id])
+  date         DateTime  @db.Date // Gregorian, converted from Ethiopian on entry
+  hoursWorked  Decimal   @db.Decimal(4, 2) // default 8.00
+  lineId       String?   // production line assignment
+  shift        String?   // e.g. "morning"
+  enteredById  String
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@unique([employeeId, date])
+  @@index([date])
+}
+
+// ─────────────────────────────────────────────
+// HOURLY COUNTS & DAY CLOSE
+// ─────────────────────────────────────────────
+
+// One sheet per day per operation (supervisor submits)
+model HourlyCountSheet {
+  id           String      @id @default(cuid())
+  date         DateTime    @db.Date
+  operationId  String
+  operation    Operation   @relation(fields: [operationId], references: [id])
+  supervisorId String      // AppUser who submitted
+  shift        String?
+  status       EntryStatus @default(DRAFT)
+  verifiedById String?
+  verifiedAt   DateTime?
+  closedAt     DateTime?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  lines        HourlyCountLine[]
+  dayClose     DayClose?   @relation(fields: [dayCloseId], references: [id])
+  dayCloseId   String?
+
+  @@unique([date, operationId])
+  @@index([date, status])
+}
+
+// One row per worker per day
+model HourlyCountLine {
+  id             String           @id @default(cuid())
+  sheetId        String
+  sheet          HourlyCountSheet @relation(fields: [sheetId], references: [id])
+  employeeId     String
+  employee       Employee         @relation(fields: [employeeId], references: [id])
+  departmentId   String
+  department     Department       @relation(fields: [departmentId], references: [id])
+
+  // Actual pieces per hour (8 columns). Null = not worked that hour.
+  h1  Int?
+  h2  Int?
+  h3  Int?
+  h4  Int?
+  h5  Int?
+  h6  Int?
+  h7  Int?
+  h8  Int?
+
+  // Derived (computed by server on save)
+  totalProduced  Int     @default(0)
+  targetForDay   Int     @default(0) // hourly_target × hours_worked
+  plusPieces     Int     @default(0) // max(0, produced - target)
+  minusPieces    Int     @default(0) // max(0, target - produced)
+
+  mistakes       Int     @default(0) // entered by supervisor/admin with reason
+  mistakeReason  String?
+
+  status         EntryStatus @default(DRAFT)
+  enteredById    String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([sheetId, employeeId])
+  @@index([employeeId])
+}
+
+// Locking a day
+model DayClose {
+  id           String    @id @default(cuid())
+  date         DateTime  @db.Date
+  closedById   String
+  closedAt     DateTime  @default(now())
+  notes        String?
+
+  sheets       HourlyCountSheet[]
+  reportJobs   ReportJob[]
+
+  @@unique([date])
+}
+
+// ─────────────────────────────────────────────
+// INCENTIVE PERIODS & STATEMENTS
+// ─────────────────────────────────────────────
+
+// Ethiopian calendar period: e.g. Nehase 20 → Meskerem 4
+model IncentivePeriod {
+  id           String    @id @default(cuid())
+  periodNumber Int       // 1 = day-4 payment, 2 = day-19 payment
+  ethYear      Int       // Ethiopian year
+  ethMonth     Int       // Ethiopian month (1=Meskerem ... 13=Pagume)
+  startDate    DateTime  @db.Date // Gregorian equivalent of period start
+  endDate      DateTime  @db.Date // Gregorian equivalent of period end
+  paymentDay   Int       // 4 or 19
+  status       IncentiveStatementStatus @default(DRAFT)
+  approvedById String?
+  approvedAt   DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  lines        IncentiveLine[]
+  reportJobs   ReportJob[]
+
+  @@unique([ethYear, ethMonth, periodNumber])
+  @@index([status])
+}
+
+// One row per worker per incentive period
+model IncentiveLine {
+  id               String          @id @default(cuid())
+  periodId         String
+  period           IncentivePeriod @relation(fields: [periodId], references: [id])
+  employeeId       String
+  employee         Employee        @relation(fields: [employeeId], references: [id])
+  departmentId     String          // denormalised for fast reporting
+  cardId           String          // rate card row at time of period close
+  card             IncentiveCard   @relation(fields: [cardId], references: [id])
+
+  // Rate copied from card at period close — immutable after approval
+  ratePerPiece     Decimal         @db.Decimal(6, 4)
+
+  // Accumulated from daily counts
+  plusPieces       Int             @default(0)
+  minusPieces      Int             @default(0)
+  mistakes         Int             @default(0) // count of reported mistakes
+
+  // Calculated = (plus - minus - 2*mistakes) * rate  — can be negative
+  calculated       Decimal         @db.Decimal(10, 2)
+  // Payable = max(0, calculated), 0 if suspended
+  payable          Decimal         @db.Decimal(10, 2)
+
+  isSuspended      Boolean         @default(false)
+  suspensionId     String?
+
+  version          Int             @default(1) // bumped on correction
+  correctedFromId  String?         // points to previous version if corrected
+  correctionReason String?
+
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+
+  @@unique([periodId, employeeId])
+  @@index([periodId])
+  @@index([employeeId])
+}
+
+// ─────────────────────────────────────────────
+// PENALTY LADDER
+// ─────────────────────────────────────────────
+
+model Offence {
+  id            String       @id @default(cuid())
+  employeeId    String
+  employee      Employee     @relation(fields: [employeeId], references: [id])
+  level         OffenceLevel
+  date          DateTime     @db.Date
+  reason        String
+  recordedById  String
+  relatedCountLineId String? // the HourlyCountLine the mistake related to
+  createdAt     DateTime     @default(now())
+
+  @@index([employeeId])
+}
+
+model Suspension {
+  id          String    @id @default(cuid())
+  employeeId  String
+  employee    Employee  @relation(fields: [employeeId], references: [id])
+  startDate   DateTime  @db.Date
+  endDate     DateTime  @db.Date   // 2 months = ~4 pay periods
+  isActive    Boolean   @default(true)
+  reason      String
+  createdById String
+  createdAt   DateTime  @default(now())
+
+  @@index([employeeId, isActive])
+}
+
+// ─────────────────────────────────────────────
+// MATERIALS & STOCK
+// ─────────────────────────────────────────────
+
+model Material {
+  id           String   @id @default(cuid())
+  sku          String   @unique // assigned by system
+  nameAm       String
+  nameEn       String?
+  unit         String   // e.g. "kg", "m", "roll"
+  minimumLevel Decimal  @db.Decimal(10, 3)
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+
+  stockMovements StockMovement[]
+  bomItems       BomItem[]
+
+  @@index([sku])
+}
+
+model Supplier {
+  id        String   @id @default(cuid())
+  nameAm    String
+  nameEn    String?
+  contact   String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  lots      Lot[]
+}
+
+model Lot {
+  id           String    @id @default(cuid())
+  lotNumber    String    @unique
+  supplierId   String
+  supplier     Supplier  @relation(fields: [supplierId], references: [id])
+  receivedAt   DateTime
+  notes        String?
+
+  stockMovements StockMovement[]
+}
+
+model StockMovement {
+  id           String            @id @default(cuid())
+  materialId   String
+  material     Material          @relation(fields: [materialId], references: [id])
+  type         StockMovementType
+  quantity     Decimal           @db.Decimal(10, 3) // positive always; direction from type
+  lotId        String?
+  lot          Lot?              @relation(fields: [lotId], references: [id])
+  reference    String?           // order ID, cut job ID etc.
+  enteredById  String
+  date         DateTime          @db.Date
+  notes        String?
+  createdAt    DateTime          @default(now())
+
+  @@index([materialId, date])
+}
+
+// ─────────────────────────────────────────────
+// GARMENT STYLES, ORDERS, CUTS, BUNDLES
+// ─────────────────────────────────────────────
+
+model GarmentStyle {
+  id        String   @id @default(cuid())
+  nameAm    String
+  nameEn    String?
+  code      String   @unique
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  bomItems     BomItem[]
+  prodOrders   ProdOrder[]
+  stageRoutes  StyleStageRoute[]
+}
+
+model BomItem {
+  id         String       @id @default(cuid())
+  styleId    String
+  style      GarmentStyle @relation(fields: [styleId], references: [id])
+  materialId String
+  material   Material     @relation(fields: [materialId], references: [id])
+  qtyPerPiece Decimal     @db.Decimal(8, 4) // e.g. 0.250 kg per piece
+  unit        String
+
+  @@unique([styleId, materialId])
+}
+
+model StyleStageRoute {
+  id        String       @id @default(cuid())
+  styleId   String
+  style     GarmentStyle @relation(fields: [styleId], references: [id])
+  stage     BundleStage
+  sortOrder Int          // allow reordering / skipping stages
+
+  @@unique([styleId, stage])
+}
+
+model ProdOrder {
+  id          String       @id @default(cuid())
+  orderNumber String       @unique
+  styleId     String
+  style       GarmentStyle @relation(fields: [styleId], references: [id])
+  quantity    Int
+  customer    String?
+  dueDate     DateTime?    @db.Date
+  isActive    Boolean      @default(true)
+  createdAt   DateTime     @default(now())
+
+  cutJobs  CutJob[]
+  deliveries Delivery[]
+}
+
+model CutJob {
+  id              String    @id @default(cuid())
+  orderId         String
+  order           ProdOrder @relation(fields: [orderId], references: [id])
+  weightIssued    Decimal   @db.Decimal(10, 3) // kg
+  weightUsed      Decimal   @db.Decimal(10, 3) // kg
+  piecesCut       Int
+  wastagePct      Decimal   @db.Decimal(5, 2)  // calculated
+  wastageAlertSent Boolean  @default(false)
+  cuttingManagerId String
+  date            DateTime  @db.Date
+  notes           String?
+  createdAt       DateTime  @default(now())
+
+  bundles Bundle[]
+
+  @@index([orderId])
+}
+
+model Bundle {
+  id         String    @id @default(cuid())
+  bundleCode String    @unique
+  cutJobId   String
+  cutJob     CutJob    @relation(fields: [cutJobId], references: [id])
+  quantity   Int
+  currentStage BundleStage @default(CUTTING)
+  createdAt  DateTime  @default(now())
+
+  stageLogs  BundleStageLog[]
+  qcInspections QcInspection[]
+}
+
+model BundleStageLog {
+  id         String      @id @default(cuid())
+  bundleId   String
+  bundle     Bundle      @relation(fields: [bundleId], references: [id])
+  stage      BundleStage
+  enteredAt  DateTime    @default(now())
+  enteredById String
+  notes      String?
+
+  @@index([bundleId])
+}
+
+// ─────────────────────────────────────────────
+// QUALITY CONTROL
+// ─────────────────────────────────────────────
+
+model QcInspection {
+  id           String   @id @default(cuid())
+  bundleId     String
+  bundle       Bundle   @relation(fields: [bundleId], references: [id])
+  inspectedById String
+  inspectedAt  DateTime @default(now())
+  passed       Boolean
+  notes        String?
+
+  defects      Defect[]
+
+  @@index([bundleId])
+}
+
+model Defect {
+  id                String       @id @default(cuid())
+  inspectionId      String
+  inspection        QcInspection @relation(fields: [inspectionId], references: [id])
+  defectType        String       // from fixed list
+  responsibleStage  BundleStage
+  responsibleEmpId  String?
+  piecesAffected    Int
+  repaired          Boolean      @default(false)
+  repairedById      String?
+  repairedAt        DateTime?
+  createdAt         DateTime     @default(now())
+}
+
+// ─────────────────────────────────────────────
+// DELIVERY
+// ─────────────────────────────────────────────
+
+model Delivery {
+  id          String    @id @default(cuid())
+  orderId     String
+  order       ProdOrder @relation(fields: [orderId], references: [id])
+  quantity    Int
+  customer    String
+  dispatchedAt DateTime @db.Date
+  dispatchedById String
+  notes       String?
+  createdAt   DateTime  @default(now())
+
+  @@index([orderId])
+}
+
+// ─────────────────────────────────────────────
+// AUTOMATION: REPORTS & TELEGRAM
+// ─────────────────────────────────────────────
+
+model ReportJob {
+  id           String     @id @default(cuid())
+  type         ReportType
+  periodDate   DateTime   @db.Date
+  status       String     @default("pending") // pending|sent|failed
+  retryCount   Int        @default(0)
+  driveFileId  String?
+  driveUrl     String?
+  telegramMsgId String?
+  version      Int        @default(1)
+  errorMessage String?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  dayClose     DayClose?  @relation(fields: [dayCloseId], references: [id])
+  dayCloseId   String?
+  period       IncentivePeriod? @relation(fields: [periodId], references: [id])
+  periodId     String?
+}
+
+model TelegramRecipient {
+  id          String    @id @default(cuid())
+  userId      String    @unique
+  user        AppUser   @relation(fields: [userId], references: [id])
+  chatId      String
+  verifiedAt  DateTime?
+  isActive    Boolean   @default(true)
+  allowedReports ReportType[]
+  createdAt   DateTime  @default(now())
+}
+
+// ─────────────────────────────────────────────
+// ALERTS
+// ─────────────────────────────────────────────
+
+model Alert {
+  id          String    @id @default(cuid())
+  type        AlertType
+  message     String
+  reference   String?   // materialId, cutJobId, orderId etc.
+  sentAt      DateTime?
+  resolvedAt  DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([type, resolvedAt])
+}
+
+// ─────────────────────────────────────────────
+// PAY PERIOD CONFIGURATION (Ethiopian calendar)
+// ─────────────────────────────────────────────
+
+model PeriodConfig {
+  id           String   @id @default(cuid())
+  ethYear      Int
+  ethMonth     Int      // 1–13
+  period1Start DateTime @db.Date // usually Nehase 20 Gregorian equivalent
+  period1End   DateTime @db.Date // usually day 4 of this month
+  period2Start DateTime @db.Date // day 5
+  period2End   DateTime @db.Date // day 19
+  createdAt    DateTime @default(now())
+
+  @@unique([ethYear, ethMonth])
+}
+
+// ─────────────────────────────────────────────
+// AUDIT LOG (append-only)
+// ─────────────────────────────────────────────
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  userId      String
+  user        AppUser  @relation(fields: [userId], references: [id])
+  action      String   // e.g. "UPDATE_SALARY", "APPROVE_INCENTIVE_PERIOD"
+  entity      String   // e.g. "SalaryRecord", "IncentiveLine"
+  entityId    String
+  before      Json?    // previous value
+  after       Json?    // new value
+  reason      String?  // required for corrections
+  actedAsManager Boolean @default(false) // Super Manager or Admin acting on another dept
+  createdAt   DateTime @default(now())
+
+  @@index([userId])
+  @@index([entity, entityId])
+  @@index([createdAt])
+}
+
+// ─────────────────────────────────────────────
+// APP SETTINGS
+// ─────────────────────────────────────────────
+
+model AppSetting {
+  key       String @id // e.g. "wastage_alert_pct", "salary_pay_day"
+  value     String
+  updatedAt DateTime @updatedAt
+  updatedBy String
+}
