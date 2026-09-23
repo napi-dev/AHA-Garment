@@ -68,10 +68,10 @@ export default async function IncentiveStatementPage({ params }: { params: Promi
               </button>
             </form>
           )}
-          <Link href={`/incentive/${id}/pdf`}
+          <a href={`/api/pdf/incentive/${id}`} target="_blank" rel="noopener noreferrer"
             className="px-4 py-2.5 bg-gray-100 text-gray-700 rounded-xl text-sm font-ethiopic hover:bg-gray-200 transition-colors">
-            PDF
-          </Link>
+            PDF ↓
+          </a>
         </div>
       </div>
 
