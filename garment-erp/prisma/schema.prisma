@@ -7,8 +7,9 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 // ─────────────────────────────────────────────
@@ -119,9 +120,9 @@ model AppUser {
 
 model Department {
   id          String   @id @default(cuid())
-  nameAm      String   // Amharic name (authoritative)
-  nameEn      String   // English name (approximate)
-  stage       BundleStage // which factory stage this dept belongs to
+  nameAm      String
+  nameEn      String   @unique
+  stage       BundleStage
   isActive    Boolean  @default(true)
   sortOrder   Int      @default(0)
   createdAt   DateTime @default(now())
@@ -184,15 +185,16 @@ model IncentiveCard {
   id             String     @id @default(cuid())
   departmentId   String
   department     Department @relation(fields: [departmentId], references: [id])
-  targetPerHour  Int        // pieces per hour (0 for helpers/support)
-  ratePerPiece   Decimal    @db.Decimal(6, 4) // ETB per piece (e.g. 1.00, 0.90)
+  targetPerHour  Int
+  ratePerPiece   Decimal    @db.Decimal(6, 4)
   effectiveFrom  DateTime
-  effectiveTo    DateTime?  // null = current
+  effectiveTo    DateTime?
   setByUserId    String
   createdAt      DateTime   @default(now())
 
-  incentiveLines IncentiveLine[] // rate copied at period close
+  incentiveLines IncentiveLine[]
 
+  @@unique([departmentId, effectiveFrom])
   @@index([departmentId, effectiveFrom])
 }
 
@@ -203,7 +205,7 @@ model IncentiveCard {
 model Operation {
   id          String   @id @default(cuid())
   nameAm      String
-  nameEn      String
+  nameEn      String   @unique
   sortOrder   Int
   isActive    Boolean  @default(true)
 

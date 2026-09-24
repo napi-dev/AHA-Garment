@@ -227,7 +227,7 @@ async function main() {
   for (let i = 0; i < DEPARTMENTS.length; i++) {
     const dept = DEPARTMENTS[i];
     const deptId = deptIds[i];
-    if (dept.ratePerPiece === "0.00" && dept.targetPerHour === 0) continue; // support rows with no card
+    if (dept.ratePerPiece === "0.00" && dept.targetPerHour === 0) continue;
 
     // Close any existing open card
     await db.incentiveCard.updateMany({
@@ -235,21 +235,22 @@ async function main() {
       data: { effectiveTo: effectiveFrom },
     });
 
-    await db.incentiveCard.upsert({
-      where: {
-        // unique by dept + effectiveFrom
-        departmentId_effectiveFrom: { departmentId: deptId, effectiveFrom },
-      } as never, // Prisma compound unique
-      update: {},
-      create: {
-        departmentId: deptId,
-        targetPerHour: dept.targetPerHour,
-        ratePerPiece: new Decimal(dept.ratePerPiece),
-        effectiveFrom,
-        effectiveTo: null,
-        setByUserId,
-      },
+    // Use createOrUpdate pattern — compound unique now exists in schema
+    const existing = await db.incentiveCard.findUnique({
+      where: { departmentId_effectiveFrom: { departmentId: deptId, effectiveFrom } },
     });
+    if (!existing) {
+      await db.incentiveCard.create({
+        data: {
+          departmentId: deptId,
+          targetPerHour: dept.targetPerHour,
+          ratePerPiece: new Decimal(dept.ratePerPiece),
+          effectiveFrom,
+          effectiveTo: null,
+          setByUserId,
+        },
+      });
+    }
   }
   console.log("    ✓ incentive cards");
 
