@@ -1,7 +1,7 @@
 import type { NextAuthConfig } from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
-import { db } from "@/lib/db";
+import { db, withRetry } from "@/lib/db";
 import type { Role } from "@prisma/client";
 
 export const authConfig: NextAuthConfig = {
@@ -19,10 +19,10 @@ export const authConfig: NextAuthConfig = {
           const code = String(credentials.employeeCode).trim().toUpperCase();
           const pin = String(credentials.pin);
 
-          const user = await db.appUser.findUnique({
+          const user = await withRetry(() => db.appUser.findUnique({
             where: { employeeCode: code },
             include: { employee: { select: { nameAm: true, nameEn: true } } },
-          });
+          }));
 
           if (!user) {
             console.log(`[auth] user not found: ${code}`);

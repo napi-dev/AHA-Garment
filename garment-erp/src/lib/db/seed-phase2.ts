@@ -28,7 +28,7 @@ const SUPPLIERS = [
 // ─── Materials (with BOM standard weights) ────────────────────────────────────
 
 const MATERIALS: Array<{
-  nameAm: string; nameEn: string; unit: string; minimumLevel: string; sku?: string;
+  nameAm: string; nameEn: string; unit: string; minimumLevel: string;
 }> = [
   { nameAm: "ነጭ ቲ-ሸርት ጨርቅ",        nameEn: "White T-Shirt Fabric",     unit: "kg",   minimumLevel: "20.000" },
   { nameAm: "ሰማያዊ ሱሪ ጨርቅ",          nameEn: "Blue Trouser Fabric",      unit: "kg",   minimumLevel: "15.000" },
@@ -128,9 +128,18 @@ async function main() {
   const materialIds: string[] = [];
   for (let i = 0; i < MATERIALS.length; i++) {
     const m = MATERIALS[i];
-    const sku = m.sku ?? `MAT-${String(i + 1).padStart(3, "0")}`;
     const existing = await db.material.findFirst({ where: { nameAm: m.nameAm } });
     if (existing) { materialIds.push(existing.id); continue; }
+
+    // Generate a SKU that doesn't already exist
+    let sku: string;
+    let attempt = 0;
+    do {
+      const count = await db.material.count();
+      sku = `MAT-${String(count + 1 + attempt).padStart(3, "0")}`;
+      attempt++;
+    } while (await db.material.findUnique({ where: { sku } }));
+
     const created = await db.material.create({
       data: { nameAm: m.nameAm, nameEn: m.nameEn, unit: m.unit, minimumLevel: m.minimumLevel, sku },
     });
@@ -138,42 +147,54 @@ async function main() {
   }
   console.log(`    ✓ ${MATERIALS.length} materials`);
 
-  // ── Initial stock ─────────────────────────────────────────────────────────
+  // ── Initial stock — batch all movements in one createMany ──────────────────
   console.log("  Adding initial stock...");
   const systemUser = await db.appUser.findFirst({ where: { role: "STORE_KEEPER" } })
     ?? await db.appUser.findFirst({ where: { role: "ADMIN" } });
+
   if (systemUser) {
-    for (const s of INITIAL_STOCK) {
-      const matId = materialIds[s.materialIdx];
-      const existing = await db.stockMovement.findFirst({
-        where: { materialId: matId, type: "RECEIVE", reference: "SEED_INITIAL" },
-      });
-      if (existing) continue;
-      await db.stockMovement.create({
-        data: {
-          materialId: matId,
-          type: "RECEIVE",
+    // Check if already seeded
+    const alreadySeeded = await db.stockMovement.count({
+      where: { reference: "SEED_INITIAL" },
+    });
+
+    if (alreadySeeded === 0) {
+      await db.stockMovement.createMany({
+        data: INITIAL_STOCK.map((s) => ({
+          materialId: materialIds[s.materialIdx],
+          type: "RECEIVE" as const,
           quantity: new Decimal(s.qty),
           lotId: lot.id,
           reference: "SEED_INITIAL",
           date: new Date("2025-09-11T00:00:00Z"),
           enteredById: systemUser.id,
           notes: "መጀመሪያ ክምችት",
-        },
+        })),
+        skipDuplicates: true,
       });
     }
     console.log(`    ✓ initial stock for ${INITIAL_STOCK.length} materials`);
   } else {
-    console.log("    ⚠️  No system user found — skipping stock movements. Run db:seed first.");
+    console.log("    ⚠️  No system user found — skipping stock. Run db:seed first.");
   }
 
   // ── Garment styles + BOM ──────────────────────────────────────────────────
   console.log("  Creating styles and BOM...");
   const styleIds: string[] = [];
+
+  const STAGES = [
+    "RECEIVING","CUTTING","SEWING","TRIMMING",
+    "QUALITY_CONTROL","STYLING_HITPRESS","IRONING","PACKING","DELIVERY",
+  ] as const;
+
   for (let i = 0; i < STYLES.length; i++) {
+    // Keep connection alive — ping DB between each style
+    await db.$queryRaw`SELECT 1`;
+
     const s = STYLES[i];
     const existing = await db.garmentStyle.findFirst({ where: { nameAm: s.nameAm } });
     let styleId: string;
+
     if (existing) {
       styleId = existing.id;
     } else {
@@ -189,46 +210,43 @@ async function main() {
     }
     styleIds.push(styleId);
 
-    // BOM items
+    // BOM items — batch upsert one by one (small loop, fast)
     for (const b of s.bom) {
       const matId = materialIds[b.materialIdx];
       await db.bomItem.upsert({
-        where: { styleId_materialId: { styleId, materialId: matId } },
+        where:  { styleId_materialId: { styleId, materialId: matId } },
         update: { qtyPerPiece: b.qty, unit: b.unit },
         create: { styleId, materialId: matId, qtyPerPiece: b.qty, unit: b.unit },
       });
     }
 
-    // Stage routes (default 9 stages)
-    const STAGES = [
-      "RECEIVING","CUTTING","SEWING","TRIMMING",
-      "QUALITY_CONTROL","STYLING_HITPRESS","IRONING","PACKING","DELIVERY",
-    ] as const;
-    for (let si = 0; si < STAGES.length; si++) {
-      await db.styleStageRoute.upsert({
-        where: { styleId_stage: { styleId, stage: STAGES[si] } },
-        update: { sortOrder: si + 1 },
-        create: { styleId, stage: STAGES[si], sortOrder: si + 1 },
+    // Stage routes — delete existing and createMany in one shot (avoids 9 round-trips)
+    const existingRoutes = await db.styleStageRoute.findMany({ where: { styleId } });
+    if (existingRoutes.length === 0) {
+      await db.styleStageRoute.createMany({
+        data: STAGES.map((stage, si) => ({ styleId, stage, sortOrder: si + 1 })),
+        skipDuplicates: true,
       });
     }
   }
   console.log(`    ✓ ${STYLES.length} styles with BOM`);
 
-  // ── Production orders ─────────────────────────────────────────────────────
+  // ── Production orders — ping then create ─────────────────────────────────
   console.log("  Creating sample production orders...");
+  await db.$queryRaw`SELECT 1`; // keep-alive
+
   const ordersToCreate = [
-    { styleIdx: 0, quantity: 500, customer: "ደምበኛ A",  dueDate: "2026-10-15" },
-    { styleIdx: 1, quantity: 300, customer: "ደምበኛ B",  dueDate: "2026-11-01" },
-    { styleIdx: 2, quantity: 200, customer: "ደምበኛ C",  dueDate: "2026-10-30" },
+    { styleIdx: 0, quantity: 500, customer: "ደምበኛ A", dueDate: "2026-10-15" },
+    { styleIdx: 1, quantity: 300, customer: "ደምበኛ B", dueDate: "2026-11-01" },
+    { styleIdx: 2, quantity: 200, customer: "ደምበኛ C", dueDate: "2026-10-30" },
   ];
 
+  let orderCount = 0;
   for (const o of ordersToCreate) {
     const styleId = styleIds[o.styleIdx];
-    const existing = await db.prodOrder.findFirst({
-      where: { customer: o.customer, styleId },
-    });
+    if (!styleId) continue;
+    const existing = await db.prodOrder.findFirst({ where: { customer: o.customer, styleId } });
     if (existing) continue;
-
     const count = await db.prodOrder.count();
     await db.prodOrder.create({
       data: {
@@ -239,8 +257,9 @@ async function main() {
         dueDate: new Date(o.dueDate + "T00:00:00Z"),
       },
     });
+    orderCount++;
   }
-  console.log(`    ✓ ${ordersToCreate.length} production orders`);
+  console.log(`    ✓ ${orderCount} production orders`);
 
   console.log("\n✅ Phase 2 seed complete.");
   console.log("\nYou can now:");

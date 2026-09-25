@@ -1,3 +1,5 @@
+"use client";
+
 /**
  * Offline fallback page — shown by the service worker when the user is
  * offline and the page is not in the cache.

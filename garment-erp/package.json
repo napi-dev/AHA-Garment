@@ -13,6 +13,7 @@
     "db:seed": "tsx src/lib/db/seed.ts",
     "db:fix-users": "tsx src/lib/db/fix-users.ts",
     "db:seed-phase2": "tsx src/lib/db/seed-phase2.ts",
+    "db:backfill-codes": "tsx src/lib/db/backfill-codes.ts",
     "test": "vitest run",
     "test:watch": "vitest"
   },

@@ -29,12 +29,6 @@ export default async function MaterialsPage({
   // Compute on-hand for each material
   const withStock = await Promise.all(
     materials.map(async (m) => {
-      const agg = await db.stockMovement.aggregate({
-        where: { materialId: m.id },
-        _sum: {
-          // We compute manually below — aggregate doesn't support conditional sums
-        },
-      });
       const movements = await db.stockMovement.findMany({
         where: { materialId: m.id },
         select: { type: true, quantity: true },

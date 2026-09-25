@@ -138,6 +138,7 @@ model Department {
 model Employee {
   id            String    @id @default(cuid())
   serialNumber  Int       @unique // auto-assigned sequential number
+  employeeCode  String?   @unique // e.g. "EMP-001" — display identifier
   nameAm        String    // Full name in Amharic
   nameEn        String?   // Optional English name
   departmentId  String

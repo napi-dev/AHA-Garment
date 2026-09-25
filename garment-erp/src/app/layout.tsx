@@ -7,13 +7,15 @@ const notoSans = Noto_Sans({
   subsets: ["latin"],
   variable: "--font-noto-sans",
   display: "swap",
+  preload: false,  // don't block startup waiting for Google Fonts
 });
 
 const notoSansEthiopic = Noto_Sans_Ethiopic({
   subsets: ["ethiopic"],
   variable: "--font-noto-sans-ethiopic",
-  weight: ["400", "500", "600", "700"],
+  weight: ["400", "700"],
   display: "swap",
+  preload: false,  // don't block startup waiting for Google Fonts
 });
 
 export const metadata: Metadata = {

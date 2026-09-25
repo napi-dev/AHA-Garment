@@ -42,18 +42,17 @@ export default async function DashboardPage() {
   const trendStart = new Date(today);
   trendStart.setDate(trendStart.getDate() - trendDays + 1);
 
-  const trendRaw = await db.hourlyCountLine.groupBy({
-    by: [],
+  // One query for 14-day grand total (for incentive cost calc)
+  const trendGrandTotal = await db.hourlyCountLine.aggregate({
     where: { sheet: { date: { gte: trendStart, lte: today } }, status: "LOCKED" },
     _sum: { totalProduced: true, plusPieces: true },
   });
 
-  // Per-day aggregation
+  // Per-day aggregation — one query per day (14 queries, fast on Neon)
   const trendPerDay: { date: string; produced: number; plus: number }[] = [];
   for (let i = 0; i < trendDays; i++) {
     const d = new Date(trendStart);
     d.setDate(d.getDate() + i);
-    const closes = await db.dayClose.findUnique({ where: { date: d } });
     const dayAgg = await db.hourlyCountLine.aggregate({
       where: { sheet: { date: d }, status: "LOCKED" },
       _sum: { totalProduced: true, plusPieces: true },
@@ -79,8 +78,8 @@ export default async function DashboardPage() {
       _sum:   { payable: true },
       _count: { _all: true },
     });
-    const totalPay = new Decimal(agg._sum.payable?.toString() ?? "0");
-    const totalProd = trendRaw[0]?._sum.totalProduced ?? 1;
+    const totalPay  = new Decimal(agg._sum.payable?.toString() ?? "0");
+    const totalProd = trendGrandTotal._sum.totalProduced ?? 0;
     periodPayable = totalPay.toFixed(2);
     incentiveCostPer1000 = totalProd > 0
       ? totalPay.div(totalProd).mul(1000).toFixed(2)

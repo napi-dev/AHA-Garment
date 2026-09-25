@@ -6,6 +6,7 @@ import { am } from "@/lib/i18n/am";
 import Link from "next/link";
 import { canViewSalary } from "@/lib/auth/permissions";
 import { UserPlus } from "lucide-react";
+import { DeleteEmployeeButton } from "./delete-button";
 
 export default async function EmployeesPage({
   searchParams,
@@ -39,6 +40,7 @@ export default async function EmployeesPage({
   const canEdit = session.user.role === "ADMIN" ||
     session.user.role === "SUPER_MANAGER" ||
     session.user.role === "HR_CLERK";
+  const canDelete = session.user.role === "ADMIN" || session.user.role === "SUPER_MANAGER";
 
   return (
     <div className="space-y-5">
@@ -98,7 +100,7 @@ export default async function EmployeesPage({
               <th className="w-12">{am.serialNumber}</th>
               <th>{am.employees.name}</th>
               <th>{am.employees.department}</th>
-              {canEdit && <th className="w-28">{am.actions}</th>}
+              {canEdit && <th className="w-36">{am.actions}</th>}
             </tr>
           </thead>
           <tbody>
@@ -111,25 +113,30 @@ export default async function EmployeesPage({
             )}
             {employees.map((emp) => (
               <tr key={emp.id}>
-                <td className="text-center tabular-nums text-gray-400">{emp.serialNumber}</td>
+                <td className="text-center tabular-nums text-gray-500 font-mono text-xs">
+                  {emp.employeeCode ?? "—"}
+                </td>
                 <td className="font-ethiopic text-gray-800 font-medium">{emp.nameAm}</td>
                 <td className="font-ethiopic text-gray-600">{emp.department.nameAm}</td>
                 {canEdit && (
                   <td>
-                    <div className="flex gap-2 justify-center">
+                    <div className="flex gap-2 justify-center items-center">
                       <Link
                         href={`/employees/${emp.id}/edit`}
                         className="text-xs text-blue-600 hover:underline font-ethiopic"
                       >
                         {am.edit}
                       </Link>
-                      {(session.user.role === "ADMIN" || session.user.role === "SUPER_MANAGER") && (
+                      {canDelete && (
                         <Link
                           href={`/employees/${emp.id}/salary`}
                           className="text-xs text-green-600 hover:underline font-ethiopic"
                         >
                           {am.salary.title}
                         </Link>
+                      )}
+                      {canDelete && (
+                        <DeleteEmployeeButton empId={emp.id} nameAm={emp.nameAm} />
                       )}
                     </div>
                   </td>

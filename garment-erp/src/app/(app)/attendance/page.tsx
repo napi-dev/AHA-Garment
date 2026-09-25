@@ -5,6 +5,7 @@ import { requirePermission } from "@/lib/auth/permissions";
 import { am } from "@/lib/i18n/am";
 import { formatAsEthDate } from "@/lib/ethiopian-calendar";
 import { AttendanceGrid } from "./attendance-grid";
+import { DatePicker } from "./date-picker";
 
 export default async function AttendancePage({
   searchParams,
@@ -50,17 +51,8 @@ export default async function AttendancePage({
             {formatAsEthDate(date)}
           </p>
         </div>
-        {/* Date picker */}
-        <input
-          type="date"
-          defaultValue={dateStr}
-          onChange={(e) => {
-            if (typeof window !== "undefined") {
-              window.location.href = `/attendance?date=${e.target.value}`;
-            }
-          }}
-          className="px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-        />
+        {/* Date picker — wrapped in client island */}
+        <DatePicker defaultValue={dateStr} />
       </div>
 
       <AttendanceGrid

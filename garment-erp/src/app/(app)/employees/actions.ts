@@ -5,8 +5,6 @@ import { db } from "@/lib/db";
 import { requirePermission } from "@/lib/auth/permissions";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import bcrypt from "bcryptjs";
-import type { Role } from "@prisma/client";
 
 export async function createEmployee(formData: FormData) {
   const session = await auth();
@@ -16,32 +14,19 @@ export async function createEmployee(formData: FormData) {
   const nameAm = String(formData.get("nameAm") ?? "").trim();
   const nameEn = String(formData.get("nameEn") ?? "").trim() || null;
   const departmentId = String(formData.get("departmentId") ?? "");
-  const createLogin = formData.get("createLogin") === "true";
-  const employeeCode = String(formData.get("employeeCode") ?? "").trim().toUpperCase();
-  const pin = String(formData.get("pin") ?? "").trim();
-  const role = (formData.get("role") ?? "OPERATOR") as Role;
 
   if (!nameAm || !departmentId) throw new Error("ስም እና ክፍል ያስፈልጋሉ");
 
-  // Get next serial
+  // Auto-assign next serial number
   const maxSerial = await db.employee.aggregate({ _max: { serialNumber: true } });
   const nextSerial = (maxSerial._max.serialNumber ?? 0) + 1;
 
-  const emp = await db.employee.create({
-    data: { nameAm, nameEn, departmentId, serialNumber: nextSerial },
-  });
+  // Auto-generate employee code EMP-001, EMP-002 …
+  const employeeCode = `EMP-${String(nextSerial).padStart(3, "0")}`;
 
-  if (createLogin && employeeCode && pin) {
-    const pinHash = await bcrypt.hash(pin, 10);
-    await db.appUser.create({
-      data: {
-        employeeCode,
-        pinHash,
-        role,
-        employeeId: emp.id,
-      },
-    });
-  }
+  const emp = await db.employee.create({
+    data: { nameAm, nameEn, departmentId, serialNumber: nextSerial, employeeCode },
+  });
 
   await db.auditLog.create({
     data: {
@@ -49,7 +34,7 @@ export async function createEmployee(formData: FormData) {
       action: "CREATE_EMPLOYEE",
       entity: "Employee",
       entityId: emp.id,
-      after: { nameAm, departmentId },
+      after: { nameAm, departmentId, employeeCode },
     },
   });
 
@@ -86,4 +71,34 @@ export async function updateEmployee(empId: string, formData: FormData) {
 
   revalidatePath("/employees");
   redirect("/employees");
+}
+
+export async function deleteEmployee(empId: string) {
+  const session = await auth();
+  if (!session?.user) throw new Error("ተፈቅዶ አልነበረም");
+  // Only Admin and Super Manager can delete
+  if (session.user.role !== "ADMIN" && session.user.role !== "SUPER_MANAGER") {
+    throw new Error("ፈቃድ የለም");
+  }
+
+  const emp = await db.employee.findUnique({ where: { id: empId } });
+  if (!emp) throw new Error("ሠራተኛ አልተገኘም");
+
+  // Soft-delete: set inactive rather than hard delete to preserve history
+  await db.employee.update({
+    where: { id: empId },
+    data: { isActive: false },
+  });
+
+  await db.auditLog.create({
+    data: {
+      userId: session.user.id,
+      action: "DELETE_EMPLOYEE",
+      entity: "Employee",
+      entityId: empId,
+      before: { nameAm: emp.nameAm, employeeCode: emp.employeeCode },
+    },
+  });
+
+  revalidatePath("/employees");
 }
