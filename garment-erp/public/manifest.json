@@ -1,0 +1,43 @@
+{
+  "name": "ልብስ ፋብሪካ ሥርዓት",
+  "short_name": "ፋብሪካ",
+  "description": "Garment Factory Production and Incentive System",
+  "start_url": "/dashboard",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#f9fafb",
+  "theme_color": "#2563eb",
+  "lang": "am",
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "screenshots": [],
+  "categories": ["productivity", "business"],
+  "shortcuts": [
+    {
+      "name": "ቁጥር አስገባ",
+      "short_name": "ቁጥር",
+      "description": "ዕለታዊ ቁጥር ያስቀምጡ",
+      "url": "/counts/enter",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "ባንድሎች",
+      "short_name": "ባንድሎች",
+      "description": "የቀጥታ ረድፍ ሰሌዳ",
+      "url": "/production/bundles",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    }
+  ]
+}

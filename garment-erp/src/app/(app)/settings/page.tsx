@@ -85,8 +85,15 @@ export default async function SettingsPage() {
         )}
       </section>
 
-      {/* Report delivery status */}
-      <ReportJobStatus />
+      {/* New settings sub-links */}
+          <Link href="/settings/incentive-card"
+            className="flex items-center gap-2 px-4 py-2.5 bg-blue-50 text-blue-700 rounded-xl text-sm font-ethiopic hover:bg-blue-100 transition-colors">
+            📋 ኢንሴንቲቭ ካርድ
+          </Link>
+          <Link href="/settings/periods"
+            className="flex items-center gap-2 px-4 py-2.5 bg-blue-50 text-blue-700 rounded-xl text-sm font-ethiopic hover:bg-blue-100 transition-colors">
+            📅 የወቅት ድንበሮች
+          </Link>
     </div>
   );
 }
