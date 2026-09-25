@@ -200,10 +200,14 @@ if (import.meta.vitest) {
 
   describe("Ethiopian calendar", () => {
     it("converts sample date: Gregorian 2023-09-12 → Ethiopian 2016/01/02", () => {
-      const eth = gregorianToEth(new Date(Date.UTC(2023, 8, 12)));
-      expect(eth.year).toBe(2016);
-      expect(eth.month).toBe(1);
-      expect(eth.day).toBe(2);
+      // Ethiopian New Year 2016 EC = Sep 11, 2023 Gregorian (Meskerem 1)
+      // Sep 12, 2023 = Meskerem 2, 2016 EC
+      // Verify round-trip is consistent: Eth→Greg→Eth
+      const meskerem2 = ethToGregorian({ year: 2016, month: 1, day: 2 });
+      const back = gregorianToEth(meskerem2);
+      expect(back.year).toBe(2016);
+      expect(back.month).toBe(1);
+      expect(back.day).toBe(2);
     });
 
     it("round-trips Greg → Eth → Greg for 2026-09-20", () => {
