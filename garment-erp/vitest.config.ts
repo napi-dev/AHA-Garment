@@ -5,7 +5,11 @@ export default defineConfig({
   test: {
     globals: true,
     environment: "node",
-    includeSource: ["src/**/*.ts"], // enables import.meta.vitest inline tests
+    include: [
+      "src/**/*.test.ts",
+      "src/**/*.test.tsx",
+    ],
+    includeSource: ["src/**/*.ts"],  // enables import.meta.vitest inline tests
   },
   resolve: {
     alias: {

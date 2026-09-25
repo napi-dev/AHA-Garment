@@ -13,35 +13,50 @@ export const authConfig: NextAuthConfig = {
         pin: { label: "PIN", type: "password" },
       },
       async authorize(credentials) {
-        if (!credentials?.employeeCode || !credentials?.pin) return null;
+        try {
+          if (!credentials?.employeeCode || !credentials?.pin) return null;
 
-        const code = String(credentials.employeeCode).trim().toUpperCase();
-        const pin = String(credentials.pin);
+          const code = String(credentials.employeeCode).trim().toUpperCase();
+          const pin = String(credentials.pin);
 
-        const user = await db.appUser.findUnique({
-          where: { employeeCode: code },
-          include: { employee: { select: { nameAm: true, nameEn: true } } },
-        });
+          const user = await db.appUser.findUnique({
+            where: { employeeCode: code },
+            include: { employee: { select: { nameAm: true, nameEn: true } } },
+          });
 
-        if (!user || !user.isActive) return null;
+          if (!user) {
+            console.log(`[auth] user not found: ${code}`);
+            return null;
+          }
+          if (!user.isActive) {
+            console.log(`[auth] user inactive: ${code}`);
+            return null;
+          }
 
-        const valid = await bcrypt.compare(pin, user.pinHash);
-        if (!valid) return null;
+          const valid = await bcrypt.compare(pin, user.pinHash);
+          if (!valid) {
+            console.log(`[auth] wrong PIN for: ${code}`);
+            return null;
+          }
 
-        // Update last login
-        await db.appUser.update({
-          where: { id: user.id },
-          data: { lastLoginAt: new Date() },
-        });
+          // Update last login (non-blocking — don't await so it doesn't delay login)
+          db.appUser.update({
+            where: { id: user.id },
+            data: { lastLoginAt: new Date() },
+          }).catch(() => {});
 
-        return {
-          id: user.id,
-          employeeCode: user.employeeCode,
-          role: user.role,
-          nameAm: user.employee?.nameAm ?? user.employeeCode,
-          nameEn: user.employee?.nameEn ?? null,
-          employeeId: user.employeeId ?? null,
-        };
+          return {
+            id: user.id,
+            employeeCode: user.employeeCode,
+            role: user.role as Role,
+            nameAm: user.employee?.nameAm ?? user.employeeCode,
+            nameEn: user.employee?.nameEn ?? null,
+            employeeId: user.employeeId ?? null,
+          };
+        } catch (e) {
+          console.error("[auth] authorize error:", e);
+          return null;
+        }
       },
     }),
   ],

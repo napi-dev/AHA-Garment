@@ -1,6 +1,7 @@
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { Sidebar } from "@/components/nav/sidebar";
+import { OfflineIndicator } from "@/components/ui/offline-indicator";
 
 export default async function AppLayout({
   children,
@@ -15,13 +16,12 @@ export default async function AppLayout({
   return (
     <div className="flex min-h-screen bg-gray-50">
       <Sidebar role={role} nameAm={nameAm} employeeCode={employeeCode} />
-
-      {/* Main content */}
       <main className="flex-1 overflow-y-auto">
         <div className="max-w-7xl mx-auto p-6">
           {children}
         </div>
       </main>
+      <OfflineIndicator />
     </div>
   );
 }

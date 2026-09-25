@@ -25,6 +25,7 @@ import { renderToBuffer } from "@react-pdf/renderer";
 import { IncentiveStatementPdf } from "@/lib/pdf/incentive-statement";
 import { DailyProductionSheetPdf } from "@/lib/pdf/daily-production-sheet";
 import { sendMessage, sendDocument, notifyDevError, CHATS, TEMPLATES } from "./telegram";
+import { buildDailySummary, type DailySummaryFacts } from "./ai-summary";
 import { uploadToDrive } from "./drive";
 import { gregorianToEth, ethMonthName, formatAsEthDate } from "@/lib/ethiopian-calendar";
 import Decimal from "decimal.js";
@@ -117,7 +118,7 @@ async function processJob(
     }
 
     case "DAILY_SUMMARY": {
-      const summary = await buildDailySummaryText(periodDate);
+      const summary = await buildAiDailySummary(periodDate);
       if (CHATS.manager) await sendMessage(CHATS.manager, summary);
       if (CHATS.dept)    await sendMessage(CHATS.dept,    summary);
       break;
@@ -269,21 +270,50 @@ async function buildDailyProductionPdf(date: Date) {
 
 // ─── Text builders ────────────────────────────────────────────────────────────
 
-async function buildDailySummaryText(date: Date): Promise<string> {
-  const stats = await db.hourlyCountLine.aggregate({
-    where: { sheet: { date }, status: "LOCKED" },
-    _sum:  { totalProduced: true, plusPieces: true },
-    _count: { _all: true },
+async function buildAiDailySummary(date: Date): Promise<string> {
+  const today = new Date(date);
+  today.setHours(0, 0, 0, 0);
+
+  const [countAgg, aboveTarget, qcPass, qcFail, packed, shipped, alerts, attendance] =
+    await Promise.all([
+      db.hourlyCountLine.aggregate({
+        where: { sheet: { date: today }, status: "LOCKED" },
+        _sum: { totalProduced: true },
+        _count: { _all: true },
+      }),
+      db.hourlyCountLine.count({ where: { sheet: { date: today }, plusPieces: { gt: 0 } } }),
+      db.qcInspection.count({ where: { inspectedAt: { gte: today }, passed: true } }),
+      db.qcInspection.count({ where: { inspectedAt: { gte: today }, passed: false } }),
+      db.bundle.count({ where: { currentStage: "PACKING" } }),
+      db.delivery.count({ where: { dispatchedAt: today } }),
+      db.alert.count({ where: { resolvedAt: null } }),
+      db.attendance.count({ where: { date: today, hoursWorked: { gt: 0 } } }),
+    ]);
+
+  const cutJobs = await db.cutJob.findMany({
+    where: { date: today },
+    select: { piecesCut: true, wastagePct: true },
   });
-  const above   = await db.hourlyCountLine.count({ where: { sheet: { date }, plusPieces: { gt: 0 } } });
-  const alerts  = await db.alert.count({ where: { resolvedAt: null } });
-  return TEMPLATES.dailySummary(
-    formatAsEthDate(date),
-    "—", "—",
-    String(stats._sum.totalProduced ?? 0),
-    "—", "—", "—", "—",
-    above, stats._count._all, alerts
-  );
+  const totalCut  = cutJobs.reduce((s, j) => s + j.piecesCut, 0);
+  const avgWaste  = cutJobs.length > 0
+    ? cutJobs.reduce((s, j) => s + Number(j.wastagePct), 0) / cutJobs.length
+    : 0;
+
+  const facts: DailySummaryFacts = {
+    dateLabel:      formatAsEthDate(date),
+    totalCut,
+    wastagePct:     avgWaste,
+    totalSewn:      countAgg._sum.totalProduced ?? 0,
+    qcPassed:       qcPass,
+    qcFailed:       qcFail,
+    totalPacked:    packed,
+    totalShipped:   shipped,
+    workersPresent: attendance,
+    workersAbove:   aboveTarget,
+    openAlerts:     alerts,
+  };
+
+  return buildDailySummary(facts);
 }
 
 async function buildMonthlySummaryText(periodId: string): Promise<string> {

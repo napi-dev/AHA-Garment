@@ -11,7 +11,9 @@ import { PrismaClient, BundleStage, Role } from "@prisma/client";
 import bcrypt from "bcryptjs";
 import Decimal from "decimal.js";
 
-const db = new PrismaClient();
+const db = new PrismaClient({
+  datasources: { db: { url: process.env.DIRECT_URL ?? process.env.DATABASE_URL } },
+});
 
 // ─── 1. Departments (21 from appendix + support roles) ───────────────────────
 
