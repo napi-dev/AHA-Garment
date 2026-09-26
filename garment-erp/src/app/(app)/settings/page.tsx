@@ -86,7 +86,10 @@ export default async function SettingsPage() {
         )}
       </section>
 
-      {/* New settings sub-links */}
+      {/* Settings sub-links */}
+      <section className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
+        <h2 className="font-semibold text-gray-700 font-ethiopic mb-3">ቅንብሮች</h2>
+        <div className="flex flex-wrap gap-3">
           <Link href="/settings/incentive-card"
             className="flex items-center gap-2 px-4 py-2.5 bg-blue-50 text-blue-700 rounded-xl text-sm font-ethiopic hover:bg-blue-100 transition-colors">
             📋 ኢንሴንቲቭ ካርድ
@@ -95,6 +98,8 @@ export default async function SettingsPage() {
             className="flex items-center gap-2 px-4 py-2.5 bg-blue-50 text-blue-700 rounded-xl text-sm font-ethiopic hover:bg-blue-100 transition-colors">
             📅 የወቅት ድንበሮች
           </Link>
+        </div>
+      </section>
     </div>
   );
 }

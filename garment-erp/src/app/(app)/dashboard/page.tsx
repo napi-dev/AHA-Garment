@@ -42,26 +42,32 @@ export default async function DashboardPage() {
   const trendStart = new Date(today);
   trendStart.setDate(trendStart.getDate() - trendDays + 1);
 
-  // One query for 14-day grand total (for incentive cost calc)
-  const trendGrandTotal = await db.hourlyCountLine.aggregate({
+  // Single query: fetch all locked lines in the 14-day window with their sheet date
+  const trendRaw = await db.hourlyCountLine.findMany({
     where: { sheet: { date: { gte: trendStart, lte: today } }, status: "LOCKED" },
-    _sum: { totalProduced: true, plusPieces: true },
+    select: { sheet: { select: { date: true } }, totalProduced: true, plusPieces: true },
   });
 
-  // Per-day aggregation — one query per day (14 queries, fast on Neon)
+  // Aggregate in memory by day — avoids 14 round-trips
+  const trendMap = new Map<string, { produced: number; plus: number }>();
+  let grandTotalProduced = 0;
+  for (const row of trendRaw) {
+    const key = row.sheet.date.toISOString().split("T")[0];
+    const existing = trendMap.get(key) ?? { produced: 0, plus: 0 };
+    existing.produced += row.totalProduced ?? 0;
+    existing.plus     += row.plusPieces    ?? 0;
+    trendMap.set(key, existing);
+    grandTotalProduced += row.totalProduced ?? 0;
+  }
+
+  // Build ordered 14-day series
   const trendPerDay: { date: string; produced: number; plus: number }[] = [];
   for (let i = 0; i < trendDays; i++) {
     const d = new Date(trendStart);
     d.setDate(d.getDate() + i);
-    const dayAgg = await db.hourlyCountLine.aggregate({
-      where: { sheet: { date: d }, status: "LOCKED" },
-      _sum: { totalProduced: true, plusPieces: true },
-    });
-    trendPerDay.push({
-      date:     formatAsEthDate(d),
-      produced: dayAgg._sum.totalProduced ?? 0,
-      plus:     dayAgg._sum.plusPieces    ?? 0,
-    });
+    const key = d.toISOString().split("T")[0];
+    const agg = trendMap.get(key) ?? { produced: 0, plus: 0 };
+    trendPerDay.push({ date: formatAsEthDate(d), produced: agg.produced, plus: agg.plus });
   }
 
   // ── Current period incentive cost ─────────────────────────────────────────
@@ -79,7 +85,7 @@ export default async function DashboardPage() {
       _count: { _all: true },
     });
     const totalPay  = new Decimal(agg._sum.payable?.toString() ?? "0");
-    const totalProd = trendGrandTotal._sum.totalProduced ?? 0;
+    const totalProd = grandTotalProduced;
     periodPayable = totalPay.toFixed(2);
     incentiveCostPer1000 = totalProd > 0
       ? totalPay.div(totalProd).mul(1000).toFixed(2)
