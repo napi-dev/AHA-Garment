@@ -4,6 +4,7 @@ import { useState } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { am } from "@/lib/i18n/am";
+import { Lock, User, Loader2, Sparkles, CheckCircle2 } from "lucide-react";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -37,93 +38,123 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-blue-100 px-4">
-      <div className="w-full max-w-sm">
-        {/* Header */}
+    <div className="min-h-screen flex flex-col items-center justify-center bg-slate-900 relative overflow-hidden px-4 py-8">
+      {/* Subtle Tailor Grid & Light Effects */}
+      <div className="absolute inset-0 stitch-pattern opacity-10 pointer-events-none" />
+      <div className="absolute top-1/4 -left-32 w-96 h-96 bg-blue-600/20 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute bottom-1/4 -right-32 w-96 h-96 bg-indigo-600/20 rounded-full blur-3xl pointer-events-none" />
+
+      <div className="w-full max-w-md relative z-10">
+        {/* Header Branding */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-blue-600 text-white text-2xl font-bold mb-4">
-            ፋ
+          <div className="inline-flex items-center justify-center w-20 h-20 rounded-3xl bg-gradient-to-tr from-blue-600 via-indigo-600 to-blue-500 text-white text-3xl shadow-xl shadow-blue-500/20 mb-4 ring-4 ring-white/10">
+            <span>🧵</span>
           </div>
-          <h1 className="text-2xl font-bold text-gray-900 font-ethiopic">
+          <h1 className="text-2xl sm:text-3xl font-bold text-white font-ethiopic tracking-tight">
             {am.appName}
           </h1>
-          <p className="text-gray-500 mt-1 text-sm">Garment Factory System</p>
+          <p className="text-slate-400 mt-1 text-sm font-ethiopic">
+            የስፌት፣ የቆረጣ፣ የጥራትና የኢንሴንቲቭ አስተዳደር መተግበሪያ
+          </p>
         </div>
 
-        {/* Login card */}
-        <div className="bg-white rounded-2xl shadow-lg p-8">
-          <h2 className="text-lg font-semibold text-gray-800 mb-6 font-ethiopic text-center">
-            {am.login.title}
-          </h2>
+        {/* Login Card */}
+        <div className="bg-white/95 backdrop-blur-xl rounded-3xl shadow-2xl border border-white/20 p-8 sm:p-10 transition-all">
+          <div className="flex items-center justify-center gap-2 mb-6 text-center">
+            <Lock size={18} className="text-blue-600" />
+            <h2 className="text-lg font-bold text-slate-900 font-ethiopic">
+              {am.login.title}
+            </h2>
+          </div>
 
           <form onSubmit={handleSubmit} className="space-y-5">
             {/* Employee Code */}
             <div>
               <label
                 htmlFor="code"
-                className="block text-sm font-medium text-gray-700 mb-1.5 font-ethiopic"
+                className="block text-xs font-semibold text-slate-700 mb-1.5 font-ethiopic flex items-center gap-1.5"
               >
+                <User size={14} className="text-slate-500" />
                 {am.login.employeeCode}
               </label>
-              <input
-                id="code"
-                type="text"
-                value={code}
-                onChange={(e) => setCode(e.target.value)}
-                placeholder={am.login.employeeCodePlaceholder}
-                autoCapitalize="characters"
-                autoComplete="username"
-                required
-                className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 text-lg tracking-widest text-center uppercase"
-              />
+              <div className="relative">
+                <input
+                  id="code"
+                  type="text"
+                  value={code}
+                  onChange={(e) => setCode(e.target.value)}
+                  placeholder={am.login.employeeCodePlaceholder}
+                  autoCapitalize="characters"
+                  autoComplete="username"
+                  required
+                  className="w-full px-4 py-3 rounded-2xl border border-slate-200 focus:outline-none focus:ring-4 focus:ring-blue-500/20 focus:border-blue-600 text-base font-semibold tracking-wider text-center uppercase bg-slate-50/50 hover:bg-white focus:bg-white transition-all"
+                />
+              </div>
             </div>
 
-            {/* PIN — large number pad feel */}
+            {/* PIN */}
             <div>
               <label
                 htmlFor="pin"
-                className="block text-sm font-medium text-gray-700 mb-1.5 font-ethiopic"
+                className="block text-xs font-semibold text-slate-700 mb-1.5 font-ethiopic flex items-center gap-1.5"
               >
+                <Lock size={14} className="text-slate-500" />
                 {am.login.pin}
               </label>
-              <input
-                id="pin"
-                type="password"
-                inputMode="numeric"
-                pattern="[0-9]*"
-                maxLength={6}
-                value={pin}
-                onChange={(e) => setPin(e.target.value)}
-                placeholder={am.login.pinPlaceholder}
-                autoComplete="current-password"
-                required
-                className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 text-3xl tracking-[0.5em] text-center"
-              />
+              <div className="relative">
+                <input
+                  id="pin"
+                  type="password"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  maxLength={6}
+                  value={pin}
+                  onChange={(e) => setPin(e.target.value)}
+                  placeholder={am.login.pinPlaceholder}
+                  autoComplete="current-password"
+                  required
+                  className="w-full px-4 py-3 rounded-2xl border border-slate-200 focus:outline-none focus:ring-4 focus:ring-blue-500/20 focus:border-blue-600 text-2xl font-bold tracking-[0.4em] text-center bg-slate-50/50 hover:bg-white focus:bg-white transition-all font-mono"
+                />
+              </div>
             </div>
 
-            {/* Error */}
+            {/* Error Message */}
             {error && (
-              <p className="text-red-600 text-sm text-center font-ethiopic bg-red-50 rounded-lg py-2 px-3">
-                {error}
-              </p>
+              <div className="p-3 rounded-xl bg-rose-50 border border-rose-200/80 text-rose-700 text-xs text-center font-ethiopic animate-in fade-in duration-200 flex items-center justify-center gap-2">
+                <span>⚠️</span>
+                <span>{error}</span>
+              </div>
             )}
 
-            {/* Submit */}
+            {/* Submit Button */}
             <button
               type="submit"
               disabled={loading || !code || !pin}
-              className="w-full py-3.5 rounded-xl bg-blue-600 text-white font-semibold text-base
-                hover:bg-blue-700 active:scale-[0.98] transition-all
-                disabled:opacity-50 disabled:cursor-not-allowed
-                font-ethiopic"
+              className="w-full py-3.5 px-6 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-semibold text-base shadow-lg shadow-blue-500/25 hover:from-blue-700 hover:to-indigo-700 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed font-ethiopic flex items-center justify-center gap-2"
             >
-              {loading ? "..." : am.login.signIn}
+              {loading ? (
+                <>
+                  <Loader2 size={18} className="animate-spin" />
+                  <span>በማረጋገጥ ላይ...</span>
+                </>
+              ) : (
+                <span>{am.login.signIn}</span>
+              )}
             </button>
           </form>
+
+          {/* Quick Helper hint */}
+          <div className="mt-6 pt-5 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500 font-ethiopic">
+            <span className="flex items-center gap-1 text-slate-400">
+              <CheckCircle2 size={13} className="text-emerald-500" />
+              የተጠበቀ የውስጥ ሥርዓት
+            </span>
+            <span className="text-slate-400">v1.0 (ልብስ ፋብሪካ)</span>
+          </div>
         </div>
 
-        <p className="text-center text-xs text-gray-400 mt-6">
-          ልብስ ፋብሪካ ሥርዓት v0.1
+        <p className="text-center text-xs text-slate-500 mt-6 font-ethiopic">
+          © {new Date().getFullYear()} የልብስ ፋብሪካ ኢአርፒ አስተዳደር ሥርዓት · መብቱ በሕግ የተጠበቀ ነው
         </p>
       </div>
     </div>

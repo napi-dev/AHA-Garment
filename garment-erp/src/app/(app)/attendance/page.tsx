@@ -6,6 +6,7 @@ import { am } from "@/lib/i18n/am";
 import { formatAsEthDate } from "@/lib/ethiopian-calendar";
 import { AttendanceGrid } from "./attendance-grid";
 import { DatePicker } from "./date-picker";
+import { Users, Calendar, CheckCircle2 } from "lucide-react";
 
 export default async function AttendancePage({
   searchParams,
@@ -36,23 +37,45 @@ export default async function AttendancePage({
     },
   });
 
-  const canEdit = session.user.role === "ADMIN" ||
+  const canEdit =
+    session.user.role === "ADMIN" ||
     session.user.role === "SUPER_MANAGER" ||
     session.user.role === "HR_CLERK";
 
+  const totalEmployees = departments.reduce((acc, d) => acc + d.employees.length, 0);
+  const totalPresent = departments.reduce(
+    (acc, d) =>
+      acc +
+      d.employees.filter(
+        (e) => e.attendances[0] && Number(e.attendances[0].hoursWorked) > 0
+      ).length,
+    0
+  );
+
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between flex-wrap gap-3">
+      {/* Top Header Card */}
+      <div className="erp-card p-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 font-ethiopic">
+          <div className="flex items-center gap-2 text-xs font-semibold text-blue-600 uppercase tracking-wider font-ethiopic">
+            <Users size={14} />
+            <span>የሰው ኃይል ክትትል</span>
+          </div>
+          <h1 className="text-2xl font-bold text-slate-900 font-ethiopic mt-1">
             {am.attendance.title}
           </h1>
-          <p className="text-gray-500 text-sm mt-0.5 font-ethiopic">
-            {formatAsEthDate(date)}
+          <p className="text-slate-500 text-sm mt-0.5 font-ethiopic flex items-center gap-2">
+            <Calendar size={14} className="text-slate-400" />
+            <span>{formatAsEthDate(date)}</span>
+            <span>·</span>
+            <span className="font-semibold text-emerald-600">{totalPresent}</span> ከ {totalEmployees} ሠራተኞች ተገኝተዋል
           </p>
         </div>
-        {/* Date picker — wrapped in client island */}
-        <DatePicker defaultValue={dateStr} />
+
+        {/* Date picker client island */}
+        <div className="flex items-center gap-3">
+          <DatePicker defaultValue={dateStr} />
+        </div>
       </div>
 
       <AttendanceGrid

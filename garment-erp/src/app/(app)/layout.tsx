@@ -1,7 +1,8 @@
 import { auth } from "@/lib/auth";
+import { db } from "@/lib/db";
 import { redirect } from "next/navigation";
-import { Sidebar } from "@/components/nav/sidebar";
-import { OfflineIndicator } from "@/components/ui/offline-indicator";
+import { AppShell } from "@/components/nav/app-shell";
+import { todayEth, ethMonthName, formatAsEthDate } from "@/lib/ethiopian-calendar";
 
 export default async function AppLayout({
   children,
@@ -13,15 +14,23 @@ export default async function AppLayout({
 
   const { role, nameAm, employeeCode } = session.user;
 
+  // Retrieve unresolved alerts count
+  const openAlertsCount = await db.alert.count({
+    where: { resolvedAt: null },
+  });
+
+  const eth = todayEth();
+  const ethDateDisplay = `${eth.day} ${ethMonthName(eth.month)} ${eth.year} ዓ.ም (${formatAsEthDate(new Date())})`;
+
   return (
-    <div className="flex min-h-screen bg-gray-50">
-      <Sidebar role={role} nameAm={nameAm} employeeCode={employeeCode} />
-      <main className="flex-1 overflow-y-auto">
-        <div className="max-w-7xl mx-auto p-6">
-          {children}
-        </div>
-      </main>
-      <OfflineIndicator />
-    </div>
+    <AppShell
+      role={role}
+      nameAm={nameAm}
+      employeeCode={employeeCode}
+      ethDateDisplay={ethDateDisplay}
+      openAlertsCount={openAlertsCount}
+    >
+      {children}
+    </AppShell>
   );
 }

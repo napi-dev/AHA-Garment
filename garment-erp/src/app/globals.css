@@ -4,7 +4,7 @@
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
+    --background: 210 40% 98%;
     --foreground: 222.2 84% 4.9%;
     --card: 0 0% 100%;
     --card-foreground: 222.2 84% 4.9%;
@@ -23,7 +23,7 @@
     --border: 214.3 31.8% 91.4%;
     --input: 214.3 31.8% 91.4%;
     --ring: 221.2 83.2% 53.3%;
-    --radius: 0.5rem;
+    --radius: 0.75rem;
   }
 }
 
@@ -32,8 +32,9 @@
     @apply border-border;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-slate-50 text-slate-900 antialiased;
     font-feature-settings: "rlig" 1, "calt" 1;
+    font-family: var(--font-noto-sans), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, system-ui, sans-serif;
   }
   /* Large touch targets for shop-floor tablets */
   button, [role="button"] {
@@ -44,57 +45,113 @@
   }
 }
 
-/* Amharic / Ethiopic script support */
+/* Amharic / Ethiopic script typography */
 [lang="am"], .font-ethiopic {
-  font-family: var(--font-noto-sans-ethiopic), 'Noto Sans Ethiopic', sans-serif;
-  line-height: 1.8; /* Ethiopic script needs more line height */
+  font-family: var(--font-noto-sans-ethiopic), 'Noto Sans Ethiopic', 'Nyala', 'Abyssinica SIL', system-ui, sans-serif;
+  line-height: 1.75;
+  letter-spacing: 0.01em;
 }
 
-/* Number pad inputs — large and clear for shop floor */
+/* Custom modern scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* Precision Textile "Stitch" Design System */
+.stitch-border-b {
+  border-bottom: 2px dashed rgba(203, 213, 225, 0.8);
+}
+.stitch-border-t {
+  border-top: 2px dashed rgba(203, 213, 225, 0.8);
+}
+.stitch-pattern {
+  background-image: radial-gradient(rgba(148, 163, 184, 0.15) 1px, transparent 1px);
+  background-size: 16px 16px;
+}
+
+/* Master ERP Card */
+.erp-card {
+  @apply bg-white rounded-2xl border border-slate-200/80 shadow-[0_1px_3px_rgba(0,0,0,0.05),0_10px_25px_-5px_rgba(0,0,0,0.02)]
+    transition-all duration-200;
+}
+.erp-card-interactive {
+  @apply erp-card hover:shadow-md hover:border-slate-300;
+}
+
+/* Number pad inputs — shop floor optimized */
 .numpad-input {
-  @apply text-3xl font-bold text-center rounded-xl border-2 border-primary
-    focus:ring-4 focus:ring-primary/30 min-h-[64px] min-w-[80px];
+  @apply text-3xl font-bold text-center rounded-xl border-2 border-blue-500
+    focus:ring-4 focus:ring-blue-500/20 min-h-[64px] min-w-[80px] bg-white
+    shadow-sm transition-all;
 }
 
-/* Status badges */
-.badge-draft     { @apply bg-gray-100 text-gray-700 text-xs px-2 py-0.5 rounded-full; }
-.badge-submitted { @apply bg-blue-100 text-blue-700 text-xs px-2 py-0.5 rounded-full; }
-.badge-verified  { @apply bg-green-100 text-green-700 text-xs px-2 py-0.5 rounded-full; }
-.badge-locked    { @apply bg-purple-100 text-purple-700 text-xs px-2 py-0.5 rounded-full; }
-.badge-pending   { @apply bg-yellow-100 text-yellow-700 text-xs px-2 py-0.5 rounded-full; }
-.badge-approved  { @apply bg-emerald-100 text-emerald-700 text-xs px-2 py-0.5 rounded-full; }
+/* High-clarity Status badges */
+.badge-draft     { @apply bg-slate-100 text-slate-700 border border-slate-200/70 text-xs px-2.5 py-0.5 rounded-full font-medium inline-flex items-center gap-1 font-ethiopic; }
+.badge-submitted { @apply bg-blue-50 text-blue-700 border border-blue-200/70 text-xs px-2.5 py-0.5 rounded-full font-medium inline-flex items-center gap-1 font-ethiopic; }
+.badge-verified  { @apply bg-emerald-50 text-emerald-700 border border-emerald-200/70 text-xs px-2.5 py-0.5 rounded-full font-medium inline-flex items-center gap-1 font-ethiopic; }
+.badge-locked    { @apply bg-purple-50 text-purple-700 border border-purple-200/70 text-xs px-2.5 py-0.5 rounded-full font-medium inline-flex items-center gap-1 font-ethiopic; }
+.badge-pending   { @apply bg-amber-50 text-amber-800 border border-amber-200/70 text-xs px-2.5 py-0.5 rounded-full font-medium inline-flex items-center gap-1 font-ethiopic; }
+.badge-approved  { @apply bg-teal-50 text-teal-700 border border-teal-200/70 text-xs px-2.5 py-0.5 rounded-full font-medium inline-flex items-center gap-1 font-ethiopic; }
+.badge-danger    { @apply bg-rose-50 text-rose-700 border border-rose-200/70 text-xs px-2.5 py-0.5 rounded-full font-medium inline-flex items-center gap-1 font-ethiopic; }
 
-/* Alert colours */
-.alert-warning  { @apply bg-amber-50 border-l-4 border-amber-500 text-amber-800 p-4 rounded; }
-.alert-error    { @apply bg-red-50 border-l-4 border-red-500 text-red-800 p-4 rounded; }
-.alert-info     { @apply bg-blue-50 border-l-4 border-blue-500 text-blue-800 p-4 rounded; }
-.alert-success  { @apply bg-green-50 border-l-4 border-green-500 text-green-800 p-4 rounded; }
+/* Alert banners */
+.alert-warning  { @apply bg-amber-50/90 border-l-4 border-amber-500 text-amber-900 p-4 rounded-xl shadow-sm; }
+.alert-error    { @apply bg-rose-50/90 border-l-4 border-rose-500 text-rose-900 p-4 rounded-xl shadow-sm; }
+.alert-info     { @apply bg-blue-50/90 border-l-4 border-blue-500 text-blue-900 p-4 rounded-xl shadow-sm; }
+.alert-success  { @apply bg-emerald-50/90 border-l-4 border-emerald-500 text-emerald-900 p-4 rounded-xl shadow-sm; }
 
-/* Table styles */
+/* Upgraded Data Table */
 .data-table {
   @apply w-full border-collapse text-sm;
 }
 .data-table th {
-  @apply bg-gray-50 text-gray-600 font-semibold p-3 text-right border-b border-gray-200;
+  @apply bg-slate-50/90 text-slate-700 font-semibold p-3.5 text-right border-b border-slate-200 font-ethiopic text-xs tracking-wider;
 }
 .data-table td {
-  @apply p-3 text-right border-b border-gray-100;
+  @apply p-3.5 text-right border-b border-slate-100 text-slate-700 transition-colors;
 }
 .data-table tr:hover td {
-  @apply bg-gray-50;
+  @apply bg-slate-50/80;
 }
-/* Numbers right-aligned; names left-aligned */
-.data-table .col-name { @apply text-right; }
+/* Numbers right-aligned; names left/right aligned */
+.data-table .col-name { @apply text-right font-ethiopic; }
 .data-table .col-num  { @apply text-right tabular-nums; }
 
-/* input-field utility — used across all forms */
+/* Enhanced input-field utility */
 .input-field {
-  @apply w-full px-4 py-3 rounded-xl border border-gray-200
-    focus:outline-none focus:ring-2 focus:ring-blue-500
-    text-sm bg-white disabled:bg-gray-50 disabled:text-gray-400;
+  @apply w-full px-4 py-3 rounded-xl border border-slate-200
+    focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500
+    text-sm bg-white text-slate-900 placeholder:text-slate-400
+    disabled:bg-slate-50 disabled:text-slate-400 transition-all duration-150;
 }
+
+/* Master Primary and Action Buttons */
+.btn-primary {
+  @apply inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl
+    bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-semibold text-sm
+    shadow-sm hover:from-blue-700 hover:to-indigo-700 active:scale-[0.98]
+    transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed font-ethiopic;
+}
+.btn-secondary {
+  @apply inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl
+    bg-white border border-slate-200 text-slate-700 font-medium text-sm
+    shadow-sm hover:bg-slate-50 hover:border-slate-300 active:scale-[0.98]
+    transition-all duration-150 font-ethiopic;
+}
+
 @media print {
-  nav, aside, .no-print { display: none !important; }
+  nav, aside, header, .no-print { display: none !important; }
   body { background: white; }
   .print-page { page-break-after: always; }
 }

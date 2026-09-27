@@ -6,11 +6,17 @@ import { redirect } from "next/navigation";
 import { hasPermission } from "@/lib/auth/permissions";
 import { DashboardCharts } from "./dashboard-charts";
 import Decimal from "decimal.js";
+import Link from "next/link";
+import {
+  Factory, Users, AlertTriangle, Clock, Layers,
+  Scissors, Package, TrendingUp, CheckCircle2,
+  Calendar, ArrowRight, ShieldAlert, Sparkles, CheckSquare
+} from "lucide-react";
 
 export default async function DashboardPage() {
   const session = await auth();
   if (!session?.user) redirect("/login");
-  const { role } = session.user;
+  const { role, nameAm } = session.user;
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -122,66 +128,210 @@ export default async function DashboardPage() {
     where: { isActive: true, dueDate: { lt: today } },
   });
 
-  const stats = [
-    { label: am.dashboard.todayProduction, value: (countStats._sum.totalProduced ?? 0).toLocaleString(),
-      sub: dayClose ? "✓ ቀን ተዘግቷል" : "ቀን አልተዘጋም", color: dayClose ? "text-green-600" : "text-amber-600" },
-    { label: am.dashboard.workersAboveTarget, value: aboveTarget.toString(),
-      sub: `${countStats._count._all} ሠራተኞች ቀርበዋል`, color: "text-blue-600" },
-    { label: am.dashboard.openAlerts, value: openAlerts.toString(),
-      sub: openAlerts > 0 ? "ትኩረት ያስፈልጋቸዋል" : "ሁሉም ጥሩ ነው", color: openAlerts > 0 ? "text-red-600" : "text-green-600" },
-    { label: "ንቁ ትዕዛዞች", value: openOrders.toString(),
-      sub: overdueOrders > 0 ? `${overdueOrders} ዘግይቷል ⚠️` : "ሁሉም በጊዜ ነው", color: overdueOrders > 0 ? "text-red-600" : "text-gray-500" },
-    ...(hasPermission(role, "incentive:view") ? [
-      { label: "ወቅታዊ ኢንሴንቲቭ (ብር)", value: periodPayable,
-        sub: `${eth.day < 5 ? "ቀን 4" : "ቀን 19"} ክፍያ`, color: "text-emerald-600" },
-      { label: "ለ1000 ፍሬ ኢ/ወጪ", value: incentiveCostPer1000,
-        sub: "ብር / 1000 ፍሬ", color: "text-purple-600" },
-    ] : []),
-    ...(pendingPeriods > 0 ? [
-      { label: am.dashboard.pendingApprovals, value: pendingPeriods.toString(),
-        sub: "ለማፅደቅ ይጠባበቃሉ", color: "text-purple-600" },
-    ] : []),
-  ];
+  const totalWorkersAttended = countStats._count._all;
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900 font-ethiopic">{am.dashboard.title}</h1>
-          <p className="text-gray-500 text-sm mt-0.5 font-ethiopic">
-            {eth.day} {ethMonthName(eth.month)} {eth.year} ዓ.ም
-            <span className="mx-2 text-gray-300">·</span>
-            {formatAsEthDate(today)}
-          </p>
-        </div>
-        {!dayClose && hasPermission(role, "counts:verify") && (
-          <a href="/counts/close"
-            className="px-5 py-2.5 bg-purple-600 text-white rounded-xl text-sm font-ethiopic font-semibold hover:bg-purple-700 transition-colors animate-pulse">
-            🔒 ቀን ዝጋ
-          </a>
-        )}
-      </div>
-
-      {/* Stat cards */}
-      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
-        {stats.map((s) => (
-          <div key={s.label} className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
-            <p className="text-xs text-gray-500 font-ethiopic mb-1 truncate">{s.label}</p>
-            <p className={`text-3xl font-bold tabular-nums leading-none ${s.color}`}>{s.value}</p>
-            <p className="text-xs text-gray-400 mt-1.5 font-ethiopic">{s.sub}</p>
+    <div className="space-y-8">
+      {/* Welcome & Shift Status Banner */}
+      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-slate-900 via-indigo-950 to-blue-950 p-6 md:p-8 text-white shadow-xl">
+        <div className="absolute right-0 top-0 bottom-0 w-1/3 stitch-pattern opacity-15 pointer-events-none" />
+        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+          <div className="space-y-2">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 backdrop-blur-md text-xs font-ethiopic text-blue-200 border border-white/10">
+              <Calendar size={13} className="text-blue-300" />
+              <span>{eth.day} {ethMonthName(eth.month)} {eth.year} ዓ.ም</span>
+              <span>·</span>
+              <span>{formatAsEthDate(today)}</span>
+            </div>
+            <h1 className="text-2xl md:text-3xl font-bold font-ethiopic tracking-tight">
+              እንኳን ደህና መጡ፣ {nameAm}
+            </h1>
+            <p className="text-slate-300 text-sm font-ethiopic max-w-xl">
+              የልብስ ፋብሪካ ዕለታዊ የምርት ፍሰት፣ የሠራተኞች መገኘትና የጥራት ቁጥጥር ዳሽቦርድ
+            </p>
           </div>
-        ))}
+
+          <div className="flex flex-wrap items-center gap-3">
+            {!dayClose && hasPermission(role, "counts:verify") && (
+              <Link
+                href="/counts/close"
+                className="px-5 py-3 rounded-2xl bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-ethiopic font-semibold text-sm hover:from-purple-500 hover:to-indigo-500 transition-all shadow-lg shadow-purple-900/30 flex items-center gap-2 animate-pulse"
+              >
+                <CheckSquare size={16} />
+                <span>{am.counts.closeDay}</span>
+              </Link>
+            )}
+            <Link
+              href="/counts/enter"
+              className="px-5 py-3 rounded-2xl bg-white text-slate-900 font-ethiopic font-semibold text-sm hover:bg-slate-100 transition-all shadow-md flex items-center gap-2"
+            >
+              <Clock size={16} className="text-blue-600" />
+              <span>{am.counts.enterCount}</span>
+            </Link>
+          </div>
+        </div>
       </div>
 
-      {/* Charts (client component) */}
+      {/* Primary KPI Metric Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+        {/* Today's Production */}
+        <div className="erp-card p-5 relative overflow-hidden group">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold text-slate-500 font-ethiopic">
+              {am.dashboard.todayProduction}
+            </span>
+            <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+              <Factory size={18} />
+            </div>
+          </div>
+          <div className="mt-3">
+            <p className="text-3xl font-bold text-slate-900 tabular-nums">
+              {(countStats._sum.totalProduced ?? 0).toLocaleString()}
+              <span className="text-xs font-normal text-slate-400 ml-1 font-ethiopic">ፍሬ</span>
+            </p>
+            <div className="mt-2 flex items-center gap-1.5 text-xs font-ethiopic">
+              {dayClose ? (
+                <span className="inline-flex items-center gap-1 text-emerald-600 font-medium">
+                  <CheckCircle2 size={13} />
+                  የዕለት ሥራ ተጠቃልሎ ተዘግቷል
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 text-amber-600 font-medium">
+                  <Clock size={13} />
+                  የዕለት ሥራ ክፍት ነው
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Above Target Workers */}
+        <div className="erp-card p-5 relative overflow-hidden group">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold text-slate-500 font-ethiopic">
+              {am.dashboard.workersAboveTarget}
+            </span>
+            <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+              <TrendingUp size={18} />
+            </div>
+          </div>
+          <div className="mt-3">
+            <p className="text-3xl font-bold text-emerald-600 tabular-nums">
+              {aboveTarget}
+              <span className="text-xs font-normal text-slate-400 ml-1 font-ethiopic">ሠራተኞች</span>
+            </p>
+            <p className="mt-2 text-xs text-slate-500 font-ethiopic">
+              ከቀረቡት {totalWorkersAttended} ሠራተኞች መካከል
+            </p>
+          </div>
+        </div>
+
+        {/* Active Production Orders */}
+        <div className="erp-card p-5 relative overflow-hidden group">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold text-slate-500 font-ethiopic">
+              ንቁ የምርት ትዕዛዞች
+            </span>
+            <div className="w-9 h-9 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center">
+              <Layers size={18} />
+            </div>
+          </div>
+          <div className="mt-3">
+            <p className="text-3xl font-bold text-slate-900 tabular-nums">
+              {openOrders}
+              <span className="text-xs font-normal text-slate-400 ml-1 font-ethiopic">ትዕዛዞች</span>
+            </p>
+            <p className="mt-2 text-xs font-ethiopic">
+              {overdueOrders > 0 ? (
+                <span className="text-rose-600 font-medium flex items-center gap-1">
+                  <AlertTriangle size={12} />
+                  {overdueOrders} የዘገዩ ትዕዛዞች አሉ
+                </span>
+              ) : (
+                <span className="text-slate-500">ሁሉም ትዕዛዞች በጊዜ ሂደት ላይ ናቸው</span>
+              )}
+            </p>
+          </div>
+        </div>
+
+        {/* Open System Alerts */}
+        <div className="erp-card p-5 relative overflow-hidden group">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold text-slate-500 font-ethiopic">
+              {am.dashboard.openAlerts}
+            </span>
+            <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${
+              openAlerts > 0 ? "bg-rose-50 text-rose-600" : "bg-emerald-50 text-emerald-600"
+            }`}>
+              <AlertTriangle size={18} />
+            </div>
+          </div>
+          <div className="mt-3">
+            <p className={`text-3xl font-bold tabular-nums ${openAlerts > 0 ? "text-rose-600" : "text-emerald-600"}`}>
+              {openAlerts}
+            </p>
+            <p className="mt-2 text-xs font-ethiopic">
+              {openAlerts > 0 ? (
+                <Link href="/alerts" className="text-rose-600 font-medium hover:underline inline-flex items-center gap-1">
+                  ትኩረት የሚሹ ማስጠንቀቂያዎች ይመልከቱ →
+                </Link>
+              ) : (
+                <span className="text-emerald-600 font-medium">ሁሉም የፋብሪካ ሂደቶች ጤናማ ናቸው</span>
+              )}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Secondary Financial / Incentive KPI if permitted */}
+      {(hasPermission(role, "incentive:view") || pendingPeriods > 0) && (
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+          {hasPermission(role, "incentive:view") && (
+            <>
+              <div className="erp-card p-5 border-l-4 border-emerald-500">
+                <p className="text-xs text-slate-500 font-ethiopic">ወቅታዊ የኢንሴንቲቭ ክፍያ</p>
+                <p className="text-2xl font-bold text-emerald-700 tabular-nums mt-1">
+                  {periodPayable} <span className="text-xs font-normal text-slate-400">ብር</span>
+                </p>
+                <p className="text-xs text-slate-400 font-ethiopic mt-1">
+                  {eth.day < 5 ? "የ1ኛ ወቅት (ቀን 4)" : "የ2ኛ ወቅት (ቀን 19)"} ክፍያ
+                </p>
+              </div>
+
+              <div className="erp-card p-5 border-l-4 border-indigo-500">
+                <p className="text-xs text-slate-500 font-ethiopic">የ1000 ፍሬ ኢንሴንቲቭ ወጪ</p>
+                <p className="text-2xl font-bold text-indigo-700 tabular-nums mt-1">
+                  {incentiveCostPer1000} <span className="text-xs font-normal text-slate-400">ብር / 1000 ፍሬ</span>
+                </p>
+                <p className="text-xs text-slate-400 font-ethiopic mt-1">
+                  የምርት ውጤታማነት ወጪ ንፅፅር
+                </p>
+              </div>
+            </>
+          )}
+
+          {pendingPeriods > 0 && (
+            <div className="erp-card p-5 border-l-4 border-amber-500 bg-amber-50/30">
+              <p className="text-xs text-amber-900 font-ethiopic">{am.dashboard.pendingApprovals}</p>
+              <p className="text-2xl font-bold text-amber-700 tabular-nums mt-1">
+                {pendingPeriods} <span className="text-xs font-normal text-amber-600">ወቅቶች</span>
+              </p>
+              <Link href="/incentive" className="text-xs text-amber-800 font-semibold font-ethiopic mt-1 hover:underline block">
+                የማኔጅመንት ማረጋገጫ ለመስጠት ይጫኑ →
+              </Link>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Charts Section */}
       <DashboardCharts
         trendData={trendPerDay}
         deptData={deptChartData}
         role={role}
       />
 
-      {/* Quick actions */}
+      {/* Quick Action Station */}
       <QuickActions role={role} />
     </div>
   );
@@ -189,29 +339,105 @@ export default async function DashboardPage() {
 
 function QuickActions({ role }: { role: string }) {
   const actions = [
-    { label: "ቁጥር አስገባ",    href: "/counts/enter",      permission: "counts:enter",      color: "bg-blue-500" },
-    { label: "ቀን ዝጋ",       href: "/counts/close",      permission: "counts:verify",     color: "bg-purple-500" },
-    { label: "ቆረጣ ጀምር",    href: "/cutting/new",       permission: "cuts:edit",         color: "bg-orange-500" },
-    { label: "ጥሬ እቃ ተቀበል", href: "/materials/receive", permission: "stock:edit",        color: "bg-teal-500" },
-    { label: "ፍተሻ",          href: "/quality",           permission: "qc:edit",           color: "bg-pink-500" },
-    { label: "ባንድሎች",        href: "/production/bundles",permission: "bundles:view",      color: "bg-indigo-500" },
-    { label: "ኢንሴንቲቭ አፅድቅ", href: "/incentive",         permission: "incentive:approve", color: "bg-emerald-500" },
+    {
+      label: "የሰዓት ቁጥር መዝግብ",
+      desc: "የእያንዳንዱን ሠራተኛ የሰዓት ውጤት አስገባ",
+      href: "/counts/enter",
+      permission: "counts:enter",
+      icon: <Clock size={20} className="text-blue-600" />,
+      badge: "ዕለታዊ",
+    },
+    {
+      label: "የዕለት ሥራ አጠቃልል",
+      desc: "የዕለቱን የምርት ሰሌዳ ፈትሽና ዝጋ",
+      href: "/counts/close",
+      permission: "counts:verify",
+      icon: <CheckSquare size={20} className="text-purple-600" />,
+      badge: "ቀን ማጠቃለያ",
+    },
+    {
+      label: "አዲስ ቆረጣ ጀምር",
+      desc: "ለጨርቅ ቆረጣ ክፍል ትዕዛዝ መዝግብ",
+      href: "/cutting/new",
+      permission: "cuts:edit",
+      icon: <Scissors size={20} className="text-orange-600" />,
+    },
+    {
+      label: "ጥሬ ዕቃ ገቢ አድርግ",
+      desc: "የመጡ አዳዲስ ጥሬ ዕቃዎችን አስመዝግብ",
+      href: "/materials/receive",
+      permission: "stock:edit",
+      icon: <Package size={20} className="text-teal-600" />,
+    },
+    {
+      label: "የጥራት ፍተሻ (QC)",
+      desc: "ባንድሎችን መርምርና አፅድቅ",
+      href: "/quality",
+      permission: "qc:edit",
+      icon: <CheckCircle2 size={20} className="text-pink-600" />,
+    },
+    {
+      label: "የስራ ባንድሎች (Bundles)",
+      desc: "የተቆረጡ የስራ ጥቅሎች ክትትል",
+      href: "/production/bundles",
+      permission: "bundles:view",
+      icon: <Layers size={20} className="text-indigo-600" />,
+    },
+    {
+      label: "ኢንሴንቲቭ አፅድቅ",
+      desc: "የተሰላ የሠራተኞች ኢንሴንቲቭ ክፍያ ማረጋገጫ",
+      href: "/incentive",
+      permission: "incentive:approve",
+      icon: <TrendingUp size={20} className="text-emerald-600" />,
+      badge: "ማኔጅመንት",
+    },
   ] as const;
 
   const visible = actions.filter((a) =>
     hasPermission(role as Parameters<typeof hasPermission>[0], a.permission)
   );
+
   if (!visible.length) return null;
 
   return (
-    <div>
-      <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3 font-ethiopic">ፈጣን ተግባራት</h2>
-      <div className="flex flex-wrap gap-3">
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h2 className="text-sm font-bold text-slate-800 uppercase tracking-wider font-ethiopic flex items-center gap-2">
+          <span>⚡</span>
+          <span>ፈጣን የስራ ተግባራት (Quick Actions)</span>
+        </h2>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
         {visible.map((a) => (
-          <a key={a.href} href={a.href}
-            className={`${a.color} text-white px-5 py-3 rounded-xl font-ethiopic text-sm font-semibold hover:opacity-90 active:scale-[0.97] transition-all shadow-sm`}>
-            {a.label}
-          </a>
+          <Link
+            key={a.href}
+            href={a.href}
+            className="erp-card p-4 hover:shadow-md hover:border-blue-300 transition-all duration-150 flex flex-col justify-between group"
+          >
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <div className="p-2.5 rounded-xl bg-slate-50 group-hover:bg-blue-50 transition-colors">
+                  {a.icon}
+                </div>
+                {a.badge && (
+                  <span className="text-[10px] font-semibold font-ethiopic px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 group-hover:bg-blue-100 group-hover:text-blue-700">
+                    {a.badge}
+                  </span>
+                )}
+              </div>
+              <h3 className="font-bold text-slate-800 text-sm font-ethiopic group-hover:text-blue-600 transition-colors">
+                {a.label}
+              </h3>
+              <p className="text-xs text-slate-500 font-ethiopic mt-1 leading-relaxed">
+                {a.desc}
+              </p>
+            </div>
+            <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-blue-600 font-semibold font-ethiopic">
+              <span>ወደ ስራው ሂድ</span>
+              <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />
+            </div>
+          </Link>
         ))}
       </div>
     </div>

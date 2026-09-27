@@ -4,6 +4,8 @@ import { redirect } from "next/navigation";
 import { requirePermission } from "@/lib/auth/permissions";
 import { am } from "@/lib/i18n/am";
 import { HourlyCountForm } from "./hourly-count-form";
+import { Clock, Lock, ArrowLeft } from "lucide-react";
+import Link from "next/link";
 
 export default async function CountEntryPage() {
   const session = await auth();
@@ -21,21 +23,31 @@ export default async function CountEntryPage() {
   if (dayClose) {
     return (
       <div className="max-w-lg mx-auto mt-16 text-center">
-        <div className="bg-purple-50 rounded-2xl p-8">
-          <p className="text-4xl mb-4">🔒</p>
-          <h2 className="text-xl font-bold text-purple-800 font-ethiopic mb-2">
+        <div className="erp-card p-10 space-y-4 border-purple-200 bg-gradient-to-b from-purple-50/50 to-white">
+          <div className="w-16 h-16 rounded-3xl bg-purple-100 text-purple-700 flex items-center justify-center mx-auto shadow-sm">
+            <Lock size={30} />
+          </div>
+          <h2 className="text-xl font-bold text-slate-900 font-ethiopic">
             {am.counts.dayAlreadyClosed}
           </h2>
-          <p className="text-purple-600 font-ethiopic text-sm">
-            ዛሬ ቀን ተዘግቷል። ሱፐርቫይዘሩ ወይም ዋና ሥራ አስኪያጁ ካስፈለጉ ሊከፍቱ ይችላሉ።
+          <p className="text-slate-600 font-ethiopic text-sm max-w-sm mx-auto leading-relaxed">
+            የዕለቱ የምርት ሥራ ተጠቃልሎ ተዘግቷል። ተጨማሪ ቁጥር ለማስገባት ሱፐርቫይዘሩ ወይም ዋና ሥራ አስኪያጁ ቀኑን መክፈት አለባቸው።
           </p>
+          <div className="pt-4">
+            <Link
+              href="/dashboard"
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-purple-600 text-white font-semibold text-xs font-ethiopic hover:bg-purple-700 transition-colors shadow-sm"
+            >
+              <ArrowLeft size={14} />
+              <span>ወደ ዳሽቦርድ ተመለስ</span>
+            </Link>
+          </div>
         </div>
       </div>
     );
   }
 
   // Load departments the operator can enter for
-  // Operators see only their own department; managers see all
   const isOperator = role === "OPERATOR";
 
   let departments;
@@ -82,13 +94,19 @@ export default async function CountEntryPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900 font-ethiopic">
-          {am.counts.title}
-        </h1>
-        <p className="text-gray-500 text-sm mt-0.5 font-ethiopic">
-          {am.counts.enterCount}
-        </p>
+      <div className="erp-card p-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-2 text-xs font-semibold text-blue-600 uppercase tracking-wider font-ethiopic">
+            <Clock size={14} />
+            <span>ዕለታዊ የምርት ቁጥር</span>
+          </div>
+          <h1 className="text-2xl font-bold text-slate-900 font-ethiopic mt-1">
+            {am.counts.title}
+          </h1>
+          <p className="text-slate-500 text-sm mt-0.5 font-ethiopic">
+            የእያንዳንዱን የስፌትና ምርት ሠራተኛ የሰዓት ውጤት እዚህ ይመዝግቡ
+          </p>
+        </div>
       </div>
 
       <HourlyCountForm
