@@ -64,11 +64,21 @@ export async function createOrder(formData: FormData) {
   const order = await db.prodOrder.create({
     data: {
       orderNumber, styleId, quantity, customer, dueDate,
-      stageRoutes: {
-        create: STAGES.map((stage, i) => ({ stage, sortOrder: i + 1 })),
-      },
     },
   });
+
+  // Ensure the style has default stage routes defined
+  const STAGES = [
+    "RECEIVING","CUTTING","SEWING","TRIMMING",
+    "QUALITY_CONTROL","STYLING_HITPRESS","IRONING","PACKING","DELIVERY",
+  ] as const;
+  for (let i = 0; i < STAGES.length; i++) {
+    await db.styleStageRoute.upsert({
+      where: { styleId_stage: { styleId, stage: STAGES[i] } },
+      update: {},
+      create: { styleId, stage: STAGES[i], sortOrder: i + 1 },
+    });
+  }
 
   await db.auditLog.create({
     data: {

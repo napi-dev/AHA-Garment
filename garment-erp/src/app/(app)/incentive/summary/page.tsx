@@ -49,8 +49,9 @@ export default async function MonthlySummaryPage({
     }
   >();
 
+  type PeriodLines = (typeof periods)[0]["lines"];
   function addLines(
-    lines: typeof p1.lines,
+    lines: PeriodLines,
     field: "p1Calc" | "p1Pay" | "p2Calc" | "p2Pay",
     amountField: "calculated" | "payable"
   ) {

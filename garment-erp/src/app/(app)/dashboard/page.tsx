@@ -361,6 +361,7 @@ function QuickActions({ role }: { role: string }) {
       href: "/cutting/new",
       permission: "cuts:edit",
       icon: <Scissors size={20} className="text-orange-600" />,
+      badge: undefined as string | undefined,
     },
     {
       label: "ጥሬ ዕቃ ገቢ አድርግ",
@@ -368,6 +369,7 @@ function QuickActions({ role }: { role: string }) {
       href: "/materials/receive",
       permission: "stock:edit",
       icon: <Package size={20} className="text-teal-600" />,
+      badge: undefined as string | undefined,
     },
     {
       label: "የጥራት ፍተሻ (QC)",
@@ -375,6 +377,7 @@ function QuickActions({ role }: { role: string }) {
       href: "/quality",
       permission: "qc:edit",
       icon: <CheckCircle2 size={20} className="text-pink-600" />,
+      badge: undefined as string | undefined,
     },
     {
       label: "የስራ ባንድሎች (Bundles)",
@@ -382,6 +385,7 @@ function QuickActions({ role }: { role: string }) {
       href: "/production/bundles",
       permission: "bundles:view",
       icon: <Layers size={20} className="text-indigo-600" />,
+      badge: undefined as string | undefined,
     },
     {
       label: "ኢንሴንቲቭ አፅድቅ",

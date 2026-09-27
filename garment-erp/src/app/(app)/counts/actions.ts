@@ -129,10 +129,19 @@ export async function verifyCountLine(lineId: string): Promise<void> {
   if (!line) throw new Error("ቁጥሩ አልተገኘም");
   if (line.status === "LOCKED") throw new Error("ቁጥሩ ተቆልፏል");
 
+  // Update the line status; verifiedById is tracked on HourlyCountSheet
   await db.hourlyCountLine.update({
     where: { id: lineId },
-    data: { status: "VERIFIED", verifiedById: session.user.id, verifiedAt: new Date() },
+    data: { status: "VERIFIED" },
   });
+
+  // Also mark the sheet as verified by this user
+  if (line.sheetId) {
+    await db.hourlyCountSheet.update({
+      where: { id: line.sheetId },
+      data: { verifiedById: session.user.id, verifiedAt: new Date() },
+    });
+  }
 
   await db.auditLog.create({
     data: {

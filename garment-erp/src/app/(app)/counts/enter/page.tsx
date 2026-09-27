@@ -70,7 +70,7 @@ export default async function CountEntryPage() {
       const employees = await db.employee.findMany({
         where: { departmentId: dept.id, isActive: true },
         include: {
-          hourlyCountLines: {
+          hourlyCounts: {
             where: { sheet: { date: today }, departmentId: dept.id },
             take: 1,
           },
@@ -118,7 +118,7 @@ export default async function CountEntryPage() {
             id: e.id,
             serialNumber: e.serialNumber,
             nameAm: e.nameAm,
-            existingLine: e.hourlyCountLines[0] ?? null,
+            existingLine: e.hourlyCounts[0] ?? null,
           })),
         }))}
         date={today.toISOString()}
