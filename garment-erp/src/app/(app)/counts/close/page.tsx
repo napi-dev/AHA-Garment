@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { requirePermission } from "@/lib/auth/permissions";
 import { am } from "@/lib/i18n/am";
 import { formatAsEthDate } from "@/lib/ethiopian-calendar";
+import { getEffectiveDate } from "@/lib/date-override/effective-date";
 import { DayCloseButton } from "./day-close-button";
 import { CheckSquare, Calendar, Users, FileText, Factory, TrendingUp, AlertTriangle } from "lucide-react";
 
@@ -12,8 +13,8 @@ export default async function DayClosePage() {
   if (!session?.user) redirect("/login");
   requirePermission(session.user.role, "counts:verify");
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  const today = await getEffectiveDate();
+  today.setUTCHours(0, 0, 0, 0);
 
   const dayClose = await db.dayClose.findUnique({ where: { date: today } });
 

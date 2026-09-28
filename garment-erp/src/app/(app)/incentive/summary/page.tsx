@@ -3,7 +3,8 @@ import { db } from "@/lib/db";
 import { redirect } from "next/navigation";
 import { requirePermission } from "@/lib/auth/permissions";
 import { am } from "@/lib/i18n/am";
-import { ethMonthName, todayEth } from "@/lib/ethiopian-calendar";
+import { ethMonthName } from "@/lib/ethiopian-calendar";
+import { getEffectiveEthDate } from "@/lib/date-override/effective-date";
 import { MonthlySummaryClient } from "./monthly-summary-client";
 import Link from "next/link";
 import Decimal from "decimal.js";
@@ -19,7 +20,7 @@ export default async function MonthlySummaryPage({
   requirePermission(session.user.role, "incentive:view");
 
   const params = await searchParams;
-  const eth = todayEth();
+  const eth = await getEffectiveEthDate();
   const year  = parseInt(params.year  ?? String(eth.year),  10);
   const month = parseInt(params.month ?? String(eth.month), 10);
 

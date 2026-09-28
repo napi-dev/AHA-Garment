@@ -1,7 +1,8 @@
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { am } from "@/lib/i18n/am";
-import { formatAsEthDate, todayEth, ethMonthName } from "@/lib/ethiopian-calendar";
+import { formatAsEthDate, ethMonthName } from "@/lib/ethiopian-calendar";
+import { getEffectiveDate, getEffectiveEthDate } from "@/lib/date-override/effective-date";
 import { redirect } from "next/navigation";
 import { hasPermission } from "@/lib/auth/permissions";
 import { DashboardCharts } from "./dashboard-charts";
@@ -18,9 +19,9 @@ export default async function DashboardPage() {
   if (!session?.user) redirect("/login");
   const { role, nameAm } = session.user;
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const eth = todayEth();
+  const today = await getEffectiveDate();
+  today.setUTCHours(0, 0, 0, 0);
+  const eth = await getEffectiveEthDate();
 
   // ── Today's stats ─────────────────────────────────────────────────────────
   const [

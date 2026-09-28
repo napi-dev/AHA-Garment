@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { requirePermission } from "@/lib/auth/permissions";
 import { am } from "@/lib/i18n/am";
 import { formatAsEthDate } from "@/lib/ethiopian-calendar";
+import { getEffectiveDate } from "@/lib/date-override/effective-date";
 import { AttendanceGrid } from "./attendance-grid";
 import { DatePicker } from "./date-picker";
 import { Users, Calendar, CheckCircle2 } from "lucide-react";
@@ -18,7 +19,10 @@ export default async function AttendancePage({
   requirePermission(session.user.role, "attendance:view");
 
   const params = await searchParams;
-  const dateStr = params.date ?? new Date().toISOString().split("T")[0];
+  // Default to the effective date (respects admin override); user can override via date picker
+  const effectiveToday = await getEffectiveDate();
+  effectiveToday.setUTCHours(0, 0, 0, 0);
+  const dateStr = params.date ?? effectiveToday.toISOString().split("T")[0];
   const date = new Date(dateStr + "T00:00:00Z");
 
   const departments = await db.department.findMany({

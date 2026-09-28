@@ -3,7 +3,8 @@ import { db } from "@/lib/db";
 import { redirect } from "next/navigation";
 import { requirePermission } from "@/lib/auth/permissions";
 import { am } from "@/lib/i18n/am";
-import { todayEth, ethMonthName } from "@/lib/ethiopian-calendar";
+import { ethMonthName } from "@/lib/ethiopian-calendar";
+import { getEffectiveDate, getEffectiveEthDate } from "@/lib/date-override/effective-date";
 import Link from "next/link";
 import { approveSalarySchedule } from "./actions";
 import { Banknote, ShieldCheck, Users, Calendar, AlertCircle, Edit3 } from "lucide-react";
@@ -13,8 +14,8 @@ export default async function SalaryPage() {
   if (!session?.user) redirect("/login");
   requirePermission(session.user.role, "salary:view");
 
-  const today = new Date();
-  const ethToday = todayEth();
+  const today = await getEffectiveDate();
+  const ethToday = await getEffectiveEthDate();
 
   // All active employees with their current salary
   const employees = await db.employee.findMany({

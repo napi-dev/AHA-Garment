@@ -187,10 +187,16 @@ export function ethMonthName(month: number): string {
 }
 
 /**
- * Get current Ethiopian date.
+ * Get current Ethiopian date using LOCAL wall-clock date (not UTC).
+ * Using UTC would shift the date when the local timezone is behind UTC,
+ * e.g. UTC-7 at 04:00 local = 11:00 UTC next day → wrong Ethiopian date.
  */
 export function todayEth(): EthDate {
-  return gregorianToEth(new Date());
+  const now = new Date();
+  // Build a Date at noon UTC using local year/month/day so gregorianToEth
+  // (which reads getUTCFullYear/Month/Date) sees the correct local day.
+  const localNoon = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate(), 12, 0, 0));
+  return gregorianToEth(localNoon);
 }
 
 // ─── Unit tests (inline — run with vitest) ────────────────────────────────────

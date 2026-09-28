@@ -2,7 +2,8 @@ import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { redirect } from "next/navigation";
 import { AppShell } from "@/components/nav/app-shell";
-import { todayEth, ethMonthName, formatAsEthDate } from "@/lib/ethiopian-calendar";
+import { ethMonthName, formatEthDate } from "@/lib/ethiopian-calendar";
+import { getEffectiveFull } from "@/lib/date-override/effective-date";
 
 export default async function AppLayout({
   children,
@@ -19,8 +20,12 @@ export default async function AppLayout({
     where: { resolvedAt: null },
   });
 
-  const eth = todayEth();
-  const ethDateDisplay = `${eth.day} ${ethMonthName(eth.month)} ${eth.year} ዓ.ም (${formatAsEthDate(new Date())})`;
+  // Get the effective Ethiopian date (override if set, otherwise auto-computed)
+  const { eth, isOverridden } = await getEffectiveFull();
+
+  const ethDateDisplay = `${eth.day} ${ethMonthName(eth.month)} ${eth.year} ዓ.ም (${formatEthDate(eth)})`;
+
+  const canEditDate = role === "ADMIN" || role === "SUPER_MANAGER";
 
   return (
     <AppShell
@@ -29,6 +34,11 @@ export default async function AppLayout({
       employeeCode={employeeCode}
       ethDateDisplay={ethDateDisplay}
       openAlertsCount={openAlertsCount}
+      isOverridden={isOverridden}
+      ethYear={eth.year}
+      ethMonth={eth.month}
+      ethDay={eth.day}
+      canEditDate={canEditDate}
     >
       {children}
     </AppShell>

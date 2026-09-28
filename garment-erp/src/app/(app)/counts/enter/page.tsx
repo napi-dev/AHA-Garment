@@ -6,6 +6,7 @@ import { am } from "@/lib/i18n/am";
 import { HourlyCountForm } from "./hourly-count-form";
 import { Clock, Lock, ArrowLeft } from "lucide-react";
 import Link from "next/link";
+import { getEffectiveDate } from "@/lib/date-override/effective-date";
 
 export default async function CountEntryPage() {
   const session = await auth();
@@ -14,8 +15,8 @@ export default async function CountEntryPage() {
   const { role, employeeId } = session.user;
   requirePermission(role, "counts:enter");
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  const today = await getEffectiveDate();
+  today.setUTCHours(0, 0, 0, 0);
 
   // Check if day is already closed
   const dayClose = await db.dayClose.findUnique({ where: { date: today } });

@@ -5,8 +5,9 @@ import { requirePermission } from "@/lib/auth/permissions";
 import { am } from "@/lib/i18n/am";
 import {
   ethMonthName, defaultPeriodBoundaries, formatAsEthDate,
-  todayEth, ethToGregorian,
+  ethToGregorian,
 } from "@/lib/ethiopian-calendar";
+import { getEffectiveEthDate } from "@/lib/date-override/effective-date";
 import { savePeriodConfig } from "./actions";
 import Link from "next/link";
 import { Calendar, ArrowLeft, Save, CheckCircle2, Clock, Sparkles } from "lucide-react";
@@ -16,7 +17,7 @@ export default async function PeriodsConfigPage() {
   if (!session?.user) redirect("/login");
   requirePermission(session.user.role, "settings:manage");
 
-  const eth  = todayEth();
+  const eth  = await getEffectiveEthDate();
   // Show current year + next year
   const years = [eth.year - 1, eth.year, eth.year + 1];
   const months = Array.from({ length: 13 }, (_, i) => i + 1);

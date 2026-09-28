@@ -6,9 +6,10 @@ import { signOut } from "next-auth/react";
 import type { Role } from "@prisma/client";
 import { am } from "@/lib/i18n/am";
 import {
-  Menu, X, Bell, Calendar, User, LogOut,
-  ShieldCheck, AlertTriangle, Sparkles
+  Menu, Bell, User, LogOut,
+  ShieldCheck, Sparkles
 } from "lucide-react";
+import { DateOverrideBadge } from "./date-override-badge";
 
 interface AppHeaderProps {
   role: Role;
@@ -16,6 +17,11 @@ interface AppHeaderProps {
   employeeCode: string;
   ethDateDisplay: string;
   openAlertsCount: number;
+  isOverridden: boolean;
+  ethYear: number;
+  ethMonth: number;
+  ethDay: number;
+  canEditDate: boolean;
   onToggleMobileMenu: () => void;
 }
 
@@ -25,6 +31,11 @@ export function AppHeader({
   employeeCode,
   ethDateDisplay,
   openAlertsCount,
+  isOverridden,
+  ethYear,
+  ethMonth,
+  ethDay,
+  canEditDate,
   onToggleMobileMenu,
 }: AppHeaderProps) {
   const [profileOpen, setProfileOpen] = useState(false);
@@ -52,11 +63,15 @@ export function AppHeader({
 
         {/* Center/Right: Ethiopian Date, Alerts, and User Profile */}
         <div className="flex items-center gap-3">
-          {/* Ethiopian Date Badge */}
-          <div className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-100/80 border border-slate-200/70 text-slate-700 text-xs font-ethiopic">
-            <Calendar size={14} className="text-blue-600" />
-            <span className="font-medium">{ethDateDisplay}</span>
-          </div>
+          {/* Ethiopian Date Badge — editable for ADMIN/SUPER_MANAGER */}
+          <DateOverrideBadge
+            ethDateDisplay={ethDateDisplay}
+            isOverridden={isOverridden}
+            ethYear={ethYear}
+            ethMonth={ethMonth}
+            ethDay={ethDay}
+            canEdit={canEditDate}
+          />
 
           {/* Quick Alert Indicator */}
           <Link

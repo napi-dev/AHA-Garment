@@ -12,6 +12,11 @@ interface AppShellProps {
   employeeCode: string;
   ethDateDisplay: string;
   openAlertsCount: number;
+  isOverridden: boolean;
+  ethYear: number;
+  ethMonth: number;
+  ethDay: number;
+  canEditDate: boolean;
   children: React.ReactNode;
 }
 
@@ -21,6 +26,11 @@ export function AppShell({
   employeeCode,
   ethDateDisplay,
   openAlertsCount,
+  isOverridden,
+  ethYear,
+  ethMonth,
+  ethDay,
+  canEditDate,
   children,
 }: AppShellProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -45,6 +55,11 @@ export function AppShell({
           employeeCode={employeeCode}
           ethDateDisplay={ethDateDisplay}
           openAlertsCount={openAlertsCount}
+          isOverridden={isOverridden}
+          ethYear={ethYear}
+          ethMonth={ethMonth}
+          ethDay={ethDay}
+          canEditDate={canEditDate}
           onToggleMobileMenu={() => setMobileMenuOpen((prev) => !prev)}
         />
 
