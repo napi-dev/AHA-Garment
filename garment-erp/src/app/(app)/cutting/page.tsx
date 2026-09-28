@@ -98,7 +98,7 @@ export default async function CuttingPage() {
 
         <div className="bg-slate-50/80 border border-slate-200/70 rounded-xl p-4 transition-all hover:bg-white hover:shadow-sm">
           <div className="flex items-center justify-between mb-1">
-            <p className="text-xs font-medium text-slate-500 font-ethiopic">ከወሰን በላይ ብክነት (>5%)</p>
+            <p className="text-xs font-medium text-slate-500 font-ethiopic">ከወሰን በላይ ብክነት (&gt;5%)</p>
             <AlertTriangle size={16} className={highWastageJobs.length > 0 ? "text-rose-500" : "text-slate-400"} />
           </div>
           <p className={`text-2xl font-bold tabular-nums ${highWastageJobs.length > 0 ? "text-rose-600" : "text-slate-400"}`}>
