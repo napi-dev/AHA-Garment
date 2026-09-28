@@ -21,7 +21,7 @@
  */
 
 import { db } from "@/lib/db";
-import { renderToBuffer } from "@react-pdf/renderer";
+import { renderPdfToBuffer } from "@/lib/pdf/render";
 import { IncentiveStatementPdf } from "@/lib/pdf/incentive-statement";
 import { DailyProductionSheetPdf } from "@/lib/pdf/daily-production-sheet";
 import { sendMessage, sendDocument, notifyDevError, CHATS, TEMPLATES } from "./telegram";
@@ -184,13 +184,13 @@ async function buildIncentiveStatementPdf(periodId: string) {
   const dateRange   = `${formatAsEthDate(period.startDate)} → ${formatAsEthDate(period.endDate)}`;
   const mName       = ethMonthName(period.ethMonth);
 
-  const buffer = await renderToBuffer(
+  const buffer = await renderPdfToBuffer(
     React.createElement(IncentiveStatementPdf, {
       periodLabel, dateRange, lines,
       totalCalc: totalCalc.toFixed(2),
       totalPay:  totalPay.toFixed(2),
     })
-  ) as Buffer;
+  );
 
   const filename = `${period.startDate.toISOString().split("T")[0]}_incentive-statement-day${period.paymentDay}_v1.pdf`;
   const caption  = TEMPLATES.incentiveReady(
@@ -253,7 +253,7 @@ async function buildDailyProductionPdf(date: Date) {
     };
   });
 
-  const buffer = await renderToBuffer(
+  const buffer = await renderPdfToBuffer(
     React.createElement(DailyProductionSheetPdf, {
       dateLabel: formatAsEthDate(date),
       supervisorName: "",
@@ -261,7 +261,7 @@ async function buildDailyProductionPdf(date: Date) {
       rows, totalProduced, aboveTarget,
       totalWorkers: rows.length,
     })
-  ) as Buffer;
+  );
 
   const dateStr  = date.toISOString().split("T")[0];
   const filename = `${dateStr}_daily-production-sheet_v1.pdf`;

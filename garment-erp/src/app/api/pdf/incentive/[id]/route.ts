@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { renderToBuffer } from "@react-pdf/renderer";
+import { renderPdfToBuffer } from "@/lib/pdf/render";
 import { IncentiveStatementPdf } from "@/lib/pdf/incentive-statement";
 import { ethMonthName, formatAsEthDate } from "@/lib/ethiopian-calendar";
 import Decimal from "decimal.js";
@@ -54,7 +54,7 @@ export async function GET(
   const periodLabel = `ኢንሴንቲቭ ክፍያ — ቀን ${period.paymentDay}`;
   const dateRange   = `${formatAsEthDate(period.startDate)} → ${formatAsEthDate(period.endDate)}  (${ethMonthName(period.ethMonth)} ${period.ethYear} ዓ.ም)`;
 
-  const buffer = await renderToBuffer(
+  const buffer = await renderPdfToBuffer(
     React.createElement(IncentiveStatementPdf, {
       periodLabel,
       dateRange,

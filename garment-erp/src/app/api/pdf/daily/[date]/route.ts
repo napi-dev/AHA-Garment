@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { renderToBuffer } from "@react-pdf/renderer";
+import { renderPdfToBuffer } from "@/lib/pdf/render";
 import { DailyProductionSheetPdf } from "@/lib/pdf/daily-production-sheet";
 import { formatAsEthDate } from "@/lib/ethiopian-calendar";
 import React from "react";
@@ -72,7 +72,7 @@ export async function GET(
     };
   });
 
-  const buffer = await renderToBuffer(
+  const buffer = await renderPdfToBuffer(
     React.createElement(DailyProductionSheetPdf, {
       dateLabel:      formatAsEthDate(date),
       supervisorName: "",
