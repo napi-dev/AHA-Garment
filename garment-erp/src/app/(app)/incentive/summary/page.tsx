@@ -5,7 +5,9 @@ import { requirePermission } from "@/lib/auth/permissions";
 import { am } from "@/lib/i18n/am";
 import { ethMonthName, todayEth } from "@/lib/ethiopian-calendar";
 import { MonthlySummaryClient } from "./monthly-summary-client";
+import Link from "next/link";
 import Decimal from "decimal.js";
+import { BarChart2, ArrowRight, Filter, Calendar, Award, Calculator, TrendingUp } from "lucide-react";
 
 export default async function MonthlySummaryPage({
   searchParams,
@@ -105,60 +107,108 @@ export default async function MonthlySummaryPage({
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between flex-wrap gap-3">
+      {/* Top Navigation Link */}
+      <div>
+        <Link
+          href="/incentive"
+          className="inline-flex items-center gap-2 text-xs font-semibold text-slate-500 hover:text-blue-600 transition-colors font-ethiopic"
+        >
+          <ArrowRight size={14} className="rotate-180" />
+          <span>ወደ ኢንሴንቲቭ ዝርዝር ተመለስ</span>
+        </Link>
+      </div>
+
+      {/* Header Card */}
+      <div className="erp-card p-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 font-ethiopic">
+          <div className="flex items-center gap-2 text-xs font-semibold text-indigo-600 uppercase tracking-wider font-ethiopic">
+            <BarChart2 size={14} />
+            <span>ወርሃዊ የክፍያ ማጠቃለያ</span>
+          </div>
+          <h1 className="text-2xl font-bold text-slate-900 font-ethiopic mt-1">
             {am.incentive.monthSummary}
           </h1>
-          <p className="text-gray-500 text-sm mt-0.5 font-ethiopic">
-            {ethMonthName(month)} {year} ዓ.ም
+          <p className="text-slate-500 text-sm mt-0.5 font-ethiopic flex items-center gap-2">
+            <Calendar size={14} className="text-slate-400" />
+            <span>{ethMonthName(month)} {year} ዓ.ም</span>
           </p>
         </div>
 
-        {/* Month selector */}
-        <form method="GET" className="flex gap-2">
-          <select name="year" defaultValue={year}
-            className="px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-            {[...new Set(allPeriods.map((p) => p.ethYear))].map((y) => (
+        {/* Month Selector */}
+        <form method="GET" className="flex items-center gap-2.5">
+          <select
+            name="year"
+            defaultValue={year}
+            className="px-3.5 py-2 rounded-xl border border-slate-200 bg-white text-sm font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+          >
+            {[...new Set([eth.year, ...allPeriods.map((p) => p.ethYear)])].map((y) => (
               <option key={y} value={y}>{y} ዓ.ም</option>
             ))}
           </select>
-          <select name="month" defaultValue={month}
-            className="px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-ethiopic">
+          <select
+            name="month"
+            defaultValue={month}
+            className="px-3.5 py-2 rounded-xl border border-slate-200 bg-white text-sm font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 font-ethiopic"
+          >
             {am.ethMonths.map((m, i) => (
               <option key={i + 1} value={i + 1}>{m}</option>
             ))}
           </select>
-          <button type="submit"
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-ethiopic hover:bg-blue-700">
-            {am.filter}
+          <button
+            type="submit"
+            className="btn-secondary flex items-center gap-2 px-4 py-2 font-ethiopic"
+          >
+            <Filter size={15} />
+            <span>{am.filter}</span>
           </button>
         </form>
       </div>
 
-      {/* Grand totals */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <SumCard label={am.incentive.period1 + " " + am.incentive.calculated}
-          value={p1 ? rows.reduce((s, r) => s + parseFloat(r.p1Calculated), 0).toFixed(2) : "—"} />
-        <SumCard label={am.incentive.period2 + " " + am.incentive.calculated}
-          value={p2 ? rows.reduce((s, r) => s + parseFloat(r.p2Calculated), 0).toFixed(2) : "—"} />
-        <SumCard label={"ወር " + am.incentive.calculated}
-          value={grandCalc.toFixed(2)} color="text-blue-700" />
-        <SumCard label={"ወር " + am.incentive.payable}
-          value={grandPay.toFixed(2)} color="text-emerald-700" />
+      {/* Grand Totals Row */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <div className="bg-slate-50/80 border border-slate-200/70 rounded-xl p-4 transition-all hover:bg-white hover:shadow-sm">
+          <p className="text-xs font-medium text-slate-500 font-ethiopic mb-1">
+            {am.incentive.period1} የተሰላ
+          </p>
+          <p className="text-2xl font-bold text-slate-800 tabular-nums">
+            {p1 ? rows.reduce((s, r) => s + parseFloat(r.p1Calculated), 0).toLocaleString("en-ET", { minimumFractionDigits: 2 }) : "—"}
+          </p>
+        </div>
+
+        <div className="bg-slate-50/80 border border-slate-200/70 rounded-xl p-4 transition-all hover:bg-white hover:shadow-sm">
+          <p className="text-xs font-medium text-slate-500 font-ethiopic mb-1">
+            {am.incentive.period2} የተሰላ
+          </p>
+          <p className="text-2xl font-bold text-slate-800 tabular-nums">
+            {p2 ? rows.reduce((s, r) => s + parseFloat(r.p2Calculated), 0).toLocaleString("en-ET", { minimumFractionDigits: 2 }) : "—"}
+          </p>
+        </div>
+
+        <div className="bg-slate-50/80 border border-slate-200/70 rounded-xl p-4 transition-all hover:bg-white hover:shadow-sm">
+          <p className="text-xs font-medium text-slate-500 font-ethiopic mb-1">
+            ወርሃዊ የተሰላ ድምር
+          </p>
+          <p className="text-2xl font-bold text-blue-700 tabular-nums">
+            {grandCalc.toNumber().toLocaleString("en-ET", { minimumFractionDigits: 2 })}
+          </p>
+        </div>
+
+        <div className="bg-slate-50/80 border border-slate-200/70 rounded-xl p-4 transition-all hover:bg-white hover:shadow-sm">
+          <p className="text-xs font-medium text-slate-500 font-ethiopic mb-1">
+            ወርሃዊ የሚከፈል የተጣራ
+          </p>
+          <p className="text-2xl font-bold text-emerald-700 tabular-nums">
+            {grandPay.toNumber().toLocaleString("en-ET", { minimumFractionDigits: 2 })} <span className="text-xs font-normal">ብር</span>
+          </p>
+        </div>
       </div>
 
-      {/* Client component: table + chart */}
-      <MonthlySummaryClient rows={rows} grandCalc={grandCalc.toFixed(2)} grandPay={grandPay.toFixed(2)} />
-    </div>
-  );
-}
-
-function SumCard({ label, value, color = "text-gray-800" }: { label: string; value: string; color?: string }) {
-  return (
-    <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
-      <p className="text-xs text-gray-500 font-ethiopic mb-1">{label}</p>
-      <p className={`text-xl font-bold tabular-nums ${color}`}>{value}</p>
+      {/* Client Component: Table + BarChart */}
+      <MonthlySummaryClient
+        rows={rows}
+        grandCalc={grandCalc.toFixed(2)}
+        grandPay={grandPay.toFixed(2)}
+      />
     </div>
   );
 }

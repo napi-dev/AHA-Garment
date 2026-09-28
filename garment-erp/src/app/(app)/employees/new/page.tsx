@@ -4,6 +4,8 @@ import { redirect } from "next/navigation";
 import { requirePermission } from "@/lib/auth/permissions";
 import { am } from "@/lib/i18n/am";
 import { createEmployee } from "../actions";
+import Link from "next/link";
+import { UserPlus, ArrowRight, UserCheck, Building2 } from "lucide-react";
 
 export default async function NewEmployeePage() {
   const session = await auth();
@@ -16,61 +18,86 @@ export default async function NewEmployeePage() {
   });
 
   return (
-    <div className="max-w-lg mx-auto space-y-6">
-      <h1 className="text-2xl font-bold text-gray-900 font-ethiopic">{am.employees.addEmployee}</h1>
+    <div className="max-w-xl mx-auto space-y-6">
+      {/* Top Navigation Link */}
+      <div>
+        <Link
+          href="/employees"
+          className="inline-flex items-center gap-2 text-xs font-semibold text-slate-500 hover:text-blue-600 transition-colors font-ethiopic"
+        >
+          <ArrowRight size={14} className="rotate-180" />
+          <span>ወደ ሠራተኞች ዝርዝር ተመለስ</span>
+        </Link>
+      </div>
 
-      <form action={createEmployee} className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 space-y-5">
+      {/* Header Card */}
+      <div className="erp-card p-6">
+        <div className="flex items-center gap-2 text-xs font-semibold text-blue-600 uppercase tracking-wider font-ethiopic">
+          <UserPlus size={14} />
+          <span>የሰው ኃይል ምዝገባ</span>
+        </div>
+        <h1 className="text-2xl font-bold text-slate-900 font-ethiopic mt-1">
+          {am.employees.addEmployee}
+        </h1>
+        <p className="text-slate-500 text-sm mt-0.5 font-ethiopic">
+          አዲስ ሠራተኛ ወደ ፋብሪካው የመረጃ ቋት ለማስገባት ቅጹን በጥንቃቄ ይሙሉ
+        </p>
+      </div>
 
+      {/* Form Card */}
+      <form action={createEmployee} className="erp-card p-6 md:p-8 space-y-5">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1.5 font-ethiopic">
-            {am.employees.name} <span className="text-red-500">*</span>
+          <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5 font-ethiopic">
+            {am.employees.name} (በአማርኛ) <span className="text-rose-500">*</span>
           </label>
           <input
             name="nameAm"
             required
-            className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 font-ethiopic"
-            placeholder="ሙሉ ስም"
+            className="input-field font-ethiopic"
+            placeholder="ምሳሌ፦ አበባየሁ በቀለ"
           />
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1.5">English name (optional)</label>
+          <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
+            English Name (ስም በእንግሊዝኛ - አማራጭ)
+          </label>
           <input
             name="nameEn"
-            className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            placeholder="Full name"
+            className="input-field"
+            placeholder="e.g. Abebayehu Bekele"
           />
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1.5 font-ethiopic">
-            {am.employees.department} <span className="text-red-500">*</span>
+          <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5 font-ethiopic">
+            {am.employees.department} <span className="text-rose-500">*</span>
           </label>
           <select
             name="departmentId"
             required
-            className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 font-ethiopic"
+            className="input-field font-ethiopic text-slate-800"
           >
-            <option value="">ክፍል ምረጥ</option>
+            <option value="">የሥራ ክፍል ይምረጡ</option>
             {departments.map((d) => (
-              <option key={d.id} value={d.id}>{d.nameAm}</option>
+              <option key={d.id} value={d.id}>
+                {d.nameAm}
+              </option>
             ))}
           </select>
         </div>
 
-        <div className="flex gap-3 pt-2">
-          <button
-            type="submit"
-            className="flex-1 py-3 bg-blue-600 text-white rounded-xl font-ethiopic font-semibold hover:bg-blue-700 transition-colors"
-          >
-            {am.save}
+        <div className="pt-4 flex items-center gap-3">
+          <button type="submit" className="btn-primary flex-1 font-ethiopic">
+            <UserCheck size={16} />
+            <span>{am.save}</span>
           </button>
-          <a
+          <Link
             href="/employees"
-            className="flex-1 py-3 bg-gray-100 text-gray-700 rounded-xl font-ethiopic font-semibold text-center hover:bg-gray-200 transition-colors"
+            className="btn-secondary px-6 font-ethiopic text-center"
           >
             {am.cancel}
-          </a>
+          </Link>
         </div>
       </form>
     </div>

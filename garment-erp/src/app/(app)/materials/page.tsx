@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { requirePermission } from "@/lib/auth/permissions";
 import { am } from "@/lib/i18n/am";
 import Link from "next/link";
-import { Package, AlertTriangle, Plus } from "lucide-react";
+import { Package, AlertTriangle, Plus, ArrowDownLeft, ArrowUpRight, Search, Filter, History, CheckCircle2, ShieldAlert } from "lucide-react";
 
 export default async function MaterialsPage({
   searchParams,
@@ -49,97 +49,219 @@ export default async function MaterialsPage({
   const canEdit = ["ADMIN", "SUPER_MANAGER", "STORE_KEEPER"].includes(session.user.role);
 
   return (
-    <div className="space-y-5">
-      <div className="flex items-center justify-between flex-wrap gap-3">
+    <div className="space-y-6">
+      {/* Top Header Card */}
+      <div className="erp-card p-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 font-ethiopic">{am.materials.title}</h1>
-          {lowCount > 0 && (
-            <p className="text-sm text-orange-600 font-ethiopic mt-0.5 flex items-center gap-1">
-              <AlertTriangle size={14} /> {lowCount} ዝቅተኛ ክምችት ላይ
-            </p>
-          )}
+          <div className="flex items-center gap-2 text-xs font-semibold text-blue-600 uppercase tracking-wider font-ethiopic">
+            <Package size={14} />
+            <span>የጥሬ ዕቃና ግብአቶች መጋዘን</span>
+          </div>
+          <h1 className="text-2xl font-bold text-slate-900 font-ethiopic mt-1">
+            {am.materials.title}
+          </h1>
+          <p className="text-slate-500 text-sm mt-0.5 font-ethiopic">
+            የጨርቆች፣ ክሮች እና መለዋወጫዎች ወቅታዊ የክምችት መጠን እና የእንቅስቃሴ ክትትል
+          </p>
         </div>
-        <div className="flex gap-2">
+
+        <div className="flex items-center gap-2.5 flex-wrap">
           {canEdit && (
-            <Link href="/materials/new"
-              className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2.5 rounded-xl text-sm font-medium hover:bg-blue-700 transition-colors font-ethiopic">
-              <Plus size={16} /> {am.materials.title} ጨምር
+            <Link
+              href="/materials/new"
+              className="btn-secondary flex items-center gap-2 font-ethiopic"
+            >
+              <Plus size={16} />
+              <span>{am.materials.newMaterial}</span>
             </Link>
           )}
-          <Link href="/materials/receive"
-            className="flex items-center gap-2 bg-green-600 text-white px-4 py-2.5 rounded-xl text-sm font-medium hover:bg-green-700 transition-colors font-ethiopic">
-            <Package size={16} /> {am.materials.receive}
+
+          <Link
+            href="/materials/receive"
+            className="btn-primary flex items-center gap-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 font-ethiopic"
+          >
+            <ArrowDownLeft size={16} />
+            <span>{am.materials.receive}</span>
           </Link>
         </div>
       </div>
 
-      {/* Filters */}
-      <form method="GET" className="flex flex-wrap gap-3">
-        <input name="q" defaultValue={params.q ?? ""}
-          placeholder="SKU ወይም ስም ፈልግ"
-          className="px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-ethiopic w-48" />
-        <label className="flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-200 text-sm cursor-pointer hover:bg-gray-50">
-          <input type="checkbox" name="low" value="1" defaultChecked={showLowOnly}
-            className="accent-orange-500" />
-          <span className="font-ethiopic text-orange-700">{am.materials.lowStock} ብቻ</span>
-        </label>
-        <button type="submit"
-          className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-ethiopic hover:bg-gray-200">
-          {am.filter}
-        </button>
-      </form>
+      {/* Metrics Row */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <div className="bg-slate-50/80 border border-slate-200/70 rounded-xl p-4 transition-all hover:bg-white hover:shadow-sm">
+          <div className="flex items-center justify-between mb-1">
+            <p className="text-xs font-medium text-slate-500 font-ethiopic">የተመዘገቡ ዕቃዎች (SKU)</p>
+            <Package size={16} className="text-blue-600" />
+          </div>
+          <p className="text-2xl font-bold text-slate-800 tabular-nums">{materials.length}</p>
+        </div>
 
-      {/* Table */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-        <table className="w-full text-sm data-table">
-          <thead>
-            <tr>
-              <th className="w-28">{am.materials.sku}</th>
-              <th>{am.materials.name}</th>
-              <th className="w-16">{am.materials.unit}</th>
-              <th className="w-28">{am.materials.currentStock}</th>
-              <th className="w-28">{am.materials.minimumLevel}</th>
-              <th className="w-24">{am.status}</th>
-              {canEdit && <th className="w-24">{am.actions}</th>}
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.length === 0 && (
-              <tr><td colSpan={7} className="text-center py-12 text-gray-400 font-ethiopic">{am.noData}</td></tr>
-            )}
-            {filtered.map((m) => (
-              <tr key={m.id} className={m.isLow ? "bg-orange-50/60" : ""}>
-                <td className="font-mono text-xs font-medium text-gray-700">{m.sku}</td>
-                <td className="font-ethiopic text-gray-800 font-medium">{m.nameAm}</td>
-                <td className="text-center text-gray-500">{m.unit}</td>
-                <td className={`tabular-nums font-semibold text-right ${m.isLow ? "text-orange-700" : "text-gray-800"}`}>
-                  {m.onHand.toLocaleString("en-ET", { minimumFractionDigits: 2, maximumFractionDigits: 3 })}
-                  {m.isLow && <span className="ml-1 text-orange-500">⚠️</span>}
-                </td>
-                <td className="tabular-nums text-right text-gray-500">
-                  {Number(m.minimumLevel).toLocaleString("en-ET", { minimumFractionDigits: 2 })}
-                </td>
-                <td className="text-center">
-                  {m.isLow
-                    ? <span className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full font-ethiopic">{am.materials.lowStock}</span>
-                    : <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-ethiopic">ጥሩ</span>}
-                </td>
-                {canEdit && (
-                  <td>
-                    <div className="flex gap-2 justify-center">
-                      <Link href={`/materials/${m.id}/movements`}
-                        className="text-xs text-blue-600 hover:underline font-ethiopic">ታሪክ</Link>
-                      <Link href={`/materials/${m.id}/issue`}
-                        className="text-xs text-purple-600 hover:underline font-ethiopic">{am.materials.issue}</Link>
-                    </div>
-                  </td>
-                )}
+        <div className="bg-slate-50/80 border border-slate-200/70 rounded-xl p-4 transition-all hover:bg-white hover:shadow-sm">
+          <div className="flex items-center justify-between mb-1">
+            <p className="text-xs font-medium text-slate-500 font-ethiopic">ዝቅተኛ ክምችት ላይ ያሉ</p>
+            <AlertTriangle size={16} className={lowCount > 0 ? "text-amber-500" : "text-slate-400"} />
+          </div>
+          <p className={`text-2xl font-bold tabular-nums ${lowCount > 0 ? "text-amber-600" : "text-slate-800"}`}>
+            {lowCount}
+          </p>
+        </div>
+
+        <div className="bg-slate-50/80 border border-slate-200/70 rounded-xl p-4 transition-all hover:bg-white hover:shadow-sm">
+          <div className="flex items-center justify-between mb-1">
+            <p className="text-xs font-medium text-slate-500 font-ethiopic">በቂ ክምችት ያላቸው</p>
+            <CheckCircle2 size={16} className="text-emerald-600" />
+          </div>
+          <p className="text-2xl font-bold text-emerald-700 tabular-nums">
+            {materials.length - lowCount}
+          </p>
+        </div>
+
+        <div className="bg-slate-50/80 border border-slate-200/70 rounded-xl p-4 transition-all hover:bg-white hover:shadow-sm">
+          <div className="flex items-center justify-between mb-1">
+            <p className="text-xs font-medium text-slate-500 font-ethiopic">የተጣሩ ዕቃዎች</p>
+            <Filter size={16} className="text-indigo-600" />
+          </div>
+          <p className="text-2xl font-bold text-indigo-700 tabular-nums">{filtered.length}</p>
+        </div>
+      </div>
+
+      {lowCount > 0 && (
+        <div className="alert-warning flex items-center gap-2 font-ethiopic text-xs">
+          <AlertTriangle size={16} className="text-amber-700 flex-shrink-0" />
+          <span>{lowCount} ጥሬ ዕቃዎች ከተፈቀደው ዝቅተኛ የክምችት ወሰን በታች ደርሰዋል! አስቸኳይ ግዢ ወይም አቅርቦት ያከናውኑ።</span>
+        </div>
+      )}
+
+      {/* Filter / Search Bar */}
+      <div className="erp-card p-4">
+        <form method="GET" className="flex flex-wrap items-center gap-3">
+          <div className="relative flex-1 min-w-[220px]">
+            <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              name="q"
+              defaultValue={params.q ?? ""}
+              placeholder="በዕቃ መለያ (SKU) ወይም በስም ፈልግ..."
+              className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 font-ethiopic placeholder:text-slate-400"
+            />
+          </div>
+
+          <label className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-sm cursor-pointer hover:bg-slate-50 font-ethiopic text-slate-700">
+            <input
+              type="checkbox"
+              name="low"
+              value="1"
+              defaultChecked={showLowOnly}
+              className="rounded accent-amber-500"
+            />
+            <span className="text-amber-800 font-semibold">{am.materials.lowStock} ብቻ</span>
+          </label>
+
+          <button
+            type="submit"
+            className="btn-secondary flex items-center gap-2"
+          >
+            <Filter size={15} />
+            <span>{am.filter}</span>
+          </button>
+
+          {(params.q || showLowOnly) && (
+            <Link
+              href="/materials"
+              className="text-xs text-slate-500 hover:text-slate-800 font-ethiopic px-2 py-1"
+            >
+              ማጣሪያዎችን አፅዳ
+            </Link>
+          )}
+        </form>
+      </div>
+
+      {/* Main Stock Table */}
+      <div className="erp-card overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm data-table">
+            <thead>
+              <tr>
+                <th className="w-28 text-center">{am.materials.sku}</th>
+                <th className="text-right">{am.materials.name}</th>
+                <th className="w-20 text-center">{am.materials.unit}</th>
+                <th className="w-32 text-right">{am.materials.currentStock}</th>
+                <th className="w-32 text-right">{am.materials.minimumLevel}</th>
+                <th className="w-28 text-center">{am.status}</th>
+                {canEdit && <th className="w-36 text-center">{am.actions}</th>}
               </tr>
-            ))}
-          </tbody>
-        </table>
-        <div className="px-5 py-2 text-xs text-gray-400 border-t border-gray-100 font-ethiopic">
-          {filtered.length} ጥሬ እቃዎች
+            </thead>
+            <tbody>
+              {filtered.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="text-center py-16 text-slate-400 font-ethiopic">
+                    <Package size={36} className="mx-auto mb-2 text-slate-300" />
+                    <p>{am.noData}</p>
+                  </td>
+                </tr>
+              ) : (
+                filtered.map((m) => (
+                  <tr key={m.id} className={m.isLow ? "bg-amber-50/50 hover:bg-amber-50/80" : "hover:bg-slate-50/80 transition-colors"}>
+                    <td className="font-mono text-xs font-semibold text-slate-700 text-center py-3.5">
+                      <span className="bg-slate-100 px-2 py-0.5 rounded">
+                        {m.sku}
+                      </span>
+                    </td>
+                    <td className="font-ethiopic font-medium text-slate-900 text-right py-3.5">
+                      {m.nameAm}
+                    </td>
+                    <td className="text-center text-slate-600 font-ethiopic text-xs py-3.5">
+                      {m.unit}
+                    </td>
+                    <td className={`tabular-nums font-bold text-right py-3.5 ${m.isLow ? "text-amber-700" : "text-slate-800"}`}>
+                      {m.onHand.toLocaleString("en-ET", { minimumFractionDigits: 2, maximumFractionDigits: 3 })}
+                    </td>
+                    <td className="tabular-nums text-right text-slate-500 py-3.5">
+                      {Number(m.minimumLevel).toLocaleString("en-ET", { minimumFractionDigits: 2 })}
+                    </td>
+                    <td className="text-center py-3.5">
+                      {m.isLow ? (
+                        <span className="badge-danger font-ethiopic">
+                          <AlertTriangle size={12} />
+                          {am.materials.lowStock}
+                        </span>
+                      ) : (
+                        <span className="badge-verified font-ethiopic">
+                          <CheckCircle2 size={12} />
+                          በቂ ክምችት
+                        </span>
+                      )}
+                    </td>
+                    {canEdit && (
+                      <td className="text-center py-3.5">
+                        <div className="flex items-center justify-center gap-2">
+                          <Link
+                            href={`/materials/${m.id}/movements`}
+                            className="p-1.5 text-slate-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors font-ethiopic text-xs flex items-center gap-1"
+                            title="የእንቅስቃሴ ታሪክ"
+                          >
+                            <History size={14} />
+                            <span>ታሪክ</span>
+                          </Link>
+                          <Link
+                            href={`/materials/${m.id}/issue`}
+                            className="p-1.5 text-slate-600 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-colors font-ethiopic text-xs flex items-center gap-1"
+                            title={am.materials.issue}
+                          >
+                            <ArrowUpRight size={14} />
+                            <span>{am.materials.issue}</span>
+                          </Link>
+                        </div>
+                      </td>
+                    )}
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+        <div className="px-6 py-3 border-t border-slate-100 bg-slate-50/50 text-xs text-slate-500 font-ethiopic flex justify-between items-center">
+          <span>በዚህ ገጽ ላይ {filtered.length} ጥሬ ዕቃዎች ይታያሉ</span>
+          <span>ጠቅላላ የዕቃ ዓይነቶች፦ {materials.length}</span>
         </div>
       </div>
     </div>

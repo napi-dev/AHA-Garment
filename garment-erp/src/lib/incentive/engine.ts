@@ -223,7 +223,7 @@ export interface DailyCountResult {
 
 export function calculateDailyCount(input: DailyCountInput): DailyCountResult {
   const hours = [input.h1, input.h2, input.h3, input.h4, input.h5, input.h6, input.h7, input.h8];
-  const totalProduced = hours.reduce((sum, h) => sum + (h ?? 0), 0);
+  const totalProduced = hours.reduce<number>((sum, h) => sum + (h ?? 0), 0);
   const targetForDay = input.hourlyTarget * input.hoursWorked;
   const dailyDifference = totalProduced - targetForDay;
   const plusPieces = Math.max(0, dailyDifference);

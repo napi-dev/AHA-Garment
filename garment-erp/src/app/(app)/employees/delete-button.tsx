@@ -2,12 +2,13 @@
 
 import { useTransition } from "react";
 import { deleteEmployee } from "./actions";
+import { Trash2 } from "lucide-react";
 
 export function DeleteEmployeeButton({ empId, nameAm }: { empId: string; nameAm: string }) {
   const [pending, startTransition] = useTransition();
 
   function handleClick() {
-    if (!confirm(`"${nameAm}" ሠራተኛ ይሰርዙ?\n(ከንቁ ሠራተኞች ዝርዝር ይወጣሉ)`)) return;
+    if (!confirm(`"${nameAm}" የተባሉትን ሠራተኛ ከዝርዝር ማውጣት ይፈልጋሉ?\n(የሥራ ሁኔታቸው ወደ "የማይሰራ" ይቀየራል)`)) return;
     startTransition(() => deleteEmployee(empId));
   }
 
@@ -15,9 +16,10 @@ export function DeleteEmployeeButton({ empId, nameAm }: { empId: string; nameAm:
     <button
       onClick={handleClick}
       disabled={pending}
-      className="text-xs text-red-500 hover:underline font-ethiopic disabled:opacity-40"
+      className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors disabled:opacity-40"
+      title="ከዝርዝር አስወግድ"
     >
-      {pending ? "..." : "አጥፋ"}
+      <Trash2 size={15} />
     </button>
   );
 }

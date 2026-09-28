@@ -5,6 +5,7 @@ import { requirePermission } from "@/lib/auth/permissions";
 import { am } from "@/lib/i18n/am";
 import { formatAsEthDate } from "@/lib/ethiopian-calendar";
 import Link from "next/link";
+import { Users, ArrowLeft, Filter, TrendingUp, CheckCircle2, Award, Calendar } from "lucide-react";
 
 export default async function ProductivityReportPage({
   searchParams,
@@ -31,17 +32,6 @@ export default async function ProductivityReportPage({
     ],
   });
 
-  if (lines.length === 0) {
-    return (
-      <div className="space-y-4">
-        <Header dateStr={dateStr} date={date} />
-        <p className="bg-gray-50 rounded-2xl p-10 text-center text-gray-400 font-ethiopic">
-          ዛሬ ምንም ቁጥር አልተቀመጠም
-        </p>
-      </div>
-    );
-  }
-
   // Compute stats per row
   const rows = lines.map((l) => {
     const target  = l.targetForDay;
@@ -66,97 +56,185 @@ export default async function ProductivityReportPage({
   }
 
   return (
-    <div className="space-y-5">
-      <Header dateStr={dateStr} date={date} />
-
-      {/* Summary */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <SC label="ሠራተኞች"       value={String(rows.length)} />
-        <SC label="ጠቅ. ያደረሱ"    value={totalProd.toLocaleString()} color="text-blue-700" />
-        <SC label="ከዒላማ በላይ"     value={`${aboveTarget} / ${rows.length}`} color="text-green-700" />
-        <SC label="አማካይ %"        value={avgPct !== null ? `${avgPct.toFixed(1)}%` : "—"}
-          color={avgPct !== null && avgPct >= 100 ? "text-green-700" : "text-amber-600"} />
+    <div className="space-y-6">
+      {/* Navigation */}
+      <div className="flex items-center justify-between">
+        <Link
+          href="/reports"
+          className="inline-flex items-center gap-2 text-xs font-semibold text-slate-600 hover:text-slate-900 font-ethiopic"
+        >
+          <ArrowLeft size={14} />
+          <span>ወደ ሪፖርቶች ማጠቃለያ ተመለስ</span>
+        </Link>
       </div>
 
-      {/* Per-department sections */}
-      {[...deptMap.entries()].map(([deptId, deptRows]) => {
-        const deptName  = deptRows[0].department.nameAm;
-        const deptTotal = deptRows.reduce((s, r) => s + r.produced, 0);
-        const deptAbove = deptRows.filter((r) => r.isAbove).length;
-
-        return (
-          <div key={deptId} className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-            <div className="px-5 py-3 bg-gray-50 border-b border-gray-100 flex items-center justify-between">
-              <span className="font-semibold text-gray-700 font-ethiopic">{deptName}</span>
-              <span className="text-xs text-gray-500 font-ethiopic tabular-nums">
-                {deptAbove}/{deptRows.length} ከዒላማ ↑ · {deptTotal.toLocaleString()} ፍሬ
-              </span>
+      {/* Header & Date Filter Card */}
+      <div className="erp-card p-6">
+        <div className="flex items-center justify-between flex-wrap gap-4">
+          <div>
+            <div className="flex items-center gap-2 text-xs font-semibold text-blue-600 uppercase tracking-wider font-ethiopic">
+              <TrendingUp size={14} />
+              <span>የምርታማነት ትንተና</span>
             </div>
-            <table className="w-full text-sm data-table">
-              <thead>
-                <tr>
-                  <th className="w-10">{am.serialNumber}</th>
-                  <th>{am.employees.name}</th>
-                  <th>ዒላማ</th>
-                  <th>ያደረሱ</th>
-                  <th>+ፍሬ</th>
-                  <th>−ፍሬ</th>
-                  <th>%</th>
-                </tr>
-              </thead>
-              <tbody>
-                {deptRows.map((r) => (
-                  <tr key={r.id} className={r.isAbove ? "bg-green-50/30" : ""}>
-                    <td className="text-center tabular-nums text-gray-400">{r.employee.serialNumber}</td>
-                    <td className="font-ethiopic text-gray-800">{r.employee.nameAm}</td>
-                    <td className="tabular-nums text-center text-gray-500">
-                      {r.target > 0 ? r.target.toLocaleString() : "—"}
-                    </td>
-                    <td className="tabular-nums font-semibold text-center">{r.produced.toLocaleString()}</td>
-                    <td className={`tabular-nums text-center font-medium ${r.plusPieces > 0 ? "text-green-700" : "text-gray-300"}`}>
-                      {r.plusPieces > 0 ? `+${r.plusPieces}` : "—"}
-                    </td>
-                    <td className={`tabular-nums text-center font-medium ${r.minusPieces > 0 ? "text-red-600" : "text-gray-300"}`}>
-                      {r.minusPieces > 0 ? `−${r.minusPieces}` : "—"}
-                    </td>
-                    <td className={`tabular-nums text-center font-semibold ${r.pct !== null && r.pct >= 100 ? "text-green-700" : r.pct !== null && r.pct < 80 ? "text-red-600" : "text-amber-600"}`}>
-                      {r.pct !== null ? `${r.pct}%` : "—"}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <h1 className="text-2xl font-bold text-slate-900 font-ethiopic mt-1">
+              {am.reports.EMPLOYEE_PRODUCTIVITY}
+            </h1>
+            <p className="text-slate-500 font-ethiopic text-sm mt-0.5">
+              የሠራተኞች የዕለት የምርት አፈጻጸም፣ የዒላማ ስኬት እና የትርፍ/ጉድለት ንጽጽር — <span className="font-semibold text-slate-700">{formatAsEthDate(date)}</span>
+            </p>
           </div>
-        );
-      })}
-    </div>
-  );
-}
 
-function Header({ dateStr, date }: { dateStr: string; date: Date }) {
-  return (
-    <div className="flex items-center justify-between flex-wrap gap-3">
-      <div>
-        <p className="text-sm text-gray-500 mb-1">
-          <Link href="/reports" className="hover:underline font-ethiopic">ሪፖርቶች</Link> /
-        </p>
-        <h1 className="text-2xl font-bold text-gray-900 font-ethiopic">{am.reports.EMPLOYEE_PRODUCTIVITY}</h1>
-        <p className="text-gray-500 text-sm mt-0.5 font-ethiopic">{formatAsEthDate(date)}</p>
+          <form method="GET" className="flex items-center gap-2">
+            <input
+              type="date"
+              name="date"
+              defaultValue={dateStr}
+              className="input-field text-xs py-2 px-3"
+            />
+            <button
+              type="submit"
+              className="btn-primary text-xs py-2.5 px-4 flex items-center gap-1.5"
+            >
+              <Filter size={14} />
+              <span>{am.filter}</span>
+            </button>
+          </form>
+        </div>
       </div>
-      <form method="GET" className="flex gap-2">
-        <input type="date" name="date" defaultValue={dateStr}
-          className="px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-        <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-ethiopic hover:bg-blue-700">{am.filter}</button>
-      </form>
-    </div>
-  );
-}
 
-function SC({ label, value, color = "text-gray-800" }: { label: string; value: string; color?: string }) {
-  return (
-    <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
-      <p className="text-xs text-gray-500 font-ethiopic mb-1">{label}</p>
-      <p className={`text-2xl font-bold tabular-nums ${color}`}>{value}</p>
+      {lines.length === 0 ? (
+        <div className="erp-card p-12 text-center space-y-2">
+          <Calendar size={32} className="mx-auto text-slate-300" />
+          <h3 className="font-bold text-slate-800 font-ethiopic">ምንም የተረጋገጠ ቁጥር አልተገኘም</h3>
+          <p className="text-xs text-slate-400 font-ethiopic max-w-sm mx-auto">
+            በተመረጠው ቀን ({formatAsEthDate(date)}) የተዘጋ ወይም የተረጋገጠ የሰዓት ቆጠራ ሰሌዳ አልተገኘም።
+          </p>
+        </div>
+      ) : (
+        <>
+          {/* Summary Stat Cards */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="erp-card p-5">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-slate-500 font-ethiopic">ተሳታፊ ሠራተኞች</span>
+                <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
+                  <Users size={16} />
+                </div>
+              </div>
+              <p className="text-2xl font-bold text-slate-900 tabular-nums mt-2">
+                {rows.length} <span className="text-xs font-normal text-slate-500">ሰው</span>
+              </p>
+            </div>
+
+            <div className="erp-card p-5">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-slate-500 font-ethiopic">ጠቅላላ የተመረተ</span>
+                <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                  <Award size={16} />
+                </div>
+              </div>
+              <p className="text-2xl font-bold text-indigo-700 tabular-nums mt-2">
+                {totalProd.toLocaleString()} <span className="text-xs font-normal text-slate-500">ፍሬ</span>
+              </p>
+            </div>
+
+            <div className="erp-card p-5">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-slate-500 font-ethiopic">ዒላማ ያሳኩ</span>
+                <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                  <CheckCircle2 size={16} />
+                </div>
+              </div>
+              <p className="text-2xl font-bold text-emerald-700 tabular-nums mt-2">
+                {aboveTarget} <span className="text-xs font-normal text-slate-400">/ {rows.length}</span>
+              </p>
+            </div>
+
+            <div className="erp-card p-5">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-slate-500 font-ethiopic">አማካይ የስኬት ምጣኔ</span>
+                <div className="w-8 h-8 rounded-lg bg-slate-100 text-slate-600 flex items-center justify-center">
+                  <TrendingUp size={16} />
+                </div>
+              </div>
+              <p className={`text-2xl font-bold tabular-nums mt-2 ${avgPct !== null && avgPct >= 100 ? "text-emerald-700" : "text-amber-600"}`}>
+                {avgPct !== null ? `${avgPct.toFixed(1)}%` : "—"}
+              </p>
+            </div>
+          </div>
+
+          {/* Department Group Sections */}
+          <div className="space-y-6">
+            {[...deptMap.entries()].map(([deptId, deptRows]) => {
+              const deptName  = deptRows[0].department.nameAm;
+              const deptTotal = deptRows.reduce((s, r) => s + r.produced, 0);
+              const deptAbove = deptRows.filter((r) => r.isAbove).length;
+
+              return (
+                <div key={deptId} className="erp-card overflow-hidden">
+                  <div className="px-6 py-4 bg-slate-50/80 border-b border-slate-200/80 flex items-center justify-between flex-wrap gap-2">
+                    <span className="font-bold text-slate-900 font-ethiopic text-sm">
+                      {deptName}
+                    </span>
+                    <span className="text-xs text-slate-600 font-ethiopic tabular-nums">
+                      <strong>{deptAbove}/{deptRows.length}</strong> ዒላማ ያሳኩ &nbsp;·&nbsp; ጠቅላላ <strong>{deptTotal.toLocaleString()}</strong> ፍሬ
+                    </span>
+                  </div>
+
+                  <table className="w-full text-left data-table">
+                    <thead>
+                      <tr>
+                        <th className="w-12 text-center">{am.serialNumber}</th>
+                        <th>{am.employees.name}</th>
+                        <th className="text-center">የዕለት ዒላማ</th>
+                        <th className="text-center">ያመረቱት</th>
+                        <th className="text-center">+ትርፍ</th>
+                        <th className="text-center">−ጉድለት</th>
+                        <th className="text-center">የስኬት %</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {deptRows.map((r) => (
+                        <tr key={r.id} className={r.isAbove ? "bg-emerald-50/20" : ""}>
+                          <td className="text-center tabular-nums text-slate-400 font-mono text-xs">
+                            {r.employee.serialNumber}
+                          </td>
+                          <td className="font-semibold text-slate-800 font-ethiopic">
+                            {r.employee.nameAm}
+                          </td>
+                          <td className="tabular-nums text-center text-slate-500 font-medium">
+                            {r.target > 0 ? r.target.toLocaleString() : "—"}
+                          </td>
+                          <td className="tabular-nums font-bold text-center text-slate-900">
+                            {r.produced.toLocaleString()}
+                          </td>
+                          <td className={`tabular-nums text-center font-semibold ${r.plusPieces > 0 ? "text-emerald-700" : "text-slate-300"}`}>
+                            {r.plusPieces > 0 ? `+${r.plusPieces}` : "—"}
+                          </td>
+                          <td className={`tabular-nums text-center font-semibold ${r.minusPieces > 0 ? "text-rose-600" : "text-slate-300"}`}>
+                            {r.minusPieces > 0 ? `−${r.minusPieces}` : "—"}
+                          </td>
+                          <td className="text-center">
+                            <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-bold tabular-nums ${
+                              r.pct !== null && r.pct >= 100
+                                ? "bg-emerald-100 text-emerald-800"
+                                : r.pct !== null && r.pct < 80
+                                ? "bg-rose-100 text-rose-800"
+                                : "bg-amber-100 text-amber-800"
+                            }`}>
+                              {r.pct !== null ? `${r.pct}%` : "—"}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              );
+            })}
+          </div>
+        </>
+      )}
     </div>
   );
 }

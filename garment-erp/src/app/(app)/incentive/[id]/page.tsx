@@ -7,6 +7,7 @@ import { ethMonthName, formatAsEthDate } from "@/lib/ethiopian-calendar";
 import { approvePeriodAction } from "../actions";
 import Link from "next/link";
 import Decimal from "decimal.js";
+import { Award, ArrowRight, Download, CheckCircle, Calendar, Users, Calculator, AlertTriangle, ShieldCheck } from "lucide-react";
 
 export default async function IncentiveStatementPage({ params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
@@ -43,139 +44,217 @@ export default async function IncentiveStatementPage({ params }: { params: Promi
   const approve = approvePeriodAction.bind(null, id);
 
   return (
-    <div className="space-y-5">
-      {/* Header */}
-      <div className="flex items-start justify-between flex-wrap gap-3">
+    <div className="space-y-6">
+      {/* Top Navigation Link */}
+      <div>
+        <Link
+          href="/incentive"
+          className="inline-flex items-center gap-2 text-xs font-semibold text-slate-500 hover:text-blue-600 transition-colors font-ethiopic"
+        >
+          <ArrowRight size={14} className="rotate-180" />
+          <span>ወደ ኢንሴንቲቭ ዝርዝር ተመለስ</span>
+        </Link>
+      </div>
+
+      {/* Header Card */}
+      <div className="erp-card p-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <p className="text-sm text-gray-500 font-ethiopic mb-1">
-            <Link href="/incentive" className="hover:underline">ኢንሴንቲቭ</Link> /
-          </p>
-          <h1 className="text-2xl font-bold text-gray-900 font-ethiopic">
+          <div className="flex items-center gap-2 text-xs font-semibold text-emerald-600 uppercase tracking-wider font-ethiopic">
+            <Award size={14} />
+            <span>የምርት ማበረታቻ ዝርዝር ሰሌዳ</span>
+          </div>
+          <h1 className="text-2xl font-bold text-slate-900 font-ethiopic mt-1">
             {am.incentive.statement} — ቀን {period.paymentDay}
           </h1>
-          <p className="text-gray-500 text-sm mt-0.5 font-ethiopic">
-            {ethMonthName(period.ethMonth)} {period.ethYear} ዓ.ም
-            <span className="mx-2">·</span>
-            {formatAsEthDate(period.startDate)} → {formatAsEthDate(period.endDate)}
+          <p className="text-slate-500 text-sm mt-0.5 font-ethiopic flex items-center gap-2">
+            <Calendar size={14} className="text-slate-400" />
+            <span>{ethMonthName(period.ethMonth)} {period.ethYear} ዓ.ም</span>
+            <span>·</span>
+            <span>{formatAsEthDate(period.startDate)} እስከ {formatAsEthDate(period.endDate)}</span>
           </p>
         </div>
-        <div className="flex items-center gap-3">
+
+        <div className="flex items-center gap-3 flex-wrap">
           <StatusChip status={period.status} />
+
           {canApprove && (
             <form action={approve}>
-              <button className="px-5 py-2.5 bg-emerald-600 text-white rounded-xl text-sm font-semibold font-ethiopic hover:bg-emerald-700 transition-colors">
-                {am.incentive.approveStatement}
+              <button
+                type="submit"
+                className="btn-primary flex items-center gap-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 font-ethiopic"
+              >
+                <ShieldCheck size={16} />
+                <span>{am.incentive.approveStatement}</span>
               </button>
             </form>
           )}
-          <a href={`/api/pdf/incentive/${id}`} target="_blank" rel="noopener noreferrer"
-            className="px-4 py-2.5 bg-gray-100 text-gray-700 rounded-xl text-sm font-ethiopic hover:bg-gray-200 transition-colors">
-            PDF ↓
+
+          <a
+            href={`/api/pdf/incentive/${id}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="btn-secondary flex items-center gap-2 font-ethiopic"
+          >
+            <Download size={15} />
+            <span>{am.print} (PDF)</span>
           </a>
         </div>
       </div>
 
-      {/* Totals bar */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <SumCard label={am.incentive.calculated} value={totalCalc.toFixed(2)} color="text-blue-700" />
-        <SumCard label={am.incentive.payable}    value={totalPay.toFixed(2)}  color="text-emerald-700" />
-        <SumCard label="ሠራተኞች" value={String(period.lines.length)} />
-        <SumCard label="ወቅት" value={`ቀን ${period.paymentDay}`} />
+      {/* Metrics Row */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <div className="bg-slate-50/80 border border-slate-200/70 rounded-xl p-4 transition-all hover:bg-white hover:shadow-sm">
+          <div className="flex items-center justify-between mb-1">
+            <p className="text-xs font-medium text-slate-500 font-ethiopic">{am.incentive.payable}</p>
+            <Award size={16} className="text-emerald-600" />
+          </div>
+          <p className="text-2xl font-bold text-emerald-700 tabular-nums">
+            {totalPay.toNumber().toLocaleString("en-ET", { minimumFractionDigits: 2 })} <span className="text-xs font-normal">ብር</span>
+          </p>
+        </div>
+
+        <div className="bg-slate-50/80 border border-slate-200/70 rounded-xl p-4 transition-all hover:bg-white hover:shadow-sm">
+          <div className="flex items-center justify-between mb-1">
+            <p className="text-xs font-medium text-slate-500 font-ethiopic">{am.incentive.calculated}</p>
+            <Calculator size={16} className="text-blue-600" />
+          </div>
+          <p className="text-2xl font-bold text-blue-700 tabular-nums">
+            {totalCalc.toNumber().toLocaleString("en-ET", { minimumFractionDigits: 2 })} <span className="text-xs font-normal">ብር</span>
+          </p>
+        </div>
+
+        <div className="bg-slate-50/80 border border-slate-200/70 rounded-xl p-4 transition-all hover:bg-white hover:shadow-sm">
+          <div className="flex items-center justify-between mb-1">
+            <p className="text-xs font-medium text-slate-500 font-ethiopic">ተጠቃሚ ሠራተኞች</p>
+            <Users size={16} className="text-indigo-600" />
+          </div>
+          <p className="text-2xl font-bold text-slate-800 tabular-nums">
+            {period.lines.length.toLocaleString()}
+          </p>
+        </div>
+
+        <div className="bg-slate-50/80 border border-slate-200/70 rounded-xl p-4 transition-all hover:bg-white hover:shadow-sm">
+          <div className="flex items-center justify-between mb-1">
+            <p className="text-xs font-medium text-slate-500 font-ethiopic">የክፍያ ቀን</p>
+            <Calendar size={16} className="text-purple-600" />
+          </div>
+          <p className="text-2xl font-bold text-purple-700 font-ethiopic">
+            ቀን {period.paymentDay}
+          </p>
+        </div>
       </div>
 
-      {/* Formula reminder */}
-      <p className="text-xs text-gray-400 font-ethiopic bg-gray-50 rounded-lg px-4 py-2">
-        {am.incentive.formula} &nbsp;·&nbsp; {am.incentive.payableRule}
-      </p>
-
-      {/* Statement table */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-x-auto">
-        <table className="w-full text-sm data-table">
-          <thead>
-            <tr>
-              <th className="w-10">{am.serialNumber}</th>
-              <th>{am.employees.name}</th>
-              <th>{am.employees.department}</th>
-              <th>{am.incentive.ratePerPiece}</th>
-              <th>{am.incentive.plusPieces}</th>
-              <th>{am.incentive.minusPieces}</th>
-              <th>{am.incentive.mistakes}</th>
-              <th>{am.incentive.calculated}</th>
-              <th>{am.incentive.payable}</th>
-              <th className="w-20">{am.signature}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {period.lines.map((line, idx) => {
-              const calc = parseFloat(line.calculated.toString());
-              const pay  = parseFloat(line.payable.toString());
-              return (
-                <tr key={line.id} className={line.isSuspended ? "bg-red-50/40" : ""}>
-                  <td className="text-center tabular-nums text-gray-400">{idx + 1}</td>
-                  <td className="font-ethiopic text-gray-800">{line.employee.nameAm}</td>
-                  <td className="font-ethiopic text-gray-600 text-xs">{line.employee.department.nameAm}</td>
-                  <td className="tabular-nums text-center">{parseFloat(line.ratePerPiece.toString()).toFixed(2)}</td>
-                  <td className="tabular-nums text-center text-green-700 font-medium">
-                    {line.plusPieces > 0 ? `+${line.plusPieces}` : "—"}
-                  </td>
-                  <td className="tabular-nums text-center text-red-600 font-medium">
-                    {line.minusPieces > 0 ? `−${line.minusPieces}` : "—"}
-                  </td>
-                  <td className="tabular-nums text-center text-orange-700">
-                    {line.mistakes > 0 ? line.mistakes : "—"}
-                  </td>
-                  <td className={`tabular-nums font-medium ${calc < 0 ? "text-red-600" : "text-gray-800"}`}>
-                    {calc.toFixed(2)}
-                  </td>
-                  <td className={`tabular-nums font-semibold ${pay > 0 ? "text-emerald-700" : "text-gray-400"}`}>
-                    {line.isSuspended ? (
-                      <span className="text-red-500 font-ethiopic text-xs">{am.incentive.suspended}</span>
-                    ) : pay.toFixed(2)}
-                  </td>
-                  <td></td>
-                </tr>
-              );
-            })}
-          </tbody>
-          <tfoot>
-            <tr className="bg-gray-50 font-bold text-base">
-              <td colSpan={7} className="p-3 text-right font-ethiopic text-gray-700">{am.total}</td>
-              <td className={`p-3 tabular-nums ${parseFloat(totalCalc.toString()) < 0 ? "text-red-600" : "text-gray-900"}`}>
-                {totalCalc.toFixed(2)}
-              </td>
-              <td className="p-3 tabular-nums text-emerald-700">{totalPay.toFixed(2)}</td>
-              <td></td>
-            </tr>
-          </tfoot>
-        </table>
+      {/* Formula Reminder Card */}
+      <div className="erp-card p-3.5 bg-slate-50/60 border-slate-200/60 text-xs text-slate-600 font-ethiopic flex items-center justify-between flex-wrap gap-2">
+        <div className="flex items-center gap-2">
+          <span className="font-bold text-slate-700">የስሌት ቀመር፦</span>
+          <code className="bg-white px-2.5 py-1 rounded-md border border-slate-200 font-mono text-slate-800 font-semibold">
+            {am.incentive.formula}
+          </code>
+        </div>
+        <span className="text-slate-500">※ {am.incentive.payableRule}</span>
       </div>
 
-      {period.approvedAt && (
-        <p className="text-xs text-gray-400 font-ethiopic">
-          ፀድቋል: {new Date(period.approvedAt).toLocaleString("en-ET")}
-        </p>
-      )}
-    </div>
-  );
-}
+      {/* Statement Table */}
+      <div className="erp-card overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm data-table">
+            <thead>
+              <tr>
+                <th className="w-12 text-center">{am.serialNumber}</th>
+                <th className="text-right">{am.employees.name}</th>
+                <th className="text-right">{am.employees.department}</th>
+                <th className="text-center">{am.incentive.ratePerPiece}</th>
+                <th className="text-center">{am.incentive.plusPieces}</th>
+                <th className="text-center">{am.incentive.minusPieces}</th>
+                <th className="text-center">{am.incentive.mistakes}</th>
+                <th className="text-right">{am.incentive.calculated}</th>
+                <th className="text-right">{am.incentive.payable}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {period.lines.map((line, idx) => {
+                const calc = parseFloat(line.calculated.toString());
+                const pay  = parseFloat(line.payable.toString());
+                return (
+                  <tr key={line.id} className={line.isSuspended ? "bg-rose-50/50" : "hover:bg-slate-50/80 transition-colors"}>
+                    <td className="text-center tabular-nums text-slate-400 py-3">{idx + 1}</td>
+                    <td className="font-ethiopic text-slate-900 font-medium text-right py-3">
+                      <div>{line.employee.nameAm}</div>
+                      <div className="text-xs font-mono text-slate-400">
+                        {line.employee.employeeCode ?? line.employee.serialNumber}
+                      </div>
+                    </td>
+                    <td className="font-ethiopic text-slate-600 text-xs text-right py-3">
+                      <span className="bg-slate-100 text-slate-700 px-2 py-0.5 rounded">
+                        {line.employee.department.nameAm}
+                      </span>
+                    </td>
+                    <td className="tabular-nums text-center text-slate-600 py-3">
+                      {parseFloat(line.ratePerPiece.toString()).toFixed(2)}
+                    </td>
+                    <td className="tabular-nums text-center text-emerald-700 font-semibold py-3">
+                      {line.plusPieces > 0 ? `+${line.plusPieces.toLocaleString()}` : "—"}
+                    </td>
+                    <td className="tabular-nums text-center text-rose-600 font-semibold py-3">
+                      {line.minusPieces > 0 ? `−${line.minusPieces.toLocaleString()}` : "—"}
+                    </td>
+                    <td className="tabular-nums text-center text-amber-700 font-semibold py-3">
+                      {line.mistakes > 0 ? `${line.mistakes.toLocaleString()}` : "—"}
+                    </td>
+                    <td className={`tabular-nums font-semibold text-right py-3 ${calc < 0 ? "text-rose-600" : "text-slate-700"}`}>
+                      {calc.toLocaleString("en-ET", { minimumFractionDigits: 2 })}
+                    </td>
+                    <td className="tabular-nums font-bold text-right text-emerald-700 py-3">
+                      {line.isSuspended ? (
+                        <span className="badge-danger text-xs font-ethiopic">{am.incentive.suspended}</span>
+                      ) : (
+                        `${pay.toLocaleString("en-ET", { minimumFractionDigits: 2 })} ብር`
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+            <tfoot>
+              <tr className="bg-slate-50 font-bold border-t-2 border-slate-200">
+                <td colSpan={7} className="p-4 text-right font-ethiopic text-slate-800 text-base">
+                  {am.total} የሚከፈል ጠቅላላ ድምር፦
+                </td>
+                <td className={`p-4 tabular-nums text-right text-base ${parseFloat(totalCalc.toString()) < 0 ? "text-rose-600" : "text-slate-800"}`}>
+                  {totalCalc.toNumber().toLocaleString("en-ET", { minimumFractionDigits: 2 })}
+                </td>
+                <td className="p-4 tabular-nums text-right text-base text-emerald-700">
+                  {totalPay.toNumber().toLocaleString("en-ET", { minimumFractionDigits: 2 })} ብር
+                </td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
 
-function SumCard({ label, value, color = "text-gray-800" }: { label: string; value: string; color?: string }) {
-  return (
-    <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
-      <p className="text-xs text-gray-500 font-ethiopic mb-1">{label}</p>
-      <p className={`text-2xl font-bold tabular-nums ${color}`}>{value}</p>
+        {period.approvedAt && (
+          <div className="p-4 border-t border-slate-100 bg-emerald-50/40 text-xs text-emerald-800 font-ethiopic flex items-center gap-2">
+            <CheckCircle size={15} className="text-emerald-600" />
+            <span>ይህ ሰሌዳ በዋና ሥራ አስኪያጅ ፀድቋል፦ {new Date(period.approvedAt).toLocaleString("en-ET")}</span>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
 
 function StatusChip({ status }: { status: string }) {
   const map: Record<string, string> = {
-    DRAFT: "badge-draft", PENDING_APPROVAL: "badge-pending",
-    APPROVED: "badge-approved", LOCKED: "badge-locked",
+    DRAFT: "badge-draft",
+    PENDING_APPROVAL: "badge-pending",
+    APPROVED: "badge-approved",
+    LOCKED: "badge-locked",
   };
   const labels: Record<string, string> = {
-    DRAFT: am.draft, PENDING_APPROVAL: am.incentive.pendingApproval,
-    APPROVED: am.incentive.approved, LOCKED: am.locked,
+    DRAFT: am.draft,
+    PENDING_APPROVAL: am.incentive.pendingApproval,
+    APPROVED: am.incentive.approved,
+    LOCKED: am.locked,
   };
-  return <span className={`text-sm px-3 py-1 rounded-full ${map[status] ?? "badge-draft"}`}>{labels[status] ?? status}</span>;
+  return <span className={`text-xs px-3 py-1 rounded-full ${map[status] ?? "badge-draft"}`}>{labels[status] ?? status}</span>;
 }

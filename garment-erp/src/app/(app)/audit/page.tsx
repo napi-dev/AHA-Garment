@@ -1,13 +1,14 @@
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { Prisma } from "@prisma/client";
 import { redirect } from "next/navigation";
 import { requirePermission } from "@/lib/auth/permissions";
 import { am } from "@/lib/i18n/am";
 import { formatAsEthDate } from "@/lib/ethiopian-calendar";
+import { ScrollText, Filter, ChevronLeft, ChevronRight } from "lucide-react";
 
 const PAGE_SIZE = 50;
 
-// Human-readable action labels
 const ACTION_LABELS: Record<string, string> = {
   SAVE_HOURLY_COUNT:        "ቁጥር አስቀምጦ",
   VERIFY_COUNT:             "ቁጥር አረጋግጧል",
@@ -42,8 +43,7 @@ export default async function AuditLogPage({
   const page    = Math.max(1, parseInt(params.page ?? "1", 10));
   const skip    = (page - 1) * PAGE_SIZE;
 
-  // Build filter
-  const where: Parameters<typeof db.auditLog.findMany>[0]["where"] = {
+  const where: Prisma.AuditLogWhereInput = {
     ...(params.user   ? { user: { employeeCode: { contains: params.user.toUpperCase() } } } : {}),
     ...(params.action ? { action: { contains: params.action } }  : {}),
     ...(params.entity ? { entity: { contains: params.entity } }  : {}),
@@ -72,7 +72,6 @@ export default async function AuditLogPage({
 
   const totalPages = Math.ceil(total / PAGE_SIZE);
 
-  // Unique actions for filter dropdown
   const distinctActions = await db.auditLog.findMany({
     select:  { action: true },
     distinct: ["action"],
@@ -80,58 +79,67 @@ export default async function AuditLogPage({
   });
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900 font-ethiopic">{am.audit.title}</h1>
-        <p className="text-gray-500 text-sm mt-0.5 font-ethiopic">
+      <div className="erp-card p-6">
+        <div className="flex items-center gap-2 text-xs font-semibold text-slate-600 uppercase tracking-wider font-ethiopic">
+          <ScrollText size={14} />
+          <span>ስርዓት ምዝገባ</span>
+        </div>
+        <h1 className="text-2xl font-bold text-slate-900 font-ethiopic mt-1">{am.audit.title}</h1>
+        <p className="text-slate-500 text-sm mt-0.5 font-ethiopic">
           {total.toLocaleString()} ምዝግቦች — አንብብ ብቻ (append-only)
         </p>
       </div>
 
       {/* Filters */}
-      <form method="GET"
-        className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 flex flex-wrap gap-3 items-end">
-        <div>
-          <label className="block text-xs text-gray-500 mb-1 font-ethiopic">{am.audit.user}</label>
-          <input name="user" defaultValue={params.user ?? ""}
-            placeholder="EMP-001"
-            className="px-3 py-2 rounded-lg border border-gray-200 text-sm w-28 focus:outline-none focus:ring-2 focus:ring-blue-500 uppercase" />
+      <div className="erp-card p-5">
+        <div className="flex items-center gap-2 mb-4">
+          <Filter size={14} className="text-slate-400" />
+          <span className="text-sm font-semibold text-slate-600 font-ethiopic">ማጣሪያ</span>
         </div>
-        <div>
-          <label className="block text-xs text-gray-500 mb-1 font-ethiopic">{am.audit.action}</label>
-          <select name="action" defaultValue={params.action ?? ""}
-            className="px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-ethiopic">
-            <option value="">ሁሉም</option>
-            {distinctActions.map((a) => (
-              <option key={a.action} value={a.action}>
-                {ACTION_LABELS[a.action] ?? a.action}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label className="block text-xs text-gray-500 mb-1 font-ethiopic">ከ</label>
-          <input type="date" name="from" defaultValue={params.from ?? ""}
-            className="px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-        </div>
-        <div>
-          <label className="block text-xs text-gray-500 mb-1 font-ethiopic">እስከ</label>
-          <input type="date" name="to" defaultValue={params.to ?? ""}
-            className="px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-        </div>
-        <button type="submit"
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-ethiopic hover:bg-blue-700 transition-colors">
-          {am.filter}
-        </button>
-        <a href="/audit"
-          className="px-4 py-2 bg-gray-100 text-gray-600 rounded-lg text-sm font-ethiopic hover:bg-gray-200 transition-colors">
-          ሁሉም
-        </a>
-      </form>
+        <form method="GET" className="flex flex-wrap gap-3 items-end">
+          <div>
+            <label className="block text-xs text-slate-500 mb-1.5 font-ethiopic">{am.audit.user}</label>
+            <input name="user" defaultValue={params.user ?? ""}
+              placeholder="EMP-001"
+              className="px-3 py-2 rounded-lg border border-slate-200 text-sm w-28 focus:outline-none focus:ring-2 focus:ring-blue-500 uppercase bg-white" />
+          </div>
+          <div>
+            <label className="block text-xs text-slate-500 mb-1.5 font-ethiopic">{am.audit.action}</label>
+            <select name="action" defaultValue={params.action ?? ""}
+              className="px-3 py-2 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-ethiopic bg-white">
+              <option value="">ሁሉም</option>
+              {distinctActions.map((a) => (
+                <option key={a.action} value={a.action}>
+                  {ACTION_LABELS[a.action] ?? a.action}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs text-slate-500 mb-1.5 font-ethiopic">ከ</label>
+            <input type="date" name="from" defaultValue={params.from ?? ""}
+              className="px-3 py-2 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white" />
+          </div>
+          <div>
+            <label className="block text-xs text-slate-500 mb-1.5 font-ethiopic">እስከ</label>
+            <input type="date" name="to" defaultValue={params.to ?? ""}
+              className="px-3 py-2 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white" />
+          </div>
+          <button type="submit"
+            className="px-4 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-ethiopic hover:bg-blue-700 transition-colors font-semibold">
+            {am.filter}
+          </button>
+          <a href="/audit"
+            className="px-4 py-2.5 bg-slate-100 text-slate-600 rounded-lg text-sm font-ethiopic hover:bg-slate-200 transition-colors">
+            ሁሉም
+          </a>
+        </form>
+      </div>
 
       {/* Log table */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+      <div className="erp-card overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm data-table">
             <thead>
@@ -149,63 +157,48 @@ export default async function AuditLogPage({
             <tbody>
               {logs.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="text-center text-gray-400 py-12 font-ethiopic">
+                  <td colSpan={8} className="text-center text-slate-400 py-12 font-ethiopic">
                     {am.noData}
                   </td>
                 </tr>
               )}
               {logs.map((log) => (
-                <tr key={log.id} className="hover:bg-gray-50 transition-colors">
-                  {/* Timestamp */}
-                  <td className="tabular-nums text-xs text-gray-500 whitespace-nowrap">
-                    <span className="block">{formatAsEthDate(log.createdAt)}</span>
-                    <span className="text-gray-400">
+                <tr key={log.id} className="hover:bg-slate-50 transition-colors">
+                  <td className="tabular-nums text-xs text-slate-500 whitespace-nowrap">
+                    <span className="block font-medium">{formatAsEthDate(log.createdAt)}</span>
+                    <span className="text-slate-400">
                       {log.createdAt.toLocaleTimeString("en-ET", { hour: "2-digit", minute: "2-digit" })}
                     </span>
                   </td>
-
-                  {/* User */}
-                  <td className="font-mono text-xs font-medium text-gray-700">
+                  <td className="font-mono text-xs font-bold text-slate-700">
                     {log.user.employeeCode}
                   </td>
-
-                  {/* Role */}
                   <td className="text-xs">
-                    <span className="font-ethiopic text-gray-500">
+                    <span className="font-ethiopic text-slate-500 text-[11px] bg-slate-100 px-1.5 py-0.5 rounded">
                       {am.roles[log.user.role as keyof typeof am.roles] ?? log.user.role}
                     </span>
                   </td>
-
-                  {/* Action */}
-                  <td className="font-ethiopic text-gray-800">
+                  <td className="font-ethiopic text-slate-800">
                     {ACTION_LABELS[log.action] ?? log.action}
-                    <span className="block text-xs text-gray-400 font-mono">{log.action}</span>
+                    <span className="block text-[10px] text-slate-400 font-mono">{log.action}</span>
                   </td>
-
-                  {/* Entity */}
                   <td className="text-xs">
-                    <span className="text-gray-600">{log.entity}</span>
-                    <span className="block font-mono text-gray-400 text-[10px] truncate max-w-[120px]">
+                    <span className="text-slate-600">{log.entity}</span>
+                    <span className="block font-mono text-slate-400 text-[10px] truncate max-w-[120px]">
                       {log.entityId.slice(0, 12)}…
                     </span>
                   </td>
-
-                  {/* Acted as manager */}
-                  <td className="text-center text-lg">
+                  <td className="text-center text-green-600 font-bold">
                     {log.actedAsManager ? "✓" : ""}
                   </td>
-
-                  {/* Reason */}
-                  <td className="font-ethiopic text-xs text-gray-600 max-w-[120px]">
+                  <td className="font-ethiopic text-xs text-slate-600 max-w-[120px]">
                     {log.reason ?? ""}
                   </td>
-
-                  {/* After value — collapsed JSON */}
                   <td className="text-xs">
                     {log.after ? (
                       <details className="cursor-pointer">
-                        <summary className="text-blue-500 hover:text-blue-700">JSON</summary>
-                        <pre className="text-[10px] text-gray-500 mt-1 whitespace-pre-wrap max-w-[200px] overflow-auto">
+                        <summary className="text-blue-500 hover:text-blue-700 font-semibold">JSON</summary>
+                        <pre className="text-[10px] text-slate-500 mt-1 whitespace-pre-wrap max-w-[200px] overflow-auto">
                           {JSON.stringify(log.after, null, 2)}
                         </pre>
                       </details>
@@ -219,17 +212,17 @@ export default async function AuditLogPage({
 
         {/* Pagination */}
         {totalPages > 1 && (
-          <div className="px-5 py-3 border-t border-gray-100 flex items-center justify-between">
-            <p className="text-xs text-gray-500 font-ethiopic">
+          <div className="px-6 py-4 border-t border-slate-100 flex items-center justify-between">
+            <p className="text-xs text-slate-500 font-ethiopic">
               {am.page} {page} {am.of} {totalPages}
-              <span className="ml-2 text-gray-400">({total.toLocaleString()} ምዝግቦች)</span>
+              <span className="ml-2 text-slate-400">({total.toLocaleString()} ምዝግቦች)</span>
             </p>
             <div className="flex gap-2">
               {page > 1 && (
-                <PaginationLink page={page - 1} params={params} label={am.previous} />
+                <PaginationLink page={page - 1} params={params} label={am.previous} icon="prev" />
               )}
               {page < totalPages && (
-                <PaginationLink page={page + 1} params={params} label={am.next} />
+                <PaginationLink page={page + 1} params={params} label={am.next} icon="next" />
               )}
             </div>
           </div>
@@ -240,11 +233,12 @@ export default async function AuditLogPage({
 }
 
 function PaginationLink({
-  page, params, label,
+  page, params, label, icon,
 }: {
   page: number;
   params: Record<string, string | undefined>;
   label: string;
+  icon: "prev" | "next";
 }) {
   const qs = new URLSearchParams();
   qs.set("page", String(page));
@@ -255,8 +249,10 @@ function PaginationLink({
 
   return (
     <a href={`/audit?${qs}`}
-      className="px-4 py-1.5 bg-gray-100 text-gray-700 rounded-lg text-sm font-ethiopic hover:bg-gray-200 transition-colors">
+      className="flex items-center gap-1 px-4 py-2 bg-slate-100 text-slate-700 rounded-lg text-sm font-ethiopic hover:bg-slate-200 transition-colors font-semibold">
+      {icon === "prev" && <ChevronLeft size={14} />}
       {label}
+      {icon === "next" && <ChevronRight size={14} />}
     </a>
   );
 }

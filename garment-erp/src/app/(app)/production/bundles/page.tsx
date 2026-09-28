@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { requirePermission } from "@/lib/auth/permissions";
 import { am } from "@/lib/i18n/am";
 import { advanceBundleStage } from "./actions";
+import { LayoutGrid, Filter, ChevronRight, Tag } from "lucide-react";
 
 const STAGES = [
   "RECEIVING","CUTTING","SEWING","TRIMMING",
@@ -12,20 +13,20 @@ const STAGES = [
 
 const STAGE_AM: Record<string, string> = {
   RECEIVING:"ጥሬ እቃ", CUTTING:"ቆረጣ", SEWING:"ስፌት",
-  TRIMMING:"ለቀማ", QUALITY_CONTROL:"ጥራት", STYLING_HITPRESS:"ሂትፕረስ",
+  TRIMMING:"ለቀማ", QUALITY_CONTROL:"ጥራት ፍተሻ", STYLING_HITPRESS:"ሂትፕረስ",
   IRONING:"ካውያ", PACKING:"ማሸግ", DELIVERY:"ማድረስ",
 };
 
-const STAGE_COLOR: Record<string, string> = {
-  RECEIVING:"bg-gray-100 text-gray-700",
-  CUTTING:"bg-orange-100 text-orange-700",
-  SEWING:"bg-blue-100 text-blue-700",
-  TRIMMING:"bg-yellow-100 text-yellow-700",
-  QUALITY_CONTROL:"bg-purple-100 text-purple-700",
-  STYLING_HITPRESS:"bg-pink-100 text-pink-700",
-  IRONING:"bg-red-100 text-red-700",
-  PACKING:"bg-teal-100 text-teal-700",
-  DELIVERY:"bg-green-100 text-green-700",
+const STAGE_COLORS: Record<string, { header: string; card: string; badge: string }> = {
+  RECEIVING:        { header:"bg-slate-100 text-slate-700",        card:"border-slate-200",  badge:"bg-slate-100 text-slate-600" },
+  CUTTING:          { header:"bg-orange-100 text-orange-700",       card:"border-orange-200", badge:"bg-orange-100 text-orange-600" },
+  SEWING:           { header:"bg-blue-100 text-blue-700",           card:"border-blue-200",   badge:"bg-blue-100 text-blue-600" },
+  TRIMMING:         { header:"bg-yellow-100 text-yellow-700",       card:"border-yellow-200", badge:"bg-yellow-100 text-yellow-600" },
+  QUALITY_CONTROL:  { header:"bg-purple-100 text-purple-700",       card:"border-purple-200", badge:"bg-purple-100 text-purple-600" },
+  STYLING_HITPRESS: { header:"bg-pink-100 text-pink-700",           card:"border-pink-200",   badge:"bg-pink-100 text-pink-600" },
+  IRONING:          { header:"bg-red-100 text-red-700",             card:"border-red-200",    badge:"bg-red-100 text-red-600" },
+  PACKING:          { header:"bg-teal-100 text-teal-700",           card:"border-teal-200",   badge:"bg-teal-100 text-teal-600" },
+  DELIVERY:         { header:"bg-green-100 text-green-700",         card:"border-green-200",  badge:"bg-green-100 text-green-600" },
 };
 
 export default async function BundleBoardPage({
@@ -60,19 +61,36 @@ export default async function BundleBoardPage({
   const canAdvance = ["ADMIN","SUPER_MANAGER","PRODUCTION_MANAGER","QC_INSPECTOR","FINISHED_GOODS_MANAGER"].includes(session.user.role);
 
   return (
-    <div className="space-y-5">
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <h1 className="text-2xl font-bold text-gray-900 font-ethiopic">የቀጥታ ረድፍ ሰሌዳ</h1>
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="erp-card p-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-2 text-xs font-semibold text-indigo-600 uppercase tracking-wider font-ethiopic">
+            <LayoutGrid size={14} />
+            <span>ምርት ክፍል — ቀጥታ ሰሌዳ</span>
+          </div>
+          <h1 className="text-2xl font-bold text-slate-900 font-ethiopic mt-1">
+            የቀጥታ ምርት ሰሌዳ
+          </h1>
+          <p className="text-slate-500 text-sm mt-0.5 font-ethiopic">
+            ሁሉም ባንድሎች በሂደት ደረጃ — {bundles.length} ባንድሎች
+          </p>
+        </div>
+
         {/* Filters */}
-        <form method="GET" className="flex gap-2">
+        <form method="GET" className="flex gap-2 items-center">
+          <Filter size={14} className="text-slate-400" />
           <input name="order" defaultValue={params.order ?? ""} placeholder="ORD-0001"
-            className="px-3 py-2 rounded-lg border border-gray-200 text-sm w-28 uppercase focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono" />
+            className="px-3 py-2 rounded-lg border border-slate-200 text-sm w-28 uppercase focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono bg-white" />
           <select name="stage" defaultValue={params.stage ?? ""}
-            className="px-3 py-2 rounded-lg border border-gray-200 text-sm font-ethiopic focus:outline-none focus:ring-2 focus:ring-blue-500">
+            className="px-3 py-2 rounded-lg border border-slate-200 text-sm font-ethiopic focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white">
             <option value="">ሁሉም ደረጃዎች</option>
             {STAGES.map((s) => <option key={s} value={s}>{STAGE_AM[s]}</option>)}
           </select>
-          <button type="submit" className="px-3 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-ethiopic hover:bg-gray-200">{am.filter}</button>
+          <button type="submit"
+            className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-ethiopic hover:bg-indigo-700 transition-colors font-semibold">
+            {am.filter}
+          </button>
         </form>
       </div>
 
@@ -81,21 +99,23 @@ export default async function BundleBoardPage({
         {STAGES.map((stage) => {
           const stageBundles = params.stage ? (byStage[params.stage] ?? []) : (byStage[stage] ?? []);
           if (params.stage && params.stage !== stage) return null;
+          const colors = STAGE_COLORS[stage];
           return (
-            <div key={stage} className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-              <div className={`px-4 py-2.5 border-b border-gray-100 flex items-center justify-between ${STAGE_COLOR[stage]}`}>
+            <div key={stage} className="erp-card overflow-hidden">
+              <div className={`px-4 py-3 border-b flex items-center justify-between ${colors.header}`}>
                 <span className="font-semibold text-sm font-ethiopic">{STAGE_AM[stage]}</span>
                 <span className="text-xs font-bold bg-white/60 px-2 py-0.5 rounded-full tabular-nums">
                   {stageBundles.length}
                 </span>
               </div>
-              <div className="p-3 space-y-2 max-h-[400px] overflow-y-auto">
+              <div className="p-3 space-y-2 max-h-[420px] overflow-y-auto">
                 {stageBundles.length === 0 && (
-                  <p className="text-xs text-gray-400 text-center py-4 font-ethiopic">ባንድል የለም</p>
+                  <p className="text-xs text-slate-400 text-center py-5 font-ethiopic">ባንድል የለም</p>
                 )}
                 {stageBundles.map((b) => (
                   <BundleCard key={b.id} bundle={b} canAdvance={canAdvance}
-                    currentStage={stage} userId={session.user.id} STAGE_AM={STAGE_AM} STAGES={STAGES} />
+                    currentStage={stage} userId={session.user.id}
+                    STAGE_AM={STAGE_AM} STAGES={STAGES} colors={colors} />
                 ))}
               </div>
             </div>
@@ -107,7 +127,7 @@ export default async function BundleBoardPage({
 }
 
 function BundleCard({
-  bundle, canAdvance, currentStage, userId, STAGE_AM, STAGES,
+  bundle, canAdvance, currentStage, userId, STAGE_AM, STAGES, colors,
 }: {
   bundle: Awaited<ReturnType<typeof db.bundle.findMany>>[0] & {
     cutJob: { order: { orderNumber: string; style: { nameAm: string } } };
@@ -117,28 +137,31 @@ function BundleCard({
   userId: string;
   STAGE_AM: Record<string, string>;
   STAGES: readonly string[];
+  colors: { header: string; card: string; badge: string };
 }) {
   const stageIdx  = STAGES.indexOf(currentStage as typeof STAGES[number]);
   const nextStage = stageIdx < STAGES.length - 1 ? STAGES[stageIdx + 1] : null;
   const action    = advanceBundleStage.bind(null, bundle.id, nextStage ?? "", userId);
 
   return (
-    <div className="bg-gray-50 rounded-xl p-3 border border-gray-100 hover:border-gray-200 transition-colors">
+    <div className={`bg-white rounded-xl p-3 border hover:shadow-sm transition-all ${colors.card}`}>
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <p className="font-mono text-xs font-bold text-gray-700 truncate">{bundle.bundleCode}</p>
-          <p className="font-ethiopic text-xs text-gray-600 truncate mt-0.5">{bundle.cutJob.order.style.nameAm}</p>
-          <p className="text-xs text-gray-400 tabular-nums">{bundle.quantity} ፍሬ</p>
+          <p className="font-mono text-xs font-bold text-slate-700 truncate">{bundle.bundleCode}</p>
+          <p className="font-ethiopic text-xs text-slate-600 truncate mt-0.5">
+            {bundle.cutJob.order.style.nameAm}
+          </p>
+          <p className="text-xs text-slate-400 tabular-nums mt-0.5">{bundle.quantity} ፍሬ</p>
         </div>
         {canAdvance && nextStage && (
-          <div className="flex gap-1 flex-col items-end">
+          <div className="flex gap-1 flex-col items-end shrink-0">
             <a href={`/api/tag/${bundle.id}`} target="_blank" rel="noopener noreferrer"
-              className="text-[10px] bg-gray-100 text-gray-600 px-2 py-1 rounded-lg hover:bg-gray-200 transition-colors">
-              🏷️ ታግ
+              className="flex items-center gap-1 text-[10px] bg-slate-100 text-slate-600 px-2 py-1 rounded-lg hover:bg-slate-200 transition-colors">
+              <Tag size={9} /> ታግ
             </a>
             <form action={action}>
-              <button className="text-[10px] bg-blue-600 text-white px-2 py-1 rounded-lg hover:bg-blue-700 transition-colors font-ethiopic whitespace-nowrap">
-                → {STAGE_AM[nextStage]}
+              <button className={`flex items-center gap-1 text-[10px] px-2 py-1 rounded-lg transition-colors font-ethiopic whitespace-nowrap font-semibold ${colors.badge}`}>
+                <ChevronRight size={9} /> {STAGE_AM[nextStage]}
               </button>
             </form>
           </div>

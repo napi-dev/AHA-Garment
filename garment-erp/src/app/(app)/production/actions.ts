@@ -68,10 +68,6 @@ export async function createOrder(formData: FormData) {
   });
 
   // Ensure the style has default stage routes defined
-  const STAGES = [
-    "RECEIVING","CUTTING","SEWING","TRIMMING",
-    "QUALITY_CONTROL","STYLING_HITPRESS","IRONING","PACKING","DELIVERY",
-  ] as const;
   for (let i = 0; i < STAGES.length; i++) {
     await db.styleStageRoute.upsert({
       where: { styleId_stage: { styleId, stage: STAGES[i] } },

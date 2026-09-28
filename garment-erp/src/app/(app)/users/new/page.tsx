@@ -4,6 +4,8 @@ import { redirect } from "next/navigation";
 import { requirePermission } from "@/lib/auth/permissions";
 import { am } from "@/lib/i18n/am";
 import { createUser } from "../actions";
+import Link from "next/link";
+import { UserPlus, ArrowLeft, Shield, KeyRound, User, Briefcase } from "lucide-react";
 
 export default async function NewUserPage() {
   const session = await auth();
@@ -17,46 +19,110 @@ export default async function NewUserPage() {
   });
 
   return (
-    <div className="max-w-lg mx-auto space-y-6">
-      <h1 className="text-2xl font-bold text-gray-900 font-ethiopic">ተጠቃሚ ጨምር</h1>
-      <form action={createUser} className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 space-y-5">
-        <F label="የሠራተኛ ኮድ (EMP-001) *">
-          <input name="employeeCode" required placeholder="EMP-001" className="input-field uppercase font-mono" />
-        </F>
-        <F label="ሠራተኛ ይምረጡ (አማራጭ)">
+    <div className="max-w-xl mx-auto space-y-6">
+      {/* Navigation */}
+      <div className="flex items-center justify-between">
+        <Link
+          href="/users"
+          className="inline-flex items-center gap-2 text-xs font-semibold text-slate-600 hover:text-slate-900 font-ethiopic"
+        >
+          <ArrowLeft size={14} />
+          <span>ወደ ተጠቃሚዎች ዝርዝር ተመለስ</span>
+        </Link>
+      </div>
+
+      {/* Header Card */}
+      <div className="erp-card p-6">
+        <div className="flex items-center gap-2 text-xs font-semibold text-blue-600 uppercase tracking-wider font-ethiopic">
+          <Shield size={14} />
+          <span>የመለያ አስተዳደር</span>
+        </div>
+        <h1 className="text-2xl font-bold text-slate-900 font-ethiopic mt-1">
+          {am.users.addUser}
+        </h1>
+        <p className="text-slate-500 font-ethiopic text-sm mt-0.5">
+          ለሰራተኛ ወይም ለአስተዳዳሪ አዲስ የመግቢያ መለያና የይለፍ ፒን ይፍጠሩ
+        </p>
+      </div>
+
+      {/* Form Card */}
+      <form action={createUser} className="erp-card p-6 space-y-5">
+        <div>
+          <label className="block text-xs font-semibold text-slate-700 mb-1.5 font-ethiopic flex items-center gap-1.5">
+            <User size={14} className="text-slate-400" />
+            <span>የሠራተኛ ኮድ (ምሳሌ፦ EMP-001) *</span>
+          </label>
+          <input
+            name="employeeCode"
+            required
+            placeholder="EMP-001"
+            className="input-field uppercase font-mono font-bold tracking-wider"
+          />
+        </div>
+
+        <div>
+          <label className="block text-xs font-semibold text-slate-700 mb-1.5 font-ethiopic flex items-center gap-1.5">
+            <Briefcase size={14} className="text-slate-400" />
+            <span>ሠራተኛ ይምረጡ (አማራጭ)</span>
+          </label>
           <select name="employeeId" className="input-field font-ethiopic">
-            <option value="">— ይምረጡ —</option>
+            <option value="">— ተዛማጅ ሠራተኛ ይምረጡ —</option>
             {employees.map((e) => (
               <option key={e.id} value={e.id}>
-                {e.serialNumber}. {e.nameAm} — {e.department.nameAm}
+                #{e.serialNumber} · {e.nameAm} ({e.department.nameAm})
               </option>
             ))}
           </select>
-        </F>
-        <F label={`${am.login.pin} (4–6 ቁጥሮች) *`}>
-          <input name="pin" type="password" inputMode="numeric" minLength={4} maxLength={6}
-            required placeholder="••••" className="input-field tracking-widest text-center text-2xl" />
-        </F>
-        <F label="ሚና *">
+        </div>
+
+        <div>
+          <label className="block text-xs font-semibold text-slate-700 mb-1.5 font-ethiopic flex items-center gap-1.5">
+            <KeyRound size={14} className="text-slate-400" />
+            <span>{am.users.pin} (4–6 ቁጥሮች) *</span>
+          </label>
+          <input
+            name="pin"
+            type="password"
+            inputMode="numeric"
+            minLength={4}
+            maxLength={6}
+            required
+            placeholder="••••"
+            className="input-field tracking-[0.4em] text-center text-2xl font-bold py-2.5"
+          />
+          <p className="text-[11px] text-slate-400 font-ethiopic mt-1">
+            ተጠቃሚው ወደ ሲስተሙ ሲገባ የሚጠቀምበት ሚስጥራዊ የቁጥር ፒን
+          </p>
+        </div>
+
+        <div>
+          <label className="block text-xs font-semibold text-slate-700 mb-1.5 font-ethiopic flex items-center gap-1.5">
+            <Shield size={14} className="text-slate-400" />
+            <span>{am.users.role} *</span>
+          </label>
           <select name="role" required className="input-field font-ethiopic">
             {Object.entries(am.roles).map(([k, v]) => (
               <option key={k} value={k}>{v}</option>
             ))}
           </select>
-        </F>
-        <div className="flex gap-3 pt-2">
-          <button type="submit" className="flex-1 py-3 bg-blue-600 text-white rounded-xl font-ethiopic font-semibold hover:bg-blue-700">{am.save}</button>
-          <a href="/users" className="flex-1 py-3 bg-gray-100 text-gray-700 rounded-xl font-ethiopic font-semibold text-center hover:bg-gray-200">{am.cancel}</a>
+        </div>
+
+        <div className="flex items-center gap-3 pt-3 border-t border-slate-100">
+          <button
+            type="submit"
+            className="btn-primary flex-1 py-3"
+          >
+            <UserPlus size={16} />
+            <span>{am.save}</span>
+          </button>
+          <Link
+            href="/users"
+            className="btn-secondary flex-1 py-3 text-center"
+          >
+            {am.cancel}
+          </Link>
         </div>
       </form>
-    </div>
-  );
-}
-function F({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div>
-      <label className="block text-sm font-medium text-gray-700 mb-1.5 font-ethiopic">{label}</label>
-      {children}
     </div>
   );
 }

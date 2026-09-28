@@ -4,6 +4,8 @@ import { redirect, notFound } from "next/navigation";
 import { requirePermission } from "@/lib/auth/permissions";
 import { am } from "@/lib/i18n/am";
 import { updateUser } from "../../actions";
+import Link from "next/link";
+import { Shield, ArrowLeft, Save, AlertTriangle, UserCheck } from "lucide-react";
 
 export default async function EditUserPage({ params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
@@ -13,41 +15,89 @@ export default async function EditUserPage({ params }: { params: Promise<{ id: s
   const { id } = await params;
   const user = await db.appUser.findUnique({
     where: { id },
-    include: { employee: { select: { nameAm: true } } },
+    include: { employee: { select: { nameAm: true, serialNumber: true } } },
   });
   if (!user) notFound();
 
   const action = updateUser.bind(null, id);
 
   return (
-    <div className="max-w-lg mx-auto space-y-6">
-      <h1 className="text-2xl font-bold text-gray-900 font-ethiopic">ተጠቃሚ አስተካክል</h1>
-      <p className="font-mono text-gray-600">{user.employeeCode} {user.employee?.nameAm ? `— ${user.employee.nameAm}` : ""}</p>
-      <form action={action} className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 space-y-5">
+    <div className="max-w-xl mx-auto space-y-6">
+      {/* Navigation */}
+      <div className="flex items-center justify-between">
+        <Link
+          href="/users"
+          className="inline-flex items-center gap-2 text-xs font-semibold text-slate-600 hover:text-slate-900 font-ethiopic"
+        >
+          <ArrowLeft size={14} />
+          <span>ወደ ተጠቃሚዎች ዝርዝር ተመለስ</span>
+        </Link>
+      </div>
+
+      {/* Header Card */}
+      <div className="erp-card p-6">
+        <div className="flex items-center gap-2 text-xs font-semibold text-blue-600 uppercase tracking-wider font-ethiopic">
+          <Shield size={14} />
+          <span>የመለያ ማስተካከያ</span>
+        </div>
+        <h1 className="text-2xl font-bold text-slate-900 font-ethiopic mt-1">
+          ተጠቃሚ አስተካክል
+        </h1>
+        <p className="text-slate-500 font-ethiopic text-sm mt-0.5">
+          መለያ ኮድ፦ <span className="font-mono font-bold text-slate-800">{user.employeeCode}</span>
+          {user.employee && (
+            <span> &nbsp;·&nbsp; {user.employee.nameAm} (#{user.employee.serialNumber})</span>
+          )}
+        </p>
+      </div>
+
+      {/* Form Card */}
+      <form action={action} className="erp-card p-6 space-y-5">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1.5 font-ethiopic">ሚና</label>
+          <label className="block text-xs font-semibold text-slate-700 mb-1.5 font-ethiopic">
+            {am.users.role} *
+          </label>
           <select name="role" defaultValue={user.role} className="input-field font-ethiopic">
             {Object.entries(am.roles).map(([k, v]) => (
               <option key={k} value={k}>{v}</option>
             ))}
           </select>
         </div>
+
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1.5 font-ethiopic">ሁኔታ</label>
+          <label className="block text-xs font-semibold text-slate-700 mb-1.5 font-ethiopic">
+            {am.users.status} *
+          </label>
           <select name="isActive" defaultValue={String(user.isActive)} className="input-field font-ethiopic">
-            <option value="true">ንቁ</option>
-            <option value="false">ተዘጋ</option>
+            <option value="true">ንቁ ተጠቃሚ (Active)</option>
+            <option value="false">የታገደ / የተዘጋ (Inactive)</option>
           </select>
         </div>
+
         {/* Protect the sole Super Manager and Admin */}
         {(user.role === "SUPER_MANAGER" || user.role === "ADMIN") && (
-          <p className="text-xs text-amber-600 font-ethiopic bg-amber-50 rounded-xl p-3">
-            ⚠️ ይህ ሱፐር ማኔጀር ወይም አስተዳዳሪ ሚና ተጠቃሚ ነው። ሚናውን ሲቀይሩ ሁለቱ ሚናዎች ሁልጊዜ አንድ ሰው ሊኖራቸው ያስፈልጋል።
-          </p>
+          <div className="alert-warning flex items-start gap-2.5">
+            <AlertTriangle size={18} className="text-amber-600 flex-shrink-0 mt-0.5" />
+            <p className="text-xs text-amber-800 font-ethiopic leading-relaxed">
+              ይህ ተጠቃሚ የ{am.roles[user.role]} ፈቃድ ያለው ነው። ሚናውን ሲቀይሩ በሲስተሙ ውስጥ ቢያንስ አንድ ንቁ ሱፐር ማኔጀር እና አስተዳዳሪ መኖር እንዳለበት ያረጋግጡ።
+            </p>
+          </div>
         )}
-        <div className="flex gap-3 pt-2">
-          <button type="submit" className="flex-1 py-3 bg-blue-600 text-white rounded-xl font-ethiopic font-semibold hover:bg-blue-700">{am.save}</button>
-          <a href="/users" className="flex-1 py-3 bg-gray-100 text-gray-700 rounded-xl font-ethiopic font-semibold text-center hover:bg-gray-200">{am.cancel}</a>
+
+        <div className="flex items-center gap-3 pt-3 border-t border-slate-100">
+          <button
+            type="submit"
+            className="btn-primary flex-1 py-3"
+          >
+            <Save size={16} />
+            <span>{am.save}</span>
+          </button>
+          <Link
+            href="/users"
+            className="btn-secondary flex-1 py-3 text-center"
+          >
+            {am.cancel}
+          </Link>
         </div>
       </form>
     </div>

@@ -4,6 +4,8 @@ import { redirect, notFound } from "next/navigation";
 import { requirePermission } from "@/lib/auth/permissions";
 import { am } from "@/lib/i18n/am";
 import { submitInspection } from "../../actions";
+import Link from "next/link";
+import { CheckSquare, AlertTriangle, ArrowLeft, CheckCircle2, XCircle, FileText, Layers, Tag } from "lucide-react";
 
 const DEFECT_TYPES = [
   "ስፌት ስህተት", "ጨርቅ ጉዳት", "ቀለም ስህተት", "ልኬት ስህተት",
@@ -11,8 +13,11 @@ const DEFECT_TYPES = [
 ];
 
 const STAGES_AM: Record<string, string> = {
-  SEWING:"ስፌት", TRIMMING:"ለቀማ", CUTTING:"ቆረጣ",
-  STYLING_HITPRESS:"ሂትፕረስ", IRONING:"ካውያ",
+  SEWING: "ስፌት (Sewing)",
+  TRIMMING: "ለቀማ (Trimming)",
+  CUTTING: "ቆረጣ (Cutting)",
+  STYLING_HITPRESS: "ሂትፕረስ (Heat Press)",
+  IRONING: "ካውያ (Ironing)",
 };
 
 export default async function InspectPage({
@@ -35,80 +40,183 @@ export default async function InspectPage({
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
-      {/* Bundle info */}
-      <div>
-        <p className="text-sm text-gray-500 font-ethiopic mb-1">
-          <a href="/quality" className="hover:underline">ጥራት</a> /
-        </p>
-        <h1 className="text-2xl font-bold font-mono text-gray-900">{bundle.bundleCode}</h1>
-        <p className="text-gray-600 font-ethiopic mt-0.5">
-          {bundle.cutJob.order.style.nameAm} · {bundle.quantity} ፍሬ · {bundle.cutJob.order.orderNumber}
+      {/* Navigation */}
+      <div className="flex items-center justify-between">
+        <Link
+          href="/quality"
+          className="inline-flex items-center gap-2 text-xs font-semibold text-slate-600 hover:text-slate-900 font-ethiopic"
+        >
+          <ArrowLeft size={14} />
+          <span>ወደ ጥራት ቁጥጥር ዝርዝር ተመለስ</span>
+        </Link>
+      </div>
+
+      {/* Header Info */}
+      <div className="erp-card p-6">
+        <div className="flex items-center gap-2 text-xs font-semibold text-purple-600 uppercase tracking-wider font-ethiopic">
+          <CheckSquare size={14} />
+          <span>{am.qc.inspect}</span>
+        </div>
+        <h1 className="text-2xl font-bold text-slate-900 font-ethiopic mt-1">
+          የጥራት ፍተሻ — <span className="font-mono text-purple-700">{bundle.bundleCode}</span>
+        </h1>
+        <p className="text-slate-500 font-ethiopic text-sm mt-0.5">
+          {bundle.cutJob.order.style.nameAm} · ጠቅላላ {bundle.quantity} ፍሬዎች · ትዕዛዝ #{bundle.cutJob.order.orderNumber}
         </p>
       </div>
 
-      <form action={action} className="space-y-5">
-        {/* Pass / Fail */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
-          <p className="font-semibold text-gray-700 font-ethiopic mb-4">ውጤት</p>
-          <div className="flex gap-4">
-            <label className="flex-1 cursor-pointer">
-              <input type="radio" name="passed" value="true" defaultChecked className="sr-only peer" />
-              <div className="w-full py-4 rounded-xl border-2 border-gray-200 text-center font-ethiopic font-semibold transition-all peer-checked:border-green-500 peer-checked:bg-green-50 peer-checked:text-green-700 hover:border-green-300">
-                ✅ {am.qc.pass}
+      <form action={action} className="space-y-6">
+        {/* Pass / Fail Selection */}
+        <div className="erp-card p-6">
+          <label className="block text-xs font-semibold text-slate-700 mb-3 font-ethiopic">
+            የፍተሻ ውጤት (Inspection Verdict) *
+          </label>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <label className="relative flex cursor-pointer rounded-2xl border-2 border-slate-200 p-4 shadow-sm hover:border-emerald-300 focus:outline-none has-[:checked]:border-emerald-600 has-[:checked]:bg-emerald-50/40 transition-all">
+              <input
+                type="radio"
+                name="passed"
+                value="true"
+                defaultChecked
+                className="sr-only"
+              />
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center flex-shrink-0">
+                  <CheckCircle2 size={22} />
+                </div>
+                <div>
+                  <p className="font-bold text-slate-900 font-ethiopic text-sm">
+                    {am.qc.pass}
+                  </p>
+                  <p className="text-xs text-slate-500 font-ethiopic mt-0.5">
+                    ምንም ጎጂ ጉድለት አልተገኘበትም፤ ወደ ቀጣይ ደረጃ ያልፋል
+                  </p>
+                </div>
               </div>
             </label>
-            <label className="flex-1 cursor-pointer">
-              <input type="radio" name="passed" value="false" className="sr-only peer" />
-              <div className="w-full py-4 rounded-xl border-2 border-gray-200 text-center font-ethiopic font-semibold transition-all peer-checked:border-red-500 peer-checked:bg-red-50 peer-checked:text-red-700 hover:border-red-300">
-                ❌ {am.qc.fail}
+
+            <label className="relative flex cursor-pointer rounded-2xl border-2 border-slate-200 p-4 shadow-sm hover:border-rose-300 focus:outline-none has-[:checked]:border-rose-600 has-[:checked]:bg-rose-50/40 transition-all">
+              <input
+                type="radio"
+                name="passed"
+                value="false"
+                className="sr-only"
+              />
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-rose-100 text-rose-700 flex items-center justify-center flex-shrink-0">
+                  <XCircle size={22} />
+                </div>
+                <div>
+                  <p className="font-bold text-slate-900 font-ethiopic text-sm">
+                    {am.qc.fail}
+                  </p>
+                  <p className="text-xs text-slate-500 font-ethiopic mt-0.5">
+                    ጉድለት ተገኝቷል፤ ለማስተካከያ (Repair) ይመለሳል
+                  </p>
+                </div>
               </div>
             </label>
           </div>
         </div>
 
-        {/* Defects */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 space-y-4">
-          <p className="font-semibold text-gray-700 font-ethiopic">ጉድለቶች (አማራጭ)</p>
-          <p className="text-xs text-gray-500 font-ethiopic">ጉድለት ካለ ከዚህ ታች ይጨምሩ</p>
-
-          {/* Up to 3 defect rows */}
-          {[0, 1, 2].map((i) => (
-            <div key={i} className="grid grid-cols-3 gap-3 p-3 bg-gray-50 rounded-xl">
-              <div>
-                <label className="block text-xs text-gray-500 mb-1 font-ethiopic">{am.qc.defectType}</label>
-                <select name={`defect_type_${i}`} className="w-full px-2 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-red-400 font-ethiopic">
-                  <option value="">—</option>
-                  {DEFECT_TYPES.map((d) => <option key={d} value={d}>{d}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs text-gray-500 mb-1 font-ethiopic">{am.qc.responsibleStage}</label>
-                <select name={`defect_stage_${i}`} className="w-full px-2 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-red-400 font-ethiopic">
-                  <option value="">—</option>
-                  {Object.entries(STAGES_AM).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs text-gray-500 mb-1 font-ethiopic">{am.qc.piecesAffected}</label>
-                <input name={`defect_pieces_${i}`} type="number" min="1" max={bundle.quantity}
-                  className="w-full px-2 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-red-400 tabular-nums" placeholder="0" />
-              </div>
+        {/* Defects Section */}
+        <div className="erp-card p-6 space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="font-bold text-slate-800 font-ethiopic text-base flex items-center gap-2">
+                <AlertTriangle size={18} className="text-amber-500" />
+                <span>የተገኙ ጉድለቶች ዝርዝር (Defects)</span>
+              </h2>
+              <p className="text-xs text-slate-500 font-ethiopic mt-0.5">
+                ጉድለት ካለ አይነት፣ የተፈጠረበትን የስራ ደረጃ እና የተጎዳውን የፍሬ ብዛት ይምረጡ
+              </p>
             </div>
-          ))}
+          </div>
+
+          <div className="space-y-3 pt-2">
+            {[0, 1, 2].map((i) => (
+              <div
+                key={i}
+                className="p-4 rounded-xl bg-slate-50 border border-slate-200/80 grid grid-cols-1 sm:grid-cols-3 gap-3"
+              >
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1 font-ethiopic">
+                    {am.qc.defectType} #{i + 1}
+                  </label>
+                  <select
+                    name={`defect_type_${i}`}
+                    className="input-field font-ethiopic text-xs py-2"
+                  >
+                    <option value="">— ይምረጡ —</option>
+                    {DEFECT_TYPES.map((d) => (
+                      <option key={d} value={d}>{d}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1 font-ethiopic">
+                    {am.qc.responsibleStage}
+                  </label>
+                  <select
+                    name={`defect_stage_${i}`}
+                    className="input-field font-ethiopic text-xs py-2"
+                  >
+                    <option value="">— ደረጃ ይምረጡ —</option>
+                    {Object.entries(STAGES_AM).map(([k, v]) => (
+                      <option key={k} value={k}>{v}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1 font-ethiopic">
+                    {am.qc.piecesAffected}
+                  </label>
+                  <input
+                    name={`defect_pieces_${i}`}
+                    type="number"
+                    min="1"
+                    max={bundle.quantity}
+                    className="input-field tabular-nums text-xs py-2"
+                    placeholder="0"
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
 
         {/* Notes */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
-          <label className="block text-sm font-medium text-gray-700 mb-2 font-ethiopic">{am.notes}</label>
-          <textarea name="notes" rows={2}
-            className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-purple-400 font-ethiopic resize-none text-sm"
-            placeholder="ማስታወሻ..." />
+        <div className="erp-card p-6">
+          <label className="block text-xs font-semibold text-slate-700 mb-1.5 font-ethiopic flex items-center gap-1.5">
+            <FileText size={14} className="text-slate-400" />
+            <span>{am.notes} (አማራጭ)</span>
+          </label>
+          <textarea
+            name="notes"
+            rows={2}
+            className="input-field font-ethiopic resize-none"
+            placeholder="ተጨማሪ የጥራት ማስታወሻ ወይም ዝርዝር ሁኔታ ካለ..."
+          />
         </div>
 
-        <button type="submit"
-          className="w-full py-4 bg-purple-600 text-white rounded-xl font-ethiopic font-semibold text-lg hover:bg-purple-700 transition-colors">
-          ፍተሻ አስቀምጥ
-        </button>
+        {/* Submit */}
+        <div className="flex items-center gap-3">
+          <button
+            type="submit"
+            className="btn-primary flex-1 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700"
+          >
+            <CheckSquare size={16} />
+            <span>የጥራት ፍተሻውን መዝግብ</span>
+          </button>
+          <Link
+            href="/quality"
+            className="btn-secondary flex-1"
+          >
+            {am.cancel}
+          </Link>
+        </div>
       </form>
     </div>
   );

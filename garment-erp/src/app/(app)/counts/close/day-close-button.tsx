@@ -5,6 +5,9 @@ import { useRouter } from "next/navigation";
 import { closeDay } from "../actions";
 import { am } from "@/lib/i18n/am";
 
+import { Lock, CheckCircle2, AlertTriangle, ArrowRight, Loader2, FileEdit } from "lucide-react";
+import Link from "next/link";
+
 interface DayCloseButtonProps {
   date: string;
   alreadyClosed: boolean;
@@ -19,16 +22,29 @@ export function DayCloseButton({ date, alreadyClosed, closedAt }: DayCloseButton
 
   if (alreadyClosed) {
     return (
-      <div className="bg-purple-50 rounded-2xl p-6 text-center border border-purple-100">
-        <p className="text-4xl mb-3">🔒</p>
-        <p className="font-semibold text-purple-800 font-ethiopic text-lg">
-          {am.counts.dayAlreadyClosed}
-        </p>
-        {closedAt && (
-          <p className="text-purple-500 text-sm mt-1">
-            {new Date(closedAt).toLocaleTimeString("en-ET")}
-          </p>
-        )}
+      <div className="erp-card p-8 text-center border-purple-200 bg-gradient-to-b from-purple-50/50 to-white space-y-4">
+        <div className="w-16 h-16 rounded-3xl bg-purple-100 text-purple-700 flex items-center justify-center mx-auto shadow-sm">
+          <Lock size={32} />
+        </div>
+        <div>
+          <h3 className="text-xl font-bold text-slate-900 font-ethiopic">
+            {am.counts.dayAlreadyClosed}
+          </h3>
+          {closedAt && (
+            <p className="text-slate-500 font-ethiopic text-sm mt-1">
+              በ {new Date(closedAt).toLocaleTimeString("en-ET")} ተጠቃልሎ ተቆልፏል
+            </p>
+          )}
+        </div>
+        <div className="pt-2">
+          <Link
+            href="/dashboard"
+            className="btn-secondary text-xs"
+          >
+            <span>ወደ ዳሽቦርድ ተመለስ</span>
+            <ArrowRight size={14} />
+          </Link>
+        </div>
       </div>
     );
   }
@@ -48,39 +64,55 @@ export function DayCloseButton({ date, alreadyClosed, closedAt }: DayCloseButton
   }
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 space-y-4">
-      <h2 className="font-semibold text-gray-800 font-ethiopic">ቀን ዝጋ</h2>
+    <div className="erp-card p-6 space-y-5">
+      <div className="flex items-center gap-2">
+        <Lock size={18} className="text-purple-600" />
+        <h2 className="font-bold text-slate-800 font-ethiopic text-base">
+          የዕለት ሥራ ማጠቃለያና መቆለፊያ
+        </h2>
+      </div>
 
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1.5 font-ethiopic">
-          {am.notes} (አማራጭ)
+        <label className="block text-xs font-semibold text-slate-700 mb-1.5 font-ethiopic flex items-center gap-1.5">
+          <FileEdit size={14} className="text-slate-400" />
+          <span>{am.notes} (አማራጭ)</span>
         </label>
         <textarea
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
-          rows={2}
-          className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none
-            focus:ring-2 focus:ring-blue-500 text-sm font-ethiopic resize-none"
-          placeholder="ዛሬ ልዩ ነገር ካለ ጻፉ..."
+          rows={3}
+          className="input-field font-ethiopic resize-none"
+          placeholder="የተለየ ክስተት፣ የኃይል መቆራረጥ ወይም ማብራሪያ ካለ እዚህ ያክሉ..."
         />
       </div>
 
       {error && (
-        <p className="text-red-600 text-sm font-ethiopic bg-red-50 rounded-lg p-3">{error}</p>
+        <div className="alert-error font-ethiopic text-xs flex items-center gap-2">
+          <AlertTriangle size={16} className="text-rose-600 flex-shrink-0" />
+          <span>{error}</span>
+        </div>
       )}
 
       <button
         onClick={handleClose}
         disabled={loading}
-        className="w-full py-4 rounded-xl bg-purple-600 text-white font-semibold text-lg
-          hover:bg-purple-700 active:scale-[0.98] transition-all
-          disabled:opacity-50 disabled:cursor-not-allowed font-ethiopic"
+        className="w-full py-3.5 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-semibold text-sm hover:from-purple-700 hover:to-indigo-700 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed font-ethiopic shadow-sm flex items-center justify-center gap-2"
       >
-        {loading ? "በመዝጋት ላይ..." : "🔒 " + am.counts.closeDay}
+        {loading ? (
+          <>
+            <Loader2 size={16} className="animate-spin" />
+            <span>በመዝጋት ላይ...</span>
+          </>
+        ) : (
+          <>
+            <Lock size={16} />
+            <span>{am.counts.closeDay}</span>
+          </>
+        )}
       </button>
 
-      <p className="text-xs text-gray-400 font-ethiopic text-center">
-        ቀኑ ሲዘጋ ሁሉም ቁጥሮች ይቆለፋሉ እና ሪፖርቶቹ ይዘጋጃሉ።
+      <p className="text-xs text-slate-400 font-ethiopic text-center">
+        ቀኑ ሲዘጋ ሁሉም ቁጥሮች ይቆለፋሉ፤ ኦፊሴላዊ የዕለት ሪፖርቶች ተዘጋጅተው ይላካሉ።
       </p>
     </div>
   );

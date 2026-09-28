@@ -5,6 +5,7 @@ import { requirePermission } from "@/lib/auth/permissions";
 import { am } from "@/lib/i18n/am";
 import { formatAsEthDate } from "@/lib/ethiopian-calendar";
 import Link from "next/link";
+import { History, ArrowRight, Package, ArrowDownLeft, ArrowUpRight, RotateCcw, Sliders, AlertTriangle } from "lucide-react";
 
 export default async function MovementsPage({ params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
@@ -22,85 +23,155 @@ export default async function MovementsPage({ params }: { params: Promise<{ id: 
   });
 
   let running = 0;
-  const totals = { RECEIVE: 0, ISSUE: 0, RETURN: 0, ADJUST: 0 };
   for (const mv of [...movements].reverse()) {
     const q = Number(mv.quantity);
     if (mv.type === "RECEIVE" || mv.type === "RETURN") running += q;
     else running -= q;
-    totals[mv.type as keyof typeof totals] = (totals[mv.type as keyof typeof totals] ?? 0) + q;
   }
 
-  const typeLabel: Record<string, string> = {
-    RECEIVE: am.materials.receive, ISSUE: am.materials.issue,
-    RETURN: am.materials.return, ADJUST: am.materials.adjust,
-  };
-  const typeColor: Record<string, string> = {
-    RECEIVE: "text-green-700", ISSUE: "text-red-600",
-    RETURN: "text-blue-600", ADJUST: "text-purple-600",
+  const isLow = running <= Number(material.minimumLevel);
+
+  const typeConfig: Record<string, { label: string; icon: React.ReactNode; badgeClass: string; sign: string }> = {
+    RECEIVE: {
+      label: am.materials.receive,
+      icon: <ArrowDownLeft size={13} className="text-emerald-600" />,
+      badgeClass: "badge-verified",
+      sign: "+",
+    },
+    ISSUE: {
+      label: am.materials.issue,
+      icon: <ArrowUpRight size={13} className="text-rose-600" />,
+      badgeClass: "badge-danger",
+      sign: "−",
+    },
+    RETURN: {
+      label: am.materials.return,
+      icon: <RotateCcw size={13} className="text-blue-600" />,
+      badgeClass: "badge-submitted",
+      sign: "+",
+    },
+    ADJUST: {
+      label: am.materials.adjust,
+      icon: <Sliders size={13} className="text-purple-600" />,
+      badgeClass: "badge-draft",
+      sign: "±",
+    },
   };
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
+      {/* Top Navigation Link */}
       <div>
-        <p className="text-sm text-gray-500 mb-1">
-          <Link href="/materials" className="hover:underline font-ethiopic">ጥሬ እቃ</Link> /
-        </p>
-        <h1 className="text-2xl font-bold text-gray-900 font-ethiopic">{material.nameAm}</h1>
-        <p className="text-gray-500 text-sm font-mono">{material.sku} · {material.unit}</p>
+        <Link
+          href="/materials"
+          className="inline-flex items-center gap-2 text-xs font-semibold text-slate-500 hover:text-blue-600 transition-colors font-ethiopic"
+        >
+          <ArrowRight size={14} className="rotate-180" />
+          <span>ወደ ጥሬ ዕቃዎች ዝርዝር ተመለስ</span>
+        </Link>
       </div>
 
-      {/* Current stock */}
-      <div className={`rounded-2xl p-5 ${running <= Number(material.minimumLevel) ? "bg-orange-50 border border-orange-200" : "bg-green-50 border border-green-200"}`}>
-        <p className="text-sm font-ethiopic text-gray-600 mb-1">{am.materials.currentStock}</p>
-        <p className={`text-4xl font-bold tabular-nums ${running <= Number(material.minimumLevel) ? "text-orange-700" : "text-green-700"}`}>
-          {running.toLocaleString("en-ET", { minimumFractionDigits: 3 })} {material.unit}
+      {/* Header Card */}
+      <div className="erp-card p-6">
+        <div className="flex items-center gap-2 text-xs font-semibold text-blue-600 uppercase tracking-wider font-ethiopic">
+          <History size={14} />
+          <span>የጥሬ ዕቃ እንቅስቃሴ ታሪክ</span>
+        </div>
+        <h1 className="text-2xl font-bold text-slate-900 font-ethiopic mt-1">
+          {material.nameAm}
+        </h1>
+        <p className="text-slate-500 text-sm mt-0.5 font-ethiopic flex items-center gap-2">
+          <span className="font-mono font-semibold text-slate-700 bg-slate-100 px-2 py-0.5 rounded text-xs">
+            {material.sku}
+          </span>
+          <span>·</span>
+          <span>መለኪያ፦ {material.unit}</span>
         </p>
-        <p className="text-xs text-gray-500 mt-1 font-ethiopic">ዝቅተኛ ወሰን: {Number(material.minimumLevel).toLocaleString("en-ET", { minimumFractionDigits: 2 })} {material.unit}</p>
       </div>
 
-      {/* Summary */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        {Object.entries(totals).map(([type, total]) => (
-          <div key={type} className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
-            <p className="text-xs text-gray-500 font-ethiopic mb-1">{typeLabel[type]}</p>
-            <p className={`text-xl font-bold tabular-nums ${typeColor[type]}`}>
-              {total.toLocaleString("en-ET", { minimumFractionDigits: 3 })}
+      {/* Current Stock Banner */}
+      <div className={`erp-card p-6 border ${isLow ? "bg-amber-50/70 border-amber-300" : "bg-emerald-50/70 border-emerald-300"}`}>
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-xs font-semibold text-slate-600 font-ethiopic mb-1">
+              {am.materials.currentStock}
+            </p>
+            <p className={`text-4xl font-bold tabular-nums ${isLow ? "text-amber-800" : "text-emerald-800"}`}>
+              {running.toLocaleString("en-ET", { minimumFractionDigits: 3 })} <span className="text-lg font-normal">{material.unit}</span>
+            </p>
+            <p className="text-xs text-slate-500 mt-1 font-ethiopic">
+              ዝቅተኛ ወሰን፦ {Number(material.minimumLevel).toLocaleString("en-ET", { minimumFractionDigits: 2 })} {material.unit}
             </p>
           </div>
-        ))}
+          {isLow ? (
+            <div className="flex items-center gap-1.5 bg-amber-100 text-amber-800 px-3 py-1.5 rounded-xl font-ethiopic text-xs font-bold">
+              <AlertTriangle size={15} />
+              <span>ዝቅተኛ ክምችት</span>
+            </div>
+          ) : (
+            <div className="flex items-center gap-1.5 bg-emerald-100 text-emerald-800 px-3 py-1.5 rounded-xl font-ethiopic text-xs font-bold">
+              <span>በቂ ክምችት</span>
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* Movements table */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-        <table className="w-full text-sm data-table">
-          <thead>
-            <tr>
-              <th>{am.date}</th>
-              <th>አይነት</th>
-              <th>{am.materials.quantity}</th>
-              <th>{am.materials.lot}</th>
-              <th>ማጣቀሻ</th>
-              <th>{am.notes}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {movements.length === 0 && (
-              <tr><td colSpan={6} className="text-center py-10 text-gray-400 font-ethiopic">{am.noData}</td></tr>
-            )}
-            {movements.map((mv) => (
-              <tr key={mv.id}>
-                <td className="font-ethiopic">{formatAsEthDate(mv.date)}</td>
-                <td><span className={`font-ethiopic text-xs font-medium ${typeColor[mv.type]}`}>{typeLabel[mv.type]}</span></td>
-                <td className={`tabular-nums font-semibold ${typeColor[mv.type]}`}>
-                  {mv.type === "ISSUE" || mv.type === "ADJUST" ? "−" : "+"}{Number(mv.quantity).toLocaleString("en-ET", { minimumFractionDigits: 3 })}
-                </td>
-                <td className="text-xs text-gray-500">{mv.lot?.lotNumber ?? "—"}</td>
-                <td className="text-xs text-gray-500 font-mono">{mv.reference ?? "—"}</td>
-                <td className="font-ethiopic text-xs text-gray-500">{mv.notes ?? "—"}</td>
+      {/* Movements Table */}
+      <div className="erp-card overflow-hidden">
+        <div className="p-4 border-b border-slate-100 flex items-center justify-between">
+          <h2 className="font-bold text-slate-800 text-sm font-ethiopic">
+            የገቢና ወጪ ምዝገባዎች ታሪክ ({movements.length})
+          </h2>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm data-table">
+            <thead>
+              <tr>
+                <th className="text-right">ቀን</th>
+                <th className="text-center">የእንቅስቃሴ አይነት</th>
+                <th className="text-right">መጠን</th>
+                <th className="text-center">ሎት (Lot)</th>
+                <th className="text-right">ማስታወሻ / ማጣቀሻ</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {movements.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="text-center py-12 text-slate-400 font-ethiopic">
+                    ምንም የእንቅስቃሴ መረጃ አልተመዘገበም
+                  </td>
+                </tr>
+              ) : (
+                movements.map((mv) => {
+                  const cfg = typeConfig[mv.type] ?? typeConfig.ADJUST;
+                  return (
+                    <tr key={mv.id} className="hover:bg-slate-50/80 transition-colors">
+                      <td className="font-ethiopic text-slate-700 text-right py-3.5">
+                        {formatAsEthDate(mv.date)}
+                      </td>
+                      <td className="text-center py-3.5">
+                        <span className={cfg.badgeClass}>
+                          {cfg.icon}
+                          <span>{cfg.label}</span>
+                        </span>
+                      </td>
+                      <td className="tabular-nums font-bold text-right py-3.5 text-slate-800">
+                        {cfg.sign} {Number(mv.quantity).toLocaleString("en-ET", { minimumFractionDigits: 3 })} {material.unit}
+                      </td>
+                      <td className="font-mono text-xs text-center py-3.5 text-slate-500">
+                        {mv.lot?.lotNumber ?? mv.reference ?? "—"}
+                      </td>
+                      <td className="font-ethiopic text-slate-600 text-right py-3.5 text-xs">
+                        {mv.notes ?? "—"}
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );

@@ -2,7 +2,10 @@ import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { redirect } from "next/navigation";
 import { requirePermission } from "@/lib/auth/permissions";
+import { am } from "@/lib/i18n/am";
 import { createCutJob } from "../actions";
+import Link from "next/link";
+import { Scissors, ArrowRight, Save, Info, AlertTriangle } from "lucide-react";
 
 export default async function NewCutJobPage({
   searchParams,
@@ -28,80 +31,161 @@ export default async function NewCutJobPage({
   const today = new Date().toISOString().split("T")[0];
 
   return (
-    <div className="max-w-2xl mx-auto space-y-6">
-      <h1 className="text-2xl font-bold text-gray-900 font-ethiopic">ቆርጦ ጀምር</h1>
+    <div className="max-w-xl mx-auto space-y-6">
+      {/* Top Navigation Link */}
+      <div>
+        <Link
+          href="/cutting"
+          className="inline-flex items-center gap-2 text-xs font-semibold text-slate-500 hover:text-blue-600 transition-colors font-ethiopic"
+        >
+          <ArrowRight size={14} className="rotate-180" />
+          <span>ወደ ቆረጣ ክፍል ተመለስ</span>
+        </Link>
+      </div>
 
-      <form action={createCutJob} className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 space-y-5">
-        {/* Order */}
+      {/* Header Card */}
+      <div className="erp-card p-6">
+        <div className="flex items-center gap-2 text-xs font-semibold text-orange-600 uppercase tracking-wider font-ethiopic">
+          <Scissors size={14} />
+          <span>አዲስ የቆረጣ ምዝገባ</span>
+        </div>
+        <h1 className="text-2xl font-bold text-slate-900 font-ethiopic mt-1">
+          {am.cutting.newCutJob}
+        </h1>
+        <p className="text-slate-500 text-sm mt-0.5 font-ethiopic">
+          ለተመረጠው ትዕዛዝ የወጣውን ጨርቅ ሚዛንና የተቆረጡትን ፍሬዎች ይመዝግቡ
+        </p>
+      </div>
+
+      {/* Form Card */}
+      <form action={createCutJob} className="erp-card p-6 md:p-8 space-y-5">
+        {/* Order Selection */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1.5 font-ethiopic">ትዕዛዝ *</label>
-          <select name="orderId" required defaultValue={params.orderId ?? ""}
-            className="input-field font-ethiopic">
-            <option value="">ምረጥ</option>
+          <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5 font-ethiopic">
+            የምርት ትዕዛዝ <span className="text-rose-500">*</span>
+          </label>
+          <select
+            name="orderId"
+            required
+            defaultValue={params.orderId ?? ""}
+            className="input-field font-ethiopic text-slate-800"
+          >
+            <option value="">የትዕዛዝ ቁጥር ይምረጡ</option>
             {orders.map((o) => (
-              <option key={o.id} value={o.id}>{o.orderNumber} — {o.style.nameAm} ({o.quantity.toLocaleString()} ፍሬ)</option>
+              <option key={o.id} value={o.id}>
+                {o.orderNumber} — {o.style.nameAm} ({o.quantity.toLocaleString()} ፍሬ)
+              </option>
             ))}
           </select>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
-          {/* Weight issued */}
+        {/* Weights & Pieces */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5 font-ethiopic">የተሰጠ ጨርቅ (ኪ.ግ) *</label>
-            <input name="weightIssued" type="number" step="0.001" min="0.001" required
-              className="input-field tabular-nums" placeholder="100.000" />
+            <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5 font-ethiopic">
+              {am.cutting.weightIssued} <span className="text-rose-500">*</span>
+            </label>
+            <input
+              name="weightIssued"
+              type="number"
+              step="0.001"
+              min="0.001"
+              required
+              className="input-field tabular-nums"
+              placeholder="ምሳሌ፦ 100.000"
+            />
           </div>
-          {/* Weight used */}
+
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5 font-ethiopic">የወጣ ጨርቅ (ኪ.ግ) *</label>
-            <input name="weightUsed" type="number" step="0.001" min="0.001" required
-              className="input-field tabular-nums" placeholder="98.000" />
+            <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5 font-ethiopic">
+              {am.cutting.weightUsed} <span className="text-rose-500">*</span>
+            </label>
+            <input
+              name="weightUsed"
+              type="number"
+              step="0.001"
+              min="0.001"
+              required
+              className="input-field tabular-nums"
+              placeholder="ምሳሌ፦ 98.000"
+            />
           </div>
-          {/* Pieces cut */}
+
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5 font-ethiopic">የተቆረጡ ፍሬዎች *</label>
-            <input name="piecesCut" type="number" min="1" required
-              className="input-field tabular-nums" placeholder="380" />
+            <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5 font-ethiopic">
+              {am.cutting.piecesCut} <span className="text-rose-500">*</span>
+            </label>
+            <input
+              name="piecesCut"
+              type="number"
+              min="1"
+              required
+              className="input-field tabular-nums"
+              placeholder="ምሳሌ፦ 380"
+            />
           </div>
-          {/* Bundles to create */}
+
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5 font-ethiopic">ባንድሎች ብዛት</label>
-            <input name="bundleCount" type="number" min="1" defaultValue="1"
-              className="input-field tabular-nums" />
+            <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5 font-ethiopic">
+              የሚፈጠሩ ባንድሎች ብዛት
+            </label>
+            <input
+              name="bundleCount"
+              type="number"
+              min="1"
+              defaultValue="1"
+              className="input-field tabular-nums"
+            />
           </div>
         </div>
 
         {/* Date */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1.5 font-ethiopic">ቀን</label>
-          <input name="date" type="date" defaultValue={today} className="input-field" />
+          <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5 font-ethiopic">
+            {am.cutting.cuttingDate}
+          </label>
+          <input
+            name="date"
+            type="date"
+            defaultValue={today}
+            className="input-field"
+          />
         </div>
 
-        {/* Standard weight hint (from BOM) */}
+        {/* Standard Weight Hint from BOM */}
         {selectedOrder?.style.bomItems[0] && (
-          <div className="bg-blue-50 rounded-xl p-4 text-sm font-ethiopic text-blue-700">
-            BOM: {Number(selectedOrder.style.bomItems[0].qtyPerPiece).toFixed(4)} {selectedOrder.style.bomItems[0].unit} / ፍሬ
-            <span className="ml-2 text-blue-500 text-xs">(ብክነት ለማስሊያ ይጠቀሙ)</span>
+          <div className="alert-info text-xs font-ethiopic flex items-start gap-2.5">
+            <Info size={16} className="text-blue-600 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="font-semibold text-blue-900">የስታይሉ መደበኛ የጨርቅ ፍጆታ (BOM)፦</p>
+              <p className="text-blue-700 mt-0.5">
+                በአንድ ፍሬ {Number(selectedOrder.style.bomItems[0].qtyPerPiece).toFixed(4)} {selectedOrder.style.bomItems[0].unit}
+              </p>
+            </div>
           </div>
         )}
 
-        <div className="flex gap-3 pt-2">
-          <button type="submit"
-            className="flex-1 py-3 bg-orange-500 text-white rounded-xl font-ethiopic font-semibold hover:bg-orange-600">
-            አስቀምጥ
+        <div className="pt-2 flex items-center gap-3">
+          <button
+            type="submit"
+            className="btn-primary flex-1 bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 font-ethiopic"
+          >
+            <Save size={16} />
+            <span>{am.save}</span>
           </button>
-          <a href="/cutting"
-            className="flex-1 py-3 bg-gray-100 text-gray-700 rounded-xl font-ethiopic font-semibold text-center hover:bg-gray-200">
-            ሰርዝ
-          </a>
+          <Link
+            href="/cutting"
+            className="btn-secondary px-6 font-ethiopic text-center"
+          >
+            {am.cancel}
+          </Link>
+        </div>
+
+        <div className="text-[11px] text-slate-400 font-ethiopic text-center pt-1 border-t border-slate-100">
+          የብክነት ስሌት ቀመር፦ ((የወጣ ጨርቅ − (ፍሬዎች × BOM)) ÷ የወጣ ጨርቅ) × 100
+          <br />ብክነቱ ከ 5% በላይ ከሆነ በስርዓቱ ውስጥ ማስጠንቀቂያ ይፈጠራል።
         </div>
       </form>
-
-      {/* Live wastage preview note */}
-      <p className="text-xs text-gray-400 font-ethiopic text-center">
-        ብክነት = (የወጣ − (ፍሬዎች × BOM ሚዛን)) ÷ የወጣ × 100
-        <br />ከ 5% በላይ ከሆነ ወዲያውኑ ማስጠንቀቂያ ይላካል።
-      </p>
     </div>
   );
 }

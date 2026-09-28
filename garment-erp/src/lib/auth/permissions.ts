@@ -78,6 +78,7 @@ const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     "bundles:view",
     "bundles:edit",
     "counts:view",
+    "counts:enter",
     "counts:verify",
     "counts:approve",
     "attendance:view",
@@ -96,7 +97,7 @@ const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
 
   SUPER_MANAGER: [
     // Super Manager sees and acts on everything
-    "users:manage",        // view only per spec; we give view-level manage
+    "users:manage",
     "settings:manage",
     "audit:view",
     "employees:view",
@@ -112,6 +113,7 @@ const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     "bundles:view",
     "bundles:edit",
     "counts:view",
+    "counts:enter",
     "counts:verify",
     "counts:approve",
     "attendance:view",
@@ -160,6 +162,7 @@ const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     "bundles:view",
     "bundles:edit",
     "counts:view",
+    "counts:enter",
     "counts:verify",
     "counts:approve",
     "attendance:view",
