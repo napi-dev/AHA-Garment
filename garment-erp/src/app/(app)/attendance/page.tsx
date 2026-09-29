@@ -7,39 +7,49 @@ import { formatAsEthDate } from "@/lib/ethiopian-calendar";
 import { getEffectiveDate } from "@/lib/date-override/effective-date";
 import { AttendanceGrid } from "./attendance-grid";
 import { DatePicker } from "./date-picker";
-import { Users, Calendar, CheckCircle2 } from "lucide-react";
+import { Users, Calendar, CheckCircle2, Building2 } from "lucide-react";
 
 export default async function AttendancePage({
   searchParams,
 }: {
-  searchParams: Promise<{ date?: string }>;
+  searchParams: Promise<{ date?: string; dept?: string }>;
 }) {
   const session = await auth();
   if (!session?.user) redirect("/login");
   requirePermission(session.user.role, "attendance:view");
 
   const params = await searchParams;
-  // Default to the effective date (respects admin override); user can override via date picker
+
   const effectiveToday = await getEffectiveDate();
   effectiveToday.setUTCHours(0, 0, 0, 0);
   const dateStr = params.date ?? effectiveToday.toISOString().split("T")[0];
   const date = new Date(dateStr + "T00:00:00Z");
 
-  const departments = await db.department.findMany({
+  // Load all dept names for the selector (lightweight — no employees yet)
+  const allDepts = await db.department.findMany({
     where: { isActive: true },
     orderBy: { sortOrder: "asc" },
-    include: {
-      employees: {
-        where: { isActive: true },
-        orderBy: { serialNumber: "asc" },
+    select: { id: true, nameAm: true },
+  });
+
+  // Determine which dept to show — default to first dept
+  const selectedDeptId = params.dept ?? allDepts[0]?.id ?? "";
+
+  // Load only the selected department's employees + their attendance for this date
+  const departments = selectedDeptId
+    ? await db.department.findMany({
+        where: { id: selectedDeptId, isActive: true },
         include: {
-          attendances: {
-            where: { date },
+          employees: {
+            where: { isActive: true },
+            orderBy: { serialNumber: "asc" },
+            include: {
+              attendances: { where: { date } },
+            },
           },
         },
-      },
-    },
-  });
+      })
+    : [];
 
   const canEdit =
     session.user.role === "ADMIN" ||
@@ -72,14 +82,43 @@ export default async function AttendancePage({
             <Calendar size={14} className="text-slate-400" />
             <span>{formatAsEthDate(date)}</span>
             <span>·</span>
-            <span className="font-semibold text-emerald-600">{totalPresent}</span> ከ {totalEmployees} ሠራተኞች ተገኝተዋል
+            <CheckCircle2 size={13} className="text-emerald-500" />
+            <span className="font-semibold text-emerald-600">{totalPresent}</span>
+            <span>ከ {totalEmployees} ሠራተኞች ተገኝተዋል</span>
           </p>
         </div>
-
-        {/* Date picker client island */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
           <DatePicker defaultValue={dateStr} />
         </div>
+      </div>
+
+      {/* Department selector */}
+      <div className="erp-card p-4">
+        <form method="GET" className="flex flex-wrap items-center gap-3">
+          {/* preserve date when switching dept */}
+          <input type="hidden" name="date" value={dateStr} />
+          <div className="flex items-center gap-2 text-xs font-semibold text-slate-600 font-ethiopic">
+            <Building2 size={14} className="text-blue-500" />
+            <span>የስራ ክፍል ምረጥ፦</span>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {allDepts.map((d) => (
+              <button
+                key={d.id}
+                type="submit"
+                name="dept"
+                value={d.id}
+                className={`px-3 py-1.5 rounded-xl text-xs font-semibold font-ethiopic transition-colors ${
+                  d.id === selectedDeptId
+                    ? "bg-blue-600 text-white shadow-sm"
+                    : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                }`}
+              >
+                {d.nameAm}
+              </button>
+            ))}
+          </div>
+        </form>
       </div>
 
       <AttendanceGrid

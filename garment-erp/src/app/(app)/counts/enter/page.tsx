@@ -4,11 +4,15 @@ import { redirect } from "next/navigation";
 import { requirePermission } from "@/lib/auth/permissions";
 import { am } from "@/lib/i18n/am";
 import { HourlyCountForm } from "./hourly-count-form";
-import { Clock, Lock, ArrowLeft } from "lucide-react";
+import { Clock, Lock, ArrowLeft, Building2 } from "lucide-react";
 import Link from "next/link";
 import { getEffectiveDate } from "@/lib/date-override/effective-date";
 
-export default async function CountEntryPage() {
+export default async function CountEntryPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ dept?: string }>;
+}) {
   const session = await auth();
   if (!session?.user) redirect("/login");
 
@@ -48,27 +52,26 @@ export default async function CountEntryPage() {
     );
   }
 
-  // Load departments the operator can enter for
   const isOperator = role === "OPERATOR";
+  const params = await searchParams;
 
-  let departments;
+  // Operators: scoped to their own department only
   if (isOperator && employeeId) {
     const emp = await db.employee.findUnique({
       where: { id: employeeId },
       include: { department: true },
     });
-    departments = emp ? [emp.department] : [];
-  } else {
-    departments = await db.department.findMany({
-      where: { isActive: true },
-      orderBy: { sortOrder: "asc" },
-    });
-  }
+    const dept = emp?.department;
+    if (!dept) {
+      return (
+        <div className="max-w-lg mx-auto mt-16 text-center erp-card p-10">
+          <p className="font-ethiopic text-slate-500">ለዚህ ሠራተኛ ክፍል አልተገኘም።</p>
+        </div>
+      );
+    }
 
-  // Load employees per department with today's draft entries
-  const deptWithEmployees = await Promise.all(
-    departments.map(async (dept) => {
-      const employees = await db.employee.findMany({
+    const [employees, card] = await Promise.all([
+      db.employee.findMany({
         where: { departmentId: dept.id, isActive: true },
         include: {
           hourlyCounts: {
@@ -77,54 +80,139 @@ export default async function CountEntryPage() {
           },
         },
         orderBy: { serialNumber: "asc" },
-      });
-
-      // Get today's incentive card for this dept
-      const card = await db.incentiveCard.findFirst({
+      }),
+      db.incentiveCard.findFirst({
         where: {
           departmentId: dept.id,
           effectiveFrom: { lte: today },
           OR: [{ effectiveTo: null }, { effectiveTo: { gte: today } }],
         },
         orderBy: { effectiveFrom: "desc" },
-      });
+      }),
+    ]);
 
-      return { dept, employees, targetPerHour: card?.targetPerHour ?? 0 };
-    })
-  );
+    return (
+      <div className="space-y-6">
+        <PageHeader />
+        <HourlyCountForm
+          deptWithEmployees={[{
+            deptId: dept.id,
+            deptNameAm: dept.nameAm,
+            targetPerHour: card?.targetPerHour ?? 0,
+            employees: employees.map((e) => ({
+              id: e.id,
+              serialNumber: e.serialNumber,
+              nameAm: e.nameAm,
+              existingLine: e.hourlyCounts[0] ?? null,
+            })),
+          }]}
+          date={today.toISOString()}
+          supervisorId={session.user.id}
+        />
+      </div>
+    );
+  }
+
+  // Managers: department selector — load all depts for the selector (names only)
+  const allDepts = await db.department.findMany({
+    where: { isActive: true },
+    orderBy: { sortOrder: "asc" },
+    select: { id: true, nameAm: true },
+  });
+
+  const selectedDeptId = params.dept ?? allDepts[0]?.id ?? "";
+
+  // Load only the selected department's data
+  const [employees, card] = selectedDeptId
+    ? await Promise.all([
+        db.employee.findMany({
+          where: { departmentId: selectedDeptId, isActive: true },
+          include: {
+            hourlyCounts: {
+              where: { sheet: { date: today }, departmentId: selectedDeptId },
+              take: 1,
+            },
+          },
+          orderBy: { serialNumber: "asc" },
+        }),
+        db.incentiveCard.findFirst({
+          where: {
+            departmentId: selectedDeptId,
+            effectiveFrom: { lte: today },
+            OR: [{ effectiveTo: null }, { effectiveTo: { gte: today } }],
+          },
+          orderBy: { effectiveFrom: "desc" },
+        }),
+      ])
+    : [[], null];
+
+  const selectedDept = allDepts.find((d) => d.id === selectedDeptId);
 
   return (
     <div className="space-y-6">
-      <div className="erp-card p-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2 text-xs font-semibold text-blue-600 uppercase tracking-wider font-ethiopic">
-            <Clock size={14} />
-            <span>ዕለታዊ የምርት ቁጥር</span>
+      <PageHeader />
+
+      {/* Department selector */}
+      <div className="erp-card p-4">
+        <form method="GET" className="flex flex-wrap items-center gap-3">
+          <div className="flex items-center gap-2 text-xs font-semibold text-slate-600 font-ethiopic">
+            <Building2 size={14} className="text-blue-500" />
+            <span>የስራ ክፍል ምረጥ፦</span>
           </div>
-          <h1 className="text-2xl font-bold text-slate-900 font-ethiopic mt-1">
-            {am.counts.title}
-          </h1>
-          <p className="text-slate-500 text-sm mt-0.5 font-ethiopic">
-            የእያንዳንዱን የስፌትና ምርት ሠራተኛ የሰዓት ውጤት እዚህ ይመዝግቡ
-          </p>
-        </div>
+          <div className="flex flex-wrap gap-2">
+            {allDepts.map((d) => (
+              <button
+                key={d.id}
+                type="submit"
+                name="dept"
+                value={d.id}
+                className={`px-3 py-1.5 rounded-xl text-xs font-semibold font-ethiopic transition-colors ${
+                  d.id === selectedDeptId
+                    ? "bg-blue-600 text-white shadow-sm"
+                    : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                }`}
+              >
+                {d.nameAm}
+              </button>
+            ))}
+          </div>
+        </form>
       </div>
 
       <HourlyCountForm
-        deptWithEmployees={deptWithEmployees.map((d) => ({
-          deptId: d.dept.id,
-          deptNameAm: d.dept.nameAm,
-          targetPerHour: d.targetPerHour,
-          employees: d.employees.map((e) => ({
+        deptWithEmployees={selectedDept ? [{
+          deptId: selectedDept.id,
+          deptNameAm: selectedDept.nameAm,
+          targetPerHour: card?.targetPerHour ?? 0,
+          employees: (employees as Awaited<ReturnType<typeof db.employee.findMany>>).map((e) => ({
             id: e.id,
             serialNumber: e.serialNumber,
             nameAm: e.nameAm,
-            existingLine: e.hourlyCounts[0] ?? null,
+            existingLine: (e as { hourlyCounts?: unknown[] }).hourlyCounts?.[0] ?? null,
           })),
-        }))}
+        }] : []}
         date={today.toISOString()}
         supervisorId={session.user.id}
       />
+    </div>
+  );
+}
+
+function PageHeader() {
+  return (
+    <div className="erp-card p-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div>
+        <div className="flex items-center gap-2 text-xs font-semibold text-blue-600 uppercase tracking-wider font-ethiopic">
+          <Clock size={14} />
+          <span>ዕለታዊ የምርት ቁጥር</span>
+        </div>
+        <h1 className="text-2xl font-bold text-slate-900 font-ethiopic mt-1">
+          {am.counts.title}
+        </h1>
+        <p className="text-slate-500 text-sm mt-0.5 font-ethiopic">
+          የእያንዳንዱን የስፌትና ምርት ሠራተኛ የሰዓት ውጤት እዚህ ይመዝግቡ
+        </p>
+      </div>
     </div>
   );
 }

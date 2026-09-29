@@ -37,13 +37,17 @@ export default async function AlertsPage({
   const params = await searchParams;
   const showResolved = params.resolved === "1";
 
-  const alerts = await db.alert.findMany({
-    where: { ...(showResolved ? {} : { resolvedAt: null }) },
-    orderBy: { createdAt: "desc" },
-    take: 100,
-  });
-
+  // Count open alerts first — if none and not showing resolved, skip the full query
   const openCount = await db.alert.count({ where: { resolvedAt: null } });
+
+  const alerts = openCount > 0 || showResolved
+    ? await db.alert.findMany({
+        where: { ...(showResolved ? {} : { resolvedAt: null }) },
+        orderBy: { createdAt: "desc" },
+        take: 100,
+      })
+    : [];
+
   const canResolve = ["ADMIN", "SUPER_MANAGER"].includes(session.user.role);
 
   return (

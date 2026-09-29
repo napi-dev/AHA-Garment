@@ -4,12 +4,15 @@ import { redirect } from "next/navigation";
 import { requirePermission } from "@/lib/auth/permissions";
 import { am } from "@/lib/i18n/am";
 import Link from "next/link";
-import { Package, AlertTriangle, Plus, ArrowDownLeft, ArrowUpRight, Search, Filter, History, CheckCircle2, ShieldAlert } from "lucide-react";
+import { Package, AlertTriangle, Plus, ArrowDownLeft, ArrowUpRight, Search, Filter, History, CheckCircle2 } from "lucide-react";
+import { Pagination } from "@/components/ui/pagination";
+
+const PAGE_SIZE = 20;
 
 export default async function MaterialsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; low?: string }>;
+  searchParams: Promise<{ q?: string; low?: string; page?: string }>;
 }) {
   const session = await auth();
   if (!session?.user) redirect("/login");
@@ -17,36 +20,51 @@ export default async function MaterialsPage({
 
   const params = await searchParams;
   const showLowOnly = params.low === "1";
+  const page = Math.max(1, parseInt(params.page ?? "1", 10));
+  const skip = (page - 1) * PAGE_SIZE;
 
-  const materials = await db.material.findMany({
-    where: {
-      isActive: true,
-      ...(params.q ? { OR: [{ nameAm: { contains: params.q } }, { sku: { contains: params.q } }] } : {}),
-    },
-    orderBy: { sku: "asc" },
+  const baseWhere = {
+    isActive: true,
+    ...(params.q ? { OR: [{ nameAm: { contains: params.q } }, { sku: { contains: params.q } }] } : {}),
+  };
+
+  // Fetch materials + their stock movements in one pass to avoid N+1
+  const [allMaterials, totalCount] = await Promise.all([
+    db.material.findMany({
+      where: baseWhere,
+      orderBy: { sku: "asc" },
+      skip,
+      take: PAGE_SIZE,
+      include: {
+        stockMovements: { select: { type: true, quantity: true } },
+      },
+    }),
+    db.material.count({ where: baseWhere }),
+  ]);
+
+  const withStock = allMaterials.map((m) => {
+    let onHand = 0;
+    for (const mv of m.stockMovements) {
+      const qty = Number(mv.quantity);
+      if (mv.type === "RECEIVE" || mv.type === "RETURN") onHand += qty;
+      else if (mv.type === "ISSUE" || mv.type === "ADJUST") onHand -= qty;
+    }
+    const isLow = onHand <= Number(m.minimumLevel);
+    return { ...m, onHand, isLow };
   });
-
-  // Compute on-hand for each material
-  const withStock = await Promise.all(
-    materials.map(async (m) => {
-      const movements = await db.stockMovement.findMany({
-        where: { materialId: m.id },
-        select: { type: true, quantity: true },
-      });
-      let onHand = 0;
-      for (const mv of movements) {
-        const qty = Number(mv.quantity);
-        if (mv.type === "RECEIVE" || mv.type === "RETURN") onHand += qty;
-        else if (mv.type === "ISSUE" || mv.type === "ADJUST") onHand -= qty;
-      }
-      const isLow = onHand <= Number(m.minimumLevel);
-      return { ...m, onHand, isLow };
-    })
-  );
 
   const filtered = showLowOnly ? withStock.filter((m) => m.isLow) : withStock;
   const lowCount = withStock.filter((m) => m.isLow).length;
+  const totalPages = Math.ceil(totalCount / PAGE_SIZE);
   const canEdit = ["ADMIN", "SUPER_MANAGER", "STORE_KEEPER"].includes(session.user.role);
+
+  function buildHref(p: number) {
+    const sp = new URLSearchParams();
+    if (params.q)   sp.set("q",   params.q);
+    if (showLowOnly) sp.set("low", "1");
+    sp.set("page", String(p));
+    return `/materials?${sp.toString()}`;
+  }
 
   return (
     <div className="space-y-6">
@@ -93,7 +111,7 @@ export default async function MaterialsPage({
             <p className="text-xs font-medium text-slate-500 font-ethiopic">የተመዘገቡ ዕቃዎች (SKU)</p>
             <Package size={16} className="text-blue-600" />
           </div>
-          <p className="text-2xl font-bold text-slate-800 tabular-nums">{materials.length}</p>
+          <p className="text-2xl font-bold text-slate-800 tabular-nums">{totalCount}</p>
         </div>
 
         <div className="bg-slate-50/80 border border-slate-200/70 rounded-xl p-4 transition-all hover:bg-white hover:shadow-sm">
@@ -121,7 +139,7 @@ export default async function MaterialsPage({
             <p className="text-xs font-medium text-slate-500 font-ethiopic">የተጣሩ ዕቃዎች</p>
             <Filter size={16} className="text-indigo-600" />
           </div>
-          <p className="text-2xl font-bold text-indigo-700 tabular-nums">{filtered.length}</p>
+          <p className="text-2xl font-bold text-indigo-700 tabular-nums">{totalCount}</p>
         </div>
       </div>
 
@@ -260,9 +278,10 @@ export default async function MaterialsPage({
           </table>
         </div>
         <div className="px-6 py-3 border-t border-slate-100 bg-slate-50/50 text-xs text-slate-500 font-ethiopic flex justify-between items-center">
-          <span>በዚህ ገጽ ላይ {filtered.length} ጥሬ ዕቃዎች ይታያሉ</span>
-          <span>ጠቅላላ የዕቃ ዓይነቶች፦ {materials.length}</span>
+          <span>ከ {totalCount} ዕቃዎች ውስጥ {filtered.length} ቀርበዋል</span>
+          <span>ጠቅላላ የዕቃ ዓይነቶች፦ {totalCount}</span>
         </div>
+        <Pagination page={page} totalPages={totalPages} buildHref={buildHref} />
       </div>
     </div>
   );

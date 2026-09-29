@@ -4,21 +4,42 @@ import { redirect } from "next/navigation";
 import { requirePermission } from "@/lib/auth/permissions";
 import { am } from "@/lib/i18n/am";
 import Link from "next/link";
-import { Truck, Plus, Layers, Phone, Building2 } from "lucide-react";
+import { Truck, Plus, Layers } from "lucide-react";
 import { createSupplier } from "./actions";
+import { Pagination } from "@/components/ui/pagination";
 
-export default async function SuppliersPage() {
+const PAGE_SIZE = 20;
+
+export default async function SuppliersPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ page?: string }>;
+}) {
   const session = await auth();
   if (!session?.user) redirect("/login");
   requirePermission(session.user.role, "stock:view");
 
-  const suppliers = await db.supplier.findMany({
-    where: { isActive: true },
-    include: { _count: { select: { lots: true } } },
-    orderBy: { nameAm: "asc" },
-  });
+  const params = await searchParams;
+  const page = Math.max(1, parseInt(params.page ?? "1", 10));
+  const skip = (page - 1) * PAGE_SIZE;
 
+  const [suppliers, total] = await Promise.all([
+    db.supplier.findMany({
+      where: { isActive: true },
+      include: { _count: { select: { lots: true } } },
+      orderBy: { nameAm: "asc" },
+      skip,
+      take: PAGE_SIZE,
+    }),
+    db.supplier.count({ where: { isActive: true } }),
+  ]);
+
+  const totalPages = Math.ceil(total / PAGE_SIZE);
   const canEdit = ["ADMIN", "SUPER_MANAGER", "STORE_KEEPER"].includes(session.user.role);
+
+  function buildHref(p: number) {
+    return `/suppliers?page=${p}`;
+  }
 
   return (
     <div className="space-y-6">
@@ -145,6 +166,8 @@ export default async function SuppliersPage() {
             </tbody>
           </table>
         </div>
+      </div>
+        <Pagination page={page} totalPages={totalPages} buildHref={buildHref} />
       </div>
     </div>
   );

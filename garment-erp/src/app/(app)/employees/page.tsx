@@ -6,11 +6,14 @@ import { am } from "@/lib/i18n/am";
 import Link from "next/link";
 import { Users, UserPlus, Search, Filter, ShieldAlert, Banknote, Edit3, CheckCircle2, XCircle, Building2 } from "lucide-react";
 import { DeleteEmployeeButton } from "./delete-button";
+import { Pagination } from "@/components/ui/pagination";
+
+const PAGE_SIZE = 20;
 
 export default async function EmployeesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ dept?: string; q?: string; active?: string }>;
+  searchParams: Promise<{ dept?: string; q?: string; active?: string; page?: string }>;
 }) {
   const session = await auth();
   if (!session?.user) redirect("/login");
@@ -18,36 +21,45 @@ export default async function EmployeesPage({
 
   const params = await searchParams;
   const activeFilter = params.active !== "false";
+  const page = Math.max(1, parseInt(params.page ?? "1", 10));
+  const skip = (page - 1) * PAGE_SIZE;
 
-  const [employees, departments, totalActive, totalInactive] = await Promise.all([
+  const where = {
+    isActive: activeFilter,
+    ...(params.dept ? { departmentId: params.dept } : {}),
+    ...(params.q
+      ? { OR: [{ nameAm: { contains: params.q } }, { nameEn: { contains: params.q } }, { employeeCode: { contains: params.q.toUpperCase() } }] }
+      : {}),
+  };
+
+  const [employees, total, departments, totalActive, totalInactive] = await Promise.all([
     db.employee.findMany({
-      where: {
-        isActive: activeFilter,
-        ...(params.dept ? { departmentId: params.dept } : {}),
-        ...(params.q
-          ? { OR: [{ nameAm: { contains: params.q } }, { nameEn: { contains: params.q } }, { employeeCode: { contains: params.q.toUpperCase() } }] }
-          : {}),
-      },
-      include: {
-        department: true,
-        _count: { select: { offences: true } },
-      },
+      where,
+      include: { department: true, _count: { select: { offences: true } } },
       orderBy: [{ department: { sortOrder: "asc" } }, { serialNumber: "asc" }],
+      skip,
+      take: PAGE_SIZE,
     }),
-    db.department.findMany({
-      where: { isActive: true },
-      orderBy: { sortOrder: "asc" },
-    }),
+    db.employee.count({ where }),
+    db.department.findMany({ where: { isActive: true }, orderBy: { sortOrder: "asc" } }),
     db.employee.count({ where: { isActive: true } }),
     db.employee.count({ where: { isActive: false } }),
   ]);
 
-  const canEdit =
-    session.user.role === "ADMIN" ||
-    session.user.role === "SUPER_MANAGER" ||
-    session.user.role === "HR_CLERK";
+  const totalPages = Math.ceil(total / PAGE_SIZE);
+
+  const canEdit = session.user.role === "ADMIN" || session.user.role === "SUPER_MANAGER" || session.user.role === "HR_CLERK";
   const canDelete = session.user.role === "ADMIN" || session.user.role === "SUPER_MANAGER";
   const userCanViewSalary = canViewSalary(session.user.role);
+
+  function buildHref(p: number) {
+    const sp = new URLSearchParams();
+    if (params.q)    sp.set("q",      params.q);
+    if (params.dept) sp.set("dept",   params.dept);
+    if (params.active === "false") sp.set("active", "false");
+    sp.set("page", String(p));
+    return `/employees?${sp.toString()}`;
+  }
 
   return (
     <div className="space-y-6">
@@ -105,7 +117,7 @@ export default async function EmployeesPage({
             <p className="text-xs font-medium text-slate-500 font-ethiopic">የተጣሩ ሠራተኞች</p>
             <Filter size={16} className="text-indigo-600" />
           </div>
-          <p className="text-2xl font-bold text-indigo-700 tabular-nums">{employees.length.toLocaleString()}</p>
+          <p className="text-2xl font-bold text-indigo-700 tabular-nums">{total.toLocaleString()}</p>
         </div>
       </div>
 
@@ -270,9 +282,10 @@ export default async function EmployeesPage({
           </table>
         </div>
         <div className="px-6 py-3 border-t border-slate-100 bg-slate-50/50 text-xs text-slate-500 font-ethiopic flex justify-between items-center">
-          <span>በዚህ ገጽ ላይ {employees.length} ሠራተኞች ይታያሉ</span>
+          <span>ከ {total} ሠራተኞች ውስጥ {employees.length} ቀርበዋል</span>
           <span>ጠቅላላ የፋብሪካው ሠራተኛ፦ {totalActive + totalInactive}</span>
         </div>
+        <Pagination page={page} totalPages={totalPages} buildHref={buildHref} />
       </div>
     </div>
   );

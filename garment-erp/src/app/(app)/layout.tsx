@@ -1,5 +1,5 @@
 import { auth } from "@/lib/auth";
-import { db } from "@/lib/db";
+import { db, safeQuery } from "@/lib/db";
 import { redirect } from "next/navigation";
 import { AppShell } from "@/components/nav/app-shell";
 import { ethMonthName, formatEthDate } from "@/lib/ethiopian-calendar";
@@ -15,16 +15,14 @@ export default async function AppLayout({
 
   const { role, nameAm, employeeCode } = session.user;
 
-  // Retrieve unresolved alerts count
-  const openAlertsCount = await db.alert.count({
-    where: { resolvedAt: null },
-  });
-
-  // Get the effective Ethiopian date (override if set, otherwise auto-computed)
-  const { eth, isOverridden } = await getEffectiveFull();
+  // Run date + alerts in parallel; alerts uses safeQuery so a DB blip
+  // never crashes the entire shell layout.
+  const [{ eth, isOverridden }, openAlertsCount] = await Promise.all([
+    getEffectiveFull(),
+    safeQuery(() => db.alert.count({ where: { resolvedAt: null } }), 0),
+  ]);
 
   const ethDateDisplay = `${eth.day} ${ethMonthName(eth.month)} ${eth.year} ዓ.ም (${formatEthDate(eth)})`;
-
   const canEditDate = role === "ADMIN" || role === "SUPER_MANAGER";
 
   return (

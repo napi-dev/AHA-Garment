@@ -6,6 +6,7 @@ import { am } from "@/lib/i18n/am";
 import { formatAsEthDate } from "@/lib/ethiopian-calendar";
 import { getEffectiveDate } from "@/lib/date-override/effective-date";
 import { DayCloseButton } from "./day-close-button";
+import { GenerateReportButton } from "./generate-report-button";
 import { CheckSquare, Calendar, Users, FileText, Factory, TrendingUp, AlertTriangle } from "lucide-react";
 
 export default async function DayClosePage() {
@@ -113,6 +114,9 @@ export default async function DayClosePage() {
         alreadyClosed={!!dayClose}
         closedAt={dayClose?.closedAt?.toISOString() ?? null}
       />
+
+      {/* Generate & send PDF report (available after closing or anytime) */}
+      <GenerateReportButton date={today.toISOString()} />
     </div>
   );
 }

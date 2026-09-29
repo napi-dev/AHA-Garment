@@ -77,27 +77,65 @@ export default async function DashboardPage() {
     trendPerDay.push({ date: formatAsEthDate(d), produced: agg.produced, plus: agg.plus });
   }
 
-  // ── Current period incentive cost ─────────────────────────────────────────
-  const currentPeriod = await db.incentivePeriod.findFirst({
-    where: { ethYear: eth.year, ethMonth: eth.month },
-    orderBy: { periodNumber: "desc" },
-  });
+  // ── Current period incentive cost + dept chart + orders — all in parallel ──
+  const trendStart = new Date(today);
+  trendStart.setDate(trendStart.getDate() - trendDays + 1);
+
+  const [
+    currentPeriod,
+    deptStatsRaw,
+    [openOrders, overdueOrders],
+  ] = await Promise.all([
+    hasPermission(role, "incentive:view")
+      ? db.incentivePeriod.findFirst({
+          where: { ethYear: eth.year, ethMonth: eth.month },
+          orderBy: { periodNumber: "desc" },
+        })
+      : Promise.resolve(null),
+    db.hourlyCountLine.groupBy({
+      by:    ["departmentId"],
+      where: { sheet: { date: today }, status: { not: "DRAFT" } },
+      _sum:  { totalProduced: true, plusPieces: true, targetForDay: true },
+    }),
+    Promise.all([
+      db.prodOrder.count({ where: { isActive: true } }),
+      db.prodOrder.count({ where: { isActive: true, dueDate: { lt: today } } }),
+    ]),
+  ]);
 
   let incentiveCostPer1000 = "—";
   let periodPayable = "—";
   if (currentPeriod) {
     const agg = await db.incentiveLine.aggregate({
-      where:  { periodId: currentPeriod.id },
-      _sum:   { payable: true },
-      _count: { _all: true },
+      where: { periodId: currentPeriod.id },
+      _sum:  { payable: true },
     });
-    const totalPay  = new Decimal(agg._sum.payable?.toString() ?? "0");
-    const totalProd = grandTotalProduced;
+    const totalPay = new Decimal(agg._sum.payable?.toString() ?? "0");
     periodPayable = totalPay.toFixed(2);
-    incentiveCostPer1000 = totalProd > 0
-      ? totalPay.div(totalProd).mul(1000).toFixed(2)
+    incentiveCostPer1000 = grandTotalProduced > 0
+      ? totalPay.div(grandTotalProduced).mul(1000).toFixed(2)
       : "—";
   }
+
+  // ── Dept chart — resolve names in one query ───────────────────────────────
+  const deptIds = deptStatsRaw.map((d) => d.departmentId);
+  const depts = deptIds.length
+    ? await db.department.findMany({
+        where:  { id: { in: deptIds } },
+        select: { id: true, nameAm: true },
+      })
+    : [];
+  const deptNameMap = Object.fromEntries(depts.map((d) => [d.id, d.nameAm]));
+
+  const deptChartData = deptStatsRaw
+    .map((d) => ({
+      name:     deptNameMap[d.departmentId] ?? d.departmentId.slice(0, 8),
+      target:   d._sum.targetForDay ?? 0,
+      produced: d._sum.totalProduced ?? 0,
+    }))
+    .filter((d) => d.target > 0)
+    .sort((a, b) => b.produced - a.produced)
+    .slice(0, 10);
 
   // ── Dept productivity for bar chart ──────────────────────────────────────
   const deptStats = await db.hourlyCountLine.groupBy({

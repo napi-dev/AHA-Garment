@@ -8,50 +8,72 @@ import { getEffectiveDate, getEffectiveEthDate } from "@/lib/date-override/effec
 import Link from "next/link";
 import { approveSalarySchedule } from "./actions";
 import { Banknote, ShieldCheck, Users, Calendar, AlertCircle, Edit3 } from "lucide-react";
+import { Pagination } from "@/components/ui/pagination";
 
-export default async function SalaryPage() {
+const PAGE_SIZE = 20;
+
+export default async function SalaryPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ page?: string; dept?: string }>;
+}) {
   const session = await auth();
   if (!session?.user) redirect("/login");
   requirePermission(session.user.role, "salary:view");
 
+  const params = await searchParams;
+  const page = Math.max(1, parseInt(params.page ?? "1", 10));
+  const skip = (page - 1) * PAGE_SIZE;
+
   const today = await getEffectiveDate();
   const ethToday = await getEffectiveEthDate();
 
-  // All active employees with their current salary
-  const employees = await db.employee.findMany({
-    where: { isActive: true },
-    include: {
-      department: true,
-      salaryRecords: {
-        where: { effectiveTo: null },
-        orderBy: { effectiveFrom: "desc" },
-        take: 1,
-      },
-      attendances: {
-        where: {
-          date: {
-            gte: new Date(today.getFullYear(), today.getMonth(), 1),
-            lte: today,
-          },
-          hoursWorked: { gt: 0 },
+  const where = {
+    isActive: true,
+    ...(params.dept ? { departmentId: params.dept } : {}),
+  };
+
+  const [employees, totalCount, departments, totals] = await Promise.all([
+    db.employee.findMany({
+      where,
+      include: {
+        department: true,
+        salaryRecords: {
+          where: { effectiveTo: null },
+          orderBy: { effectiveFrom: "desc" },
+          take: 1,
         },
       },
-    },
-    orderBy: [{ department: { sortOrder: "asc" } }, { serialNumber: "asc" }],
-  });
+      orderBy: [{ department: { sortOrder: "asc" } }, { serialNumber: "asc" }],
+      skip,
+      take: PAGE_SIZE,
+    }),
+    db.employee.count({ where }),
+    db.department.findMany({ where: { isActive: true }, orderBy: { sortOrder: "asc" }, select: { id: true, nameAm: true } }),
+    // aggregate totals separately
+    db.salaryRecord.aggregate({
+      where: { effectiveTo: null, employee: { isActive: true } },
+      _sum: { amount: true },
+      _count: { _all: true },
+    }),
+  ]);
 
+  const totalPages = Math.ceil(totalCount / PAGE_SIZE);
   const canEdit = session.user.role === "ADMIN" || session.user.role === "SUPER_MANAGER";
   const canApprove = session.user.role === "SUPER_MANAGER";
 
-  const totalSalary = employees.reduce((sum, e) => {
-    const sal = e.salaryRecords[0];
-    return sum + (sal ? Number(sal.amount) : 0);
-  }, 0);
-
-  const missingSalariesCount = employees.filter((e) => !e.salaryRecords[0]).length;
-  const avgSalary = employees.length > 0 ? totalSalary / employees.length : 0;
+  const totalSalary = Number(totals._sum.amount ?? 0);
+  const missingSalariesCount = totalCount - (totals._count._all ?? 0);
+  const avgSalary = totals._count._all > 0 ? totalSalary / totals._count._all : 0;
 
   const approveAction = approveSalarySchedule.bind(null, ethToday.year, ethToday.month);
+
+  function buildHref(p: number) {
+    const sp = new URLSearchParams();
+    if (params.dept) sp.set("dept", params.dept);
+    sp.set("page", String(p));
+    return `/salary?${sp.toString()}`;
+  }
 
   return (
     <div className="space-y-6">
@@ -137,14 +159,12 @@ export default async function SalaryPage() {
                 <th className="text-right">{am.employees.name}</th>
                 <th className="text-right">{am.employees.department}</th>
                 <th className="text-right">{am.salary.fixedSalary}</th>
-                <th className="text-center">የተገኘባቸው ቀናት</th>
                 {canEdit && <th className="w-24 text-center">{am.actions}</th>}
               </tr>
             </thead>
             <tbody>
               {employees.map((emp, idx) => {
                 const salRec = emp.salaryRecords[0];
-                const daysAttended = emp.attendances.length;
                 return (
                   <tr key={emp.id} className="hover:bg-slate-50/80 transition-colors">
                     <td className="text-center tabular-nums text-slate-400 py-3">{idx + 1}</td>
@@ -171,7 +191,7 @@ export default async function SalaryPage() {
                       )}
                     </td>
                     <td className="text-center tabular-nums text-slate-600 font-medium py-3">
-                      {daysAttended > 0 ? `${daysAttended} ቀን` : "—"}
+                      —
                     </td>
                     {canEdit && (
                       <td className="text-center py-3">
@@ -201,6 +221,10 @@ export default async function SalaryPage() {
             </tfoot>
           </table>
         </div>
+        <div className="px-6 py-3 border-t border-slate-100 bg-slate-50/50 text-xs text-slate-500 font-ethiopic">
+          ከ {totalCount} ሠራተኞች ውስጥ {employees.length} ቀርበዋል
+        </div>
+        <Pagination page={page} totalPages={totalPages} buildHref={buildHref} />
       </div>
     </div>
   );

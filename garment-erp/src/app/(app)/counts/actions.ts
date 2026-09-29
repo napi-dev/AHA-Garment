@@ -221,3 +221,121 @@ export async function closeDay(dateStr: string, notes?: string): Promise<void> {
   revalidatePath("/counts");
   revalidatePath("/dashboard");
 }
+
+// ─── Generate daily PDF report and send to Telegram ──────────────────────────
+
+export async function generateAndSendDailyReport(dateStr: string): Promise<{ ok: boolean; message: string }> {
+  "use server";
+  const session = await auth();
+  if (!session?.user) return { ok: false, message: "ተፈቅዶ አልነበረም" };
+  requirePermission(session.user.role, "counts:verify");
+
+  try {
+    const date = new Date(dateStr);
+    date.setUTCHours(0, 0, 0, 0);
+
+    // Load lines for the day
+    const lines = await db.hourlyCountLine.findMany({
+      where: { sheet: { date }, status: { not: "DRAFT" } },
+      include: {
+        employee: true,
+        department: true,
+        sheet: { include: { operation: true } },
+      },
+      orderBy: [
+        { department: { sortOrder: "asc" } },
+        { employee: { serialNumber: "asc" } },
+      ],
+    });
+
+    // Build incentive card lookup
+    const cardMap = new Map<string, number>();
+    const deptIds = [...new Set(lines.map((l) => l.departmentId))];
+    await Promise.all(
+      deptIds.map(async (deptId) => {
+        const card = await db.incentiveCard.findFirst({
+          where: { departmentId: deptId, effectiveFrom: { lte: date }, OR: [{ effectiveTo: null }, { effectiveTo: { gte: date } }] },
+          orderBy: { effectiveFrom: "desc" },
+        });
+        cardMap.set(deptId, card?.targetPerHour ?? 0);
+      })
+    );
+
+    let totalProduced = 0;
+    let aboveTarget   = 0;
+
+    const rows = lines.map((line, idx) => {
+      const targetPerHour = cardMap.get(line.departmentId) ?? 0;
+      const targetPerDay  = targetPerHour * 8;
+      totalProduced += line.totalProduced;
+      if (line.plusPieces > 0) aboveTarget++;
+      const diff = line.plusPieces - line.minusPieces;
+      const pct  = targetPerDay > 0 ? Math.round((line.totalProduced / targetPerDay) * 100 * 10) / 10 : 0;
+      return {
+        serial: idx + 1,
+        nameAm: line.employee.nameAm,
+        operationAm: line.sheet.operation.nameAm,
+        machineType: line.department.nameEn ?? "",
+        targetPerDay,
+        produced: line.totalProduced,
+        plusPieces: line.plusPieces,
+        minusPieces: line.minusPieces,
+        percentOfTarget: pct,
+      };
+    });
+
+    // Generate PDF
+    const { renderPdfToBuffer } = await import("@/lib/pdf/render");
+    const { DailyProductionSheetPdf } = await import("@/lib/pdf/daily-production-sheet");
+    const React = await import("react");
+    const { formatAsEthDate } = await import("@/lib/ethiopian-calendar");
+
+    const buffer = await renderPdfToBuffer(
+      React.default.createElement(DailyProductionSheetPdf, {
+        dateLabel: formatAsEthDate(date),
+        supervisorName: session.user.nameAm ?? "",
+        shift: "ቀን",
+        rows,
+        totalProduced,
+        aboveTarget,
+        totalWorkers: rows.length,
+      })
+    ) as Buffer;
+
+    // Send to Telegram
+    const { sendDocument, sendMessage } = await import("@/lib/automation/telegram");
+    const managerChatId = process.env.TELEGRAM_MANAGER_CHAT_ID ?? "";
+    const deptChatId    = process.env.TELEGRAM_DEPT_GROUP_CHAT_ID ?? "";
+
+    const filename = `daily-production-${dateStr}.pdf`;
+    const caption  = `📊 የዕለት ምርት ሪፖርት\nቀን: ${formatAsEthDate(date)}\nጠቅላላ: ${totalProduced.toLocaleString()} ፍሬ\nሠራተኞች: ${rows.length}\nከዒላማ በላይ: ${aboveTarget}`;
+
+    const results = await Promise.allSettled([
+      managerChatId ? sendDocument(managerChatId, filename, buffer, caption) : Promise.resolve({ ok: true }),
+      deptChatId    ? sendDocument(deptChatId,    filename, buffer, caption) : Promise.resolve({ ok: true }),
+    ]);
+
+    const allOk = results.every((r) => r.status === "fulfilled" && r.value.ok);
+
+    // Save report job record
+    const dayClose = await db.dayClose.findUnique({ where: { date } });
+    if (dayClose) {
+      await db.reportJob.upsert({
+        where: { type_periodDate: { type: "DAILY_PRODUCTION_SHEET", periodDate: date } },
+        update: { status: allOk ? "sent" : "failed", attempts: { increment: 1 } },
+        create: {
+          type: "DAILY_PRODUCTION_SHEET",
+          periodDate: date,
+          status: allOk ? "sent" : "failed",
+          dayCloseId: dayClose.id,
+        },
+      });
+    }
+
+    revalidatePath("/counts/close");
+    return { ok: allOk, message: allOk ? "ሪፖርቱ ወደ Telegram ተልኳል ✓" : "ሪፖርቱ ተዘጋጅቷል — Telegram ላኪ ሊሳካ አልቻለም" };
+  } catch (e) {
+    console.error("[generateAndSendDailyReport]", e);
+    return { ok: false, message: e instanceof Error ? e.message : "ስህተት ተፈጥሯል" };
+  }
+}

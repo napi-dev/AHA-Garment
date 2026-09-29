@@ -10,17 +10,36 @@ import { ScrollText, Filter, ChevronLeft, ChevronRight } from "lucide-react";
 const PAGE_SIZE = 50;
 
 const ACTION_LABELS: Record<string, string> = {
-  SAVE_HOURLY_COUNT:        "ቁጥር አስቀምጦ",
-  VERIFY_COUNT:             "ቁጥር አረጋግጧል",
-  CLOSE_DAY:                "ቀን ዘጋ",
-  CLOSE_INCENTIVE_PERIOD:   "ወቅት ዘጋ",
-  APPROVE_INCENTIVE_PERIOD: "ወቅት አፀደቀ",
-  SET_SALARY:               "ደሞዝ ቀየረ",
-  APPROVE_SALARY_SCHEDULE:  "ደሞዝ ሰሌዳ አፀደቀ",
-  CREATE_EMPLOYEE:          "ሠራተኛ ፈጠረ",
-  UPDATE_EMPLOYEE:          "ሠራተኛ አስተካከለ",
-  RECORD_OFFENCE:           "ጥፋት ሰነደ",
-  LIFT_SUSPENSION:          "ታግዱ አነሳ",
+  // Count operations
+  SAVE_HOURLY_COUNT:        "📝 የሰዓት ቁጥር ገባ",
+  VERIFY_COUNT:             "✅ ቁጥር ተረጋገጠ",
+  CLOSE_DAY:                "🔒 ቀን ተዘጋ",
+  // Incentive
+  CLOSE_INCENTIVE_PERIOD:   "📊 ወቅት ተጠናቀቀ",
+  APPROVE_INCENTIVE_PERIOD: "✅ ወቅት ፀደቀ",
+  // Salary
+  SET_SALARY:               "💰 ደሞዝ ተቀየረ",
+  APPROVE_SALARY_SCHEDULE:  "✅ ደሞዝ ሰሌዳ ፀደቀ",
+  // Employees
+  CREATE_EMPLOYEE:          "👤 ሠራተኛ ተጨመረ",
+  UPDATE_EMPLOYEE:          "✏️ ሠራተኛ ተስተካከለ",
+  DELETE_EMPLOYEE:          "🗑️ ሠራተኛ ተሰረዘ",
+  // Offences
+  RECORD_OFFENCE:           "⚠️ ጥፋት ሰነድ ሆነ",
+  LIFT_SUSPENSION:          "🔓 ታግዱ ተነሳ",
+  // Attendance
+  SAVE_ATTENDANCE:          "🕐 የመገኘት ሁኔታ ተቀመጠ",
+  // Materials
+  RECEIVE_STOCK:            "📦 ጥሬ ዕቃ ገባ",
+  ISSUE_STOCK:              "📤 ጥሬ ዕቃ ወጣ",
+  // Settings
+  UPDATE_SETTING:           "⚙️ ቅንብር ተቀየረ",
+  SET_DATE_OVERRIDE:        "📅 ቀን ተስተካከለ",
+  CLEAR_DATE_OVERRIDE:      "📅 የቀን ማሻሻያ ተሰረዘ",
+  // Users
+  CREATE_USER:              "👥 ተጠቃሚ ተፈጠረ",
+  UPDATE_USER:              "✏️ ተጠቃሚ ተቀየረ",
+  RESET_PIN:                "🔑 ፒን ተቀየረ",
 };
 
 export default async function AuditLogPage({
@@ -178,9 +197,10 @@ export default async function AuditLogPage({
                       {am.roles[log.user.role as keyof typeof am.roles] ?? log.user.role}
                     </span>
                   </td>
-                  <td className="font-ethiopic text-slate-800">
-                    {ACTION_LABELS[log.action] ?? log.action}
-                    <span className="block text-[10px] text-slate-400 font-mono">{log.action}</span>
+                  <td className="font-ethiopic text-slate-800 py-3">
+                    <span title={log.action}>
+                      {ACTION_LABELS[log.action] ?? log.action}
+                    </span>
                   </td>
                   <td className="text-xs">
                     <span className="text-slate-600">{log.entity}</span>
