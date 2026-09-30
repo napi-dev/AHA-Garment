@@ -11,8 +11,10 @@ export default async function ReportsPage() {
   if (!session?.user) redirect("/login");
   requirePermission(session.user.role, "reports:view");
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  // Use EAT (UTC+3) so date queries match Ethiopia's current date
+  const eatOffset = 3 * 60 * 60 * 1000;
+  const eatNow    = new Date(Date.now() + eatOffset);
+  const today     = new Date(Date.UTC(eatNow.getUTCFullYear(), eatNow.getUTCMonth(), eatNow.getUTCDate(), 0, 0, 0));
 
   const [
     totalMaterials,

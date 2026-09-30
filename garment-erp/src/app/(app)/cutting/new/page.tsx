@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { redirect } from "next/navigation";
 import { requirePermission } from "@/lib/auth/permissions";
 import { am } from "@/lib/i18n/am";
+import { todayISOStringEAT } from "@/lib/ethiopian-calendar";
 import { createCutJob } from "../actions";
 import Link from "next/link";
 import { Scissors, ArrowRight, Info } from "lucide-react";
@@ -29,7 +30,7 @@ export default async function NewCutJobPage({
     ? orders.find((o) => o.id === params.orderId)
     : null;
 
-  const today = new Date().toISOString().split("T")[0];
+  const today = todayISOStringEAT();
 
   return (
     <div className="max-w-xl mx-auto space-y-6">

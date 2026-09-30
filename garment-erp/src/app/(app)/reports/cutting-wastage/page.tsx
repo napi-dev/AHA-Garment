@@ -3,7 +3,7 @@ import { db } from "@/lib/db";
 import { redirect } from "next/navigation";
 import { requirePermission } from "@/lib/auth/permissions";
 import { am } from "@/lib/i18n/am";
-import { formatAsEthDate } from "@/lib/ethiopian-calendar";
+import { formatAsEthDate, todayISOStringEAT } from "@/lib/ethiopian-calendar";
 import Link from "next/link";
 import Decimal from "decimal.js";
 import { Scissors, AlertTriangle, ArrowLeft, Filter, Layers, CheckCircle2, TrendingDown } from "lucide-react";
@@ -18,7 +18,7 @@ export default async function CuttingWastageReportPage({
   requirePermission(session.user.role, "reports:view");
 
   const params  = await searchParams;
-  const today   = new Date().toISOString().split("T")[0];
+  const today   = todayISOStringEAT();
   const fromStr = params.from ?? today;
   const toStr   = params.to   ?? today;
   const from    = new Date(fromStr + "T00:00:00Z");

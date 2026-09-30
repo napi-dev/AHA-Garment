@@ -179,12 +179,12 @@ export function DailyProductionSheetPdf({
             const abovePct = row.percentOfTarget >= 100;
             return (
               <View key={String(idx)} style={idx % 2 === 0 ? s.trow : s.trowAlt}>
-                <Text style={s.cSerial}>{String(row.serial)}</Text>
-                <Text style={s.cName}>{row.nameAm}</Text>
-                <Text style={s.cOp}>{row.operationAm}</Text>
-                <Text style={s.cMachine}>{row.machineType}</Text>
+                <Text style={s.cSerial}>{String(row.serial ?? "—")}</Text>
+                <Text style={s.cName}>{row.nameAm ?? "—"}</Text>
+                <Text style={s.cOp}>{row.operationAm ?? "—"}</Text>
+                <Text style={s.cMachine}>{row.machineType ?? "—"}</Text>
                 <Text style={s.cTarget}>{row.targetPerDay > 0 ? String(row.targetPerDay) : "—"}</Text>
-                <Text style={s.cProdBold}>{String(row.produced)}</Text>
+                <Text style={s.cProdBold}>{String(row.produced ?? 0)}</Text>
                 <Text style={isAbove ? s.cDiffPos : s.cDiffNeg}>
                   {diff > 0 ? `+${diff}` : diff < 0 ? String(diff) : "—"}
                 </Text>
@@ -235,11 +235,11 @@ export function DailyProductionSheetPdf({
 
           {auditRows.map((row, idx) => (
             <View key={String(idx)} style={idx % 2 === 0 ? s.auditRow : s.auditRowAlt}>
-              <Text style={s.aTime}>{row.time}</Text>
-              <Text style={s.aUser}>{row.userCode}</Text>
-              <Text style={s.aAction}>{ACTION_LABELS[row.action] ?? row.action}</Text>
-              <Text style={s.aEntity}>{`${row.entity} / ${row.entityId.slice(0, 10)}`}</Text>
-              <Text style={s.aReason}>{row.reason || "—"}</Text>
+              <Text style={s.aTime}>{row.time ?? "—"}</Text>
+              <Text style={s.aUser}>{row.userCode ?? "—"}</Text>
+              <Text style={s.aAction}>{ACTION_LABELS[row.action] ?? row.action ?? "—"}</Text>
+              <Text style={s.aEntity}>{`${row.entity ?? "—"} / ${(row.entityId ?? "—").slice(0, 10)}`}</Text>
+              <Text style={s.aReason}>{row.reason ?? "—"}</Text>
             </View>
           ))}
         </View>

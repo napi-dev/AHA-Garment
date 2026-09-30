@@ -19,7 +19,9 @@ export default async function DispatchPage({ params }: { params: Promise<{ bundl
   });
   if (!bundle) notFound();
 
-  const today = new Date().toISOString().split("T")[0];
+  // Use EAT (UTC+3) for the default dispatch date
+  const eatNow = new Date(Date.now() + 3 * 60 * 60 * 1000);
+  const today  = eatNow.toISOString().split("T")[0];
   const action = dispatchBundle.bind(null, bundleId, session.user.id);
 
   return (

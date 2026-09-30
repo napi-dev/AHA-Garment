@@ -3,7 +3,7 @@ import { db } from "@/lib/db";
 import { redirect, notFound } from "next/navigation";
 import { requirePermission } from "@/lib/auth/permissions";
 import { am } from "@/lib/i18n/am";
-import { formatAsEthDate } from "@/lib/ethiopian-calendar";
+import { formatAsEthDate, todayISOStringEAT } from "@/lib/ethiopian-calendar";
 import { setSalary } from "@/app/(app)/salary/actions";
 import Link from "next/link";
 import { Banknote, ArrowRight, Save, History, AlertTriangle, CheckCircle2 } from "lucide-react";
@@ -25,7 +25,7 @@ export default async function EmployeeSalaryPage({ params }: { params: Promise<{
 
   const canEdit = session.user.role === "ADMIN" || session.user.role === "SUPER_MANAGER";
   const current = emp.salaryRecords[0];
-  const today = new Date().toISOString().split("T")[0];
+  const today = todayISOStringEAT();
 
   async function boundSetSalary(formData: FormData) {
     "use server";

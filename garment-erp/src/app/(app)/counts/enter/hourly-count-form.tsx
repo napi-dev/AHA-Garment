@@ -4,7 +4,7 @@ import { useState, useCallback } from "react";
 import { am } from "@/lib/i18n/am";
 import { calculateDailyCount } from "@/lib/incentive/engine";
 import { saveHourlyCounts } from "../actions";
-import { Check, Loader2, AlertCircle, Save, Target, Sparkles, Building2 } from "lucide-react";
+import { Check, Loader2, AlertCircle, Save, Target, Sparkles, Building2, Calendar, CheckCircle2 } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -70,7 +70,8 @@ function lineToRow(line: ExistingLine): RowState {
     h8: line.h8 != null ? String(line.h8) : "",
     mistakes: String(line.mistakes),
     mistakeReason: line.mistakeReason ?? "",
-    dirty: false, saving: false, saved: false, error: "",
+    // Mark as already saved so the row shows the green ✓ on load
+    dirty: false, saving: false, saved: true, error: "",
   };
 }
 
@@ -89,6 +90,15 @@ export function HourlyCountForm({ deptWithEmployees, date, supervisorId }: Hourl
 
   const [rows, setRows] = useState<Record<string, RowState>>(initialState);
   const [activeEmpId, setActiveEmpId] = useState<string | null>(null);
+
+  // Count how many rows are already saved (had existing data)
+  const totalRows    = Object.keys(initialState).length;
+  const alreadySaved = Object.values(initialState).filter((r) => r.saved).length;
+
+  // Format the date nicely — convert ISO string to Ethiopian display
+  const dateDisplay = new Date(date).toLocaleDateString("en-ET", {
+    year: "numeric", month: "2-digit", day: "2-digit",
+  });
 
   const updateRow = useCallback(
     (empId: string, field: keyof RowState, value: string) => {
@@ -161,7 +171,35 @@ export function HourlyCountForm({ deptWithEmployees, date, supervisorId }: Hourl
   );
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
+      {/* Date header & saved count indicator */}
+      <div className="erp-card p-5 flex items-center justify-between gap-4 flex-wrap border-blue-200 bg-gradient-to-r from-blue-50/50 to-indigo-50/30">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center shadow-sm">
+            <Calendar size={18} />
+          </div>
+          <div>
+            <p className="text-xs text-slate-500 font-ethiopic mb-0.5">የቁጥር መሙላት ቀን</p>
+            <p className="text-base font-bold text-slate-900 font-mono">{dateDisplay}</p>
+          </div>
+        </div>
+
+        {alreadySaved > 0 && (
+          <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800">
+            <CheckCircle2 size={16} className="text-emerald-600" />
+            <span className="text-xs font-semibold font-ethiopic">
+              {alreadySaved} ሠራተኞች ቁጥራቸውን አስቀድመዋል ({Math.round((alreadySaved / totalRows) * 100)}%)
+            </span>
+          </div>
+        )}
+
+        {alreadySaved === 0 && (
+          <span className="text-xs text-slate-400 font-ethiopic">
+            ለዛሬ ገና የተመዘገበ ቁጥር የለም
+          </span>
+        )}
+      </div>
+
       {deptWithEmployees.map((dept) => (
         <DeptSection
           key={dept.deptId}

@@ -3,7 +3,7 @@ import { db } from "@/lib/db";
 import { redirect, notFound } from "next/navigation";
 import { requirePermission } from "@/lib/auth/permissions";
 import { am } from "@/lib/i18n/am";
-import { formatAsEthDate } from "@/lib/ethiopian-calendar";
+import { formatAsEthDate, todayISOStringEAT } from "@/lib/ethiopian-calendar";
 import { createLot } from "../../actions";
 import Link from "next/link";
 import { Layers, ArrowRight, Plus } from "lucide-react";
@@ -21,7 +21,7 @@ export default async function LotsPage({ params }: { params: Promise<{ id: strin
   if (!supplier) notFound();
 
   const action = createLot.bind(null, id);
-  const today  = new Date().toISOString().split("T")[0];
+  const today  = todayISOStringEAT();
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">

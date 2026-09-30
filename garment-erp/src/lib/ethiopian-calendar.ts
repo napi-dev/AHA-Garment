@@ -208,6 +208,17 @@ export function ethMonthName(month: number): string {
  * This is correct regardless of the machine's system timezone setting,
  * which is important because the Next.js server may run on UTC.
  */
+/**
+ * Returns today's date as a "YYYY-MM-DD" string in EAT (UTC+3).
+ * Use this anywhere you need a date string default for <input type="date">,
+ * replacing the timezone-incorrect `new Date().toISOString().split("T")[0]`.
+ */
+export function todayISOStringEAT(): string {
+  const eatOffset = 3 * 60 * 60 * 1000;
+  const eatNow    = new Date(Date.now() + eatOffset);
+  return eatNow.toISOString().split("T")[0];
+}
+
 export function todayEth(): EthDate {
   // Get current UTC ms, add 3 hours for EAT
   const eatOffset = 3 * 60 * 60 * 1000;

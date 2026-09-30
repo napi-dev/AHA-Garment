@@ -3,7 +3,7 @@ import { db } from "@/lib/db";
 import { redirect } from "next/navigation";
 import { requirePermission } from "@/lib/auth/permissions";
 import { am } from "@/lib/i18n/am";
-import { formatAsEthDate } from "@/lib/ethiopian-calendar";
+import { formatAsEthDate, todayISOStringEAT } from "@/lib/ethiopian-calendar";
 import { updateIncentiveCard } from "./actions";
 import { IncentiveCardSaveButton } from "./save-button";
 import Link from "next/link";
@@ -22,7 +22,7 @@ export default async function IncentiveCardPage({
   const params = await searchParams;
   const justSaved = params.saved === "1";
 
-  const today = new Date().toISOString().split("T")[0];
+  const today = todayISOStringEAT();
 
   // All departments with their current active card
   const departments = await db.department.findMany({

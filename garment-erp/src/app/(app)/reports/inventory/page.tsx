@@ -3,7 +3,7 @@ import { db } from "@/lib/db";
 import { redirect } from "next/navigation";
 import { requirePermission } from "@/lib/auth/permissions";
 import { am } from "@/lib/i18n/am";
-import { formatAsEthDate } from "@/lib/ethiopian-calendar";
+import { formatAsEthDate, todayISOStringEAT } from "@/lib/ethiopian-calendar";
 import Link from "next/link";
 import Decimal from "decimal.js";
 import { Warehouse, ArrowLeft, Filter, FileDown, AlertTriangle, ArrowUpRight, ArrowDownLeft, CheckCircle2 } from "lucide-react";
@@ -18,7 +18,7 @@ export default async function InventoryReportPage({
   requirePermission(session.user.role, "reports:view");
 
   const params  = await searchParams;
-  const dateStr = params.date ?? new Date().toISOString().split("T")[0];
+  const dateStr = params.date ?? todayISOStringEAT();
   const date    = new Date(dateStr + "T00:00:00Z");
   const nextDay = new Date(date);
   nextDay.setDate(nextDay.getDate() + 1);

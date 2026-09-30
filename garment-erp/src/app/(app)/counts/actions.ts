@@ -158,16 +158,21 @@ export async function verifyCountLine(lineId: string): Promise<void> {
 
 // ─── Close the day ────────────────────────────────────────────────────────────
 
-export async function closeDay(dateStr: string, notes?: string): Promise<void> {
+export async function closeDay(dateStr: string, notes?: string): Promise<{ ok: boolean; message: string }> {
   const session = await auth();
-  if (!session?.user) throw new Error("ተፈቅዶ አልነበረም");
+  if (!session?.user) return { ok: false, message: "ተፈቅዶ አልነበረም" };
   requirePermission(session.user.role, "counts:verify");
 
   const date = new Date(dateStr);
   date.setHours(0, 0, 0, 0);
 
   const existing = await db.dayClose.findUnique({ where: { date } });
-  if (existing) throw new Error("ቀኑ ቀድሞ ተዘግቷል");
+  if (existing) {
+    return {
+      ok: false,
+      message: `ይህ ቀን ቀድሞ ተዘግቷል — ${new Date(existing.closedAt).toLocaleTimeString("en-ET", { hour: "2-digit", minute: "2-digit" })}`,
+    };
+  }
 
   // Lock all sheets for this date
   const sheets = await db.hourlyCountSheet.findMany({ where: { date } });
@@ -220,6 +225,7 @@ export async function closeDay(dateStr: string, notes?: string): Promise<void> {
 
   revalidatePath("/counts");
   revalidatePath("/dashboard");
+  return { ok: true, message: "ቀኑ ተዘግቷል" };
 }
 
 // ─── Generate daily PDF report and send to Telegram ──────────────────────────

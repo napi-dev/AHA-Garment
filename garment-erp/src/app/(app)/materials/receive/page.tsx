@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { redirect } from "next/navigation";
 import { requirePermission } from "@/lib/auth/permissions";
 import { am } from "@/lib/i18n/am";
+import { todayISOStringEAT } from "@/lib/ethiopian-calendar";
 import { recordMovement } from "../actions";
 import Link from "next/link";
 import { ArrowDownLeft, ArrowRight, Save, PackagePlus } from "lucide-react";
@@ -16,7 +17,7 @@ export default async function ReceiveMaterialPage() {
     db.material.findMany({ where: { isActive: true }, orderBy: { sku: "asc" } }),
     db.supplier.findMany({ where: { isActive: true }, orderBy: { nameAm: "asc" } }),
   ]);
-  const today = new Date().toISOString().split("T")[0];
+  const today = todayISOStringEAT();
 
   return (
     <div className="max-w-xl mx-auto space-y-6">

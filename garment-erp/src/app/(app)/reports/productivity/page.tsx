@@ -3,7 +3,7 @@ import { db } from "@/lib/db";
 import { redirect } from "next/navigation";
 import { requirePermission } from "@/lib/auth/permissions";
 import { am } from "@/lib/i18n/am";
-import { formatAsEthDate } from "@/lib/ethiopian-calendar";
+import { formatAsEthDate, todayISOStringEAT } from "@/lib/ethiopian-calendar";
 import Link from "next/link";
 import { Users, ArrowLeft, Filter, TrendingUp, CheckCircle2, Award, Calendar } from "lucide-react";
 
@@ -17,7 +17,7 @@ export default async function ProductivityReportPage({
   requirePermission(session.user.role, "reports:view");
 
   const params  = await searchParams;
-  const dateStr = params.date ?? new Date().toISOString().split("T")[0];
+  const dateStr = params.date ?? todayISOStringEAT();
   const date    = new Date(dateStr + "T00:00:00Z");
 
   const lines = await db.hourlyCountLine.findMany({

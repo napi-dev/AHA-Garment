@@ -34,7 +34,10 @@ export default async function ProductionPage({
     orderBy: { createdAt: "desc" },
   });
 
-  const today = new Date();
+  // Use EAT (UTC+3) so overdue comparison matches Ethiopia's current date
+  const eatOffset = 3 * 60 * 60 * 1000;
+  const eatNow    = new Date(Date.now() + eatOffset);
+  const today     = new Date(Date.UTC(eatNow.getUTCFullYear(), eatNow.getUTCMonth(), eatNow.getUTCDate(), 0, 0, 0));
 
   const [activeCount, totalCount, overdueCount] = await Promise.all([
     db.prodOrder.count({ where: { isActive: true } }),

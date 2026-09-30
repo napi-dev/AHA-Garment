@@ -8,36 +8,77 @@ import { getEffectiveDate } from "@/lib/date-override/effective-date";
 import { DayCloseButton } from "./day-close-button";
 import { GenerateReportButton } from "./generate-report-button";
 import { PurgeAuditButton } from "./purge-audit-button";
-import { CheckSquare, Calendar, Users, FileText, Factory, TrendingUp, AlertTriangle } from "lucide-react";
+import {
+  CheckSquare, Calendar, Users, FileText,
+  Factory, TrendingUp, AlertTriangle, History,
+} from "lucide-react";
 
 export default async function DayClosePage() {
   const session = await auth();
   if (!session?.user) redirect("/login");
   requirePermission(session.user.role, "counts:verify");
 
+  // Effective today (respects admin date override)
   const today = await getEffectiveDate();
   today.setUTCHours(0, 0, 0, 0);
 
-  const dayClose = await db.dayClose.findUnique({ where: { date: today } });
+  const todayClose = await db.dayClose.findUnique({ where: { date: today } });
 
-  // Summary for today — all in parallel
+  // ── Find the active working date ──────────────────────────────────────────
+  // If today is already closed, check if yesterday was not closed but had entries
+  // (the manager forgot to close it). Show that day instead so they can still close it.
+  let workingDate = today;
+  let isYesterday = false;
+
+  if (todayClose) {
+    const yesterday = new Date(today);
+    yesterday.setUTCDate(yesterday.getUTCDate() - 1);
+
+    const yesterdayClose  = await db.dayClose.findUnique({ where: { date: yesterday } });
+    const yesterdaySheets = await db.hourlyCountSheet.count({ where: { date: yesterday } });
+
+    if (!yesterdayClose && yesterdaySheets > 0) {
+      workingDate = yesterday;
+      isYesterday = true;
+    }
+  }
+
+  const dayClose = workingDate === today ? todayClose : null;
+
+  // Summary for working date — all in parallel
   const [sheetCount, lineStats, pendingLines, verifiedLines] = await Promise.all([
-    db.hourlyCountSheet.count({ where: { date: today } }),
+    db.hourlyCountSheet.count({ where: { date: workingDate } }),
     db.hourlyCountLine.aggregate({
-      where: { sheet: { date: today } },
+      where: { sheet: { date: workingDate } },
       _count: { _all: true },
       _sum: { totalProduced: true, plusPieces: true, minusPieces: true },
     }),
     db.hourlyCountLine.count({
-      where: { sheet: { date: today }, status: "SUBMITTED" },
+      where: { sheet: { date: workingDate }, status: "SUBMITTED" },
     }),
     db.hourlyCountLine.count({
-      where: { sheet: { date: today }, status: "VERIFIED" },
+      where: { sheet: { date: workingDate }, status: "VERIFIED" },
     }),
   ]);
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
+
+      {/* Yesterday warning banner */}
+      {isYesterday && (
+        <div className="flex items-start gap-3 px-4 py-3 rounded-xl bg-amber-50 border border-amber-300 text-amber-800">
+          <History size={18} className="text-amber-600 flex-shrink-0 mt-0.5" />
+          <div className="text-xs font-ethiopic leading-relaxed">
+            <p className="font-bold">ትናንት ቀን ያልተዘጋ ምዝገባ አለ!</p>
+            <p className="mt-0.5 text-amber-700">
+              የዛሬ ({formatAsEthDate(today)}) ቀን ቀድሞ ተዘግቷል።
+              ትናንት ({formatAsEthDate(workingDate)}) ግን ቁጥሮች ተስቀምጠዋል ነገር ግን ቀኑ አልተዘጋም።
+              ከዚህ ታች ያለው ማጠቃለያ ለትናንት ነው።
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="erp-card p-6">
         <div className="flex items-center gap-2 text-xs font-semibold text-purple-600 uppercase tracking-wider font-ethiopic">
@@ -49,7 +90,12 @@ export default async function DayClosePage() {
         </h1>
         <p className="text-slate-500 font-ethiopic text-sm mt-0.5 flex items-center gap-2">
           <Calendar size={14} className="text-slate-400" />
-          <span>{formatAsEthDate(today)} ({today.toLocaleDateString("en-ET")})</span>
+          <span>{formatAsEthDate(workingDate)}</span>
+          {isYesterday && (
+            <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-semibold">
+              ትናንት
+            </span>
+          )}
         </p>
       </div>
 
@@ -57,7 +103,9 @@ export default async function DayClosePage() {
       <div className="erp-card p-6 space-y-5">
         <h2 className="font-bold text-slate-800 font-ethiopic text-base flex items-center gap-2">
           <span>📊</span>
-          <span>የዛሬ የፋብሪካው ጠቅላላ የምርት ማጠቃለያ</span>
+          <span>
+            {isYesterday ? "ትናንት" : "የዛሬ"} የፋብሪካው ጠቅላላ የምርት ማጠቃለያ
+          </span>
         </h2>
 
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
@@ -99,27 +147,43 @@ export default async function DayClosePage() {
         {pendingLines > 0 && (
           <div className="alert-warning font-ethiopic text-xs flex items-center gap-2">
             <AlertTriangle size={16} className="text-amber-700 flex-shrink-0" />
-            <span>{pendingLines} ሠራተኞች ያስመዘገቧቸው ቁጥሮች ገና አልተረጋገጡም። ቀን ከመዝጋቱ በፊት ማረጋገጥ ይመከራል።</span>
+            <span>
+              {pendingLines} ሠራተኞች ያስመዘገቧቸው ቁጥሮች ገና አልተረጋገጡም።
+              ቀን ከመዝጋቱ በፊት ማረጋገጥ ይመከራል።
+            </span>
           </div>
         )}
 
         {verifiedLines === 0 && lineStats._count._all > 0 && (
           <div className="alert-info font-ethiopic text-xs flex items-center gap-2">
             <span>ℹ️</span>
-            <span>እስካሁን የተረጋገጠ ቁጥር የለም። የቁጥጥር ሂደቱ ከተጠናቀቀ በኋላ ቀኑን መዝጋት ይችላሉ።</span>
+            <span>
+              እስካሁን የተረጋገጠ ቁጥር የለም። የቁጥጥር ሂደቱ ከተጠናቀቀ በኋላ ቀኑን መዝጋት ይችላሉ።
+            </span>
+          </div>
+        )}
+
+        {/* Today is already closed and no yesterday pending */}
+        {todayClose && !isYesterday && (
+          <div className="flex items-center gap-2 text-xs text-emerald-700 font-ethiopic bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2.5">
+            <CheckSquare size={14} className="text-emerald-600 flex-shrink-0" />
+            <span>
+              የዛሬ ({formatAsEthDate(today)}) ቀን ተዘግቷል።
+              ዘጋ፦ {new Date(todayClose.closedAt).toLocaleTimeString("en-ET", { hour: "2-digit", minute: "2-digit" })}
+            </span>
           </div>
         )}
       </div>
 
-      {/* Close action */}
+      {/* Close action — uses workingDate */}
       <DayCloseButton
-        date={today.toISOString()}
+        date={workingDate.toISOString()}
         alreadyClosed={!!dayClose}
         closedAt={dayClose?.closedAt?.toISOString() ?? null}
       />
 
-      {/* Generate & send PDF report (available after closing or anytime) */}
-      <GenerateReportButton date={today.toISOString()} />
+      {/* Generate & send PDF report */}
+      <GenerateReportButton date={workingDate.toISOString()} />
 
       {/* Monthly audit log purge — Admin / Super Manager only */}
       {(session.user.role === "ADMIN" || session.user.role === "SUPER_MANAGER") && (

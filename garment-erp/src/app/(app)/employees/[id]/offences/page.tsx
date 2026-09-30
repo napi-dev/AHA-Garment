@@ -3,7 +3,7 @@ import { db } from "@/lib/db";
 import { redirect, notFound } from "next/navigation";
 import { requirePermission } from "@/lib/auth/permissions";
 import { am } from "@/lib/i18n/am";
-import { formatAsEthDate } from "@/lib/ethiopian-calendar";
+import { formatAsEthDate, todayISOStringEAT } from "@/lib/ethiopian-calendar";
 import { recordOffence, liftSuspension } from "./actions";
 import Link from "next/link";
 import { ShieldAlert, ArrowRight, AlertTriangle, CheckCircle, Ban, History, ShieldX } from "lucide-react";
@@ -32,7 +32,7 @@ export default async function OffencesPage({ params }: { params: Promise<{ id: s
     offenceCount === 1 ? "SECOND" :
     offenceCount === 2 ? "THIRD"  : "FOURTH";
 
-  const today = new Date().toISOString().split("T")[0];
+  const today = todayISOStringEAT();
 
   const recordAction  = recordOffence.bind(null, id);
   const liftAction    = activeSuspension ? liftSuspension.bind(null, activeSuspension.id) : null;

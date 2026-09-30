@@ -30,8 +30,10 @@ export default async function OrderStatusReportPage({
 
   const params     = await searchParams;
   const activeOnly = params.status !== "all";
-  const today      = new Date();
-  today.setHours(0, 0, 0, 0);
+  // Use EAT (UTC+3) so overdue comparison matches Ethiopia's current date
+  const eatOffset  = 3 * 60 * 60 * 1000;
+  const eatNow     = new Date(Date.now() + eatOffset);
+  const today      = new Date(Date.UTC(eatNow.getUTCFullYear(), eatNow.getUTCMonth(), eatNow.getUTCDate(), 0, 0, 0));
 
   const orders = await db.prodOrder.findMany({
     where: { ...(activeOnly ? { isActive: true } : {}) },
