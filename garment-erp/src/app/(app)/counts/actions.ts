@@ -302,9 +302,9 @@ export async function generateAndSendDailyReport(dateStr: string): Promise<{ ok:
         : 0;
       return {
         serial: idx + 1,
-        nameAm: line.employee.nameAm,
-        operationAm: line.sheet.operation.nameAm,
-        machineType: line.department.nameEn ?? "",
+        nameAm: line.employee.nameAm ?? "—",
+        operationAm: line.sheet.operation.nameAm ?? "—",
+        machineType: line.department.nameEn ?? line.department.nameAm ?? "—",
         targetPerDay,
         produced: line.totalProduced,
         plusPieces: line.plusPieces,
@@ -316,11 +316,11 @@ export async function generateAndSendDailyReport(dateStr: string): Promise<{ ok:
     // Build audit rows for PDF page 2
     const auditRows = auditLogs.map((log) => ({
       time:     log.createdAt.toLocaleTimeString("en-ET", { hour: "2-digit", minute: "2-digit" }),
-      userCode: log.user.employeeCode,
-      action:   log.action,
-      entity:   log.entity,
-      entityId: log.entityId,
-      reason:   log.reason ?? "",
+      userCode: log.user?.employeeCode ?? "—",
+      action:   log.action ?? "—",
+      entity:   log.entity ?? "—",
+      entityId: log.entityId ?? "—",
+      reason:   log.reason ?? "—",
     }));
 
     // ── Build Ethiopian date strings ────────────────────────────────────────
