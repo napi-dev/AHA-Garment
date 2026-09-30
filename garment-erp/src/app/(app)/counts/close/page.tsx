@@ -7,6 +7,7 @@ import { formatAsEthDate } from "@/lib/ethiopian-calendar";
 import { getEffectiveDate } from "@/lib/date-override/effective-date";
 import { DayCloseButton } from "./day-close-button";
 import { GenerateReportButton } from "./generate-report-button";
+import { PurgeAuditButton } from "./purge-audit-button";
 import { CheckSquare, Calendar, Users, FileText, Factory, TrendingUp, AlertTriangle } from "lucide-react";
 
 export default async function DayClosePage() {
@@ -117,6 +118,11 @@ export default async function DayClosePage() {
 
       {/* Generate & send PDF report (available after closing or anytime) */}
       <GenerateReportButton date={today.toISOString()} />
+
+      {/* Monthly audit log purge — Admin / Super Manager only */}
+      {(session.user.role === "ADMIN" || session.user.role === "SUPER_MANAGER") && (
+        <PurgeAuditButton />
+      )}
     </div>
   );
 }

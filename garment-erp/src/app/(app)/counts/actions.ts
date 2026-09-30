@@ -234,19 +234,31 @@ export async function generateAndSendDailyReport(dateStr: string): Promise<{ ok:
     const date = new Date(dateStr);
     date.setUTCHours(0, 0, 0, 0);
 
-    // Load lines for the day
-    const lines = await db.hourlyCountLine.findMany({
-      where: { sheet: { date }, status: { not: "DRAFT" } },
-      include: {
-        employee: true,
-        department: true,
-        sheet: { include: { operation: true } },
-      },
-      orderBy: [
-        { department: { sortOrder: "asc" } },
-        { employee: { serialNumber: "asc" } },
-      ],
-    });
+    // Day boundaries for audit log query
+    const dayEnd = new Date(date);
+    dayEnd.setUTCHours(23, 59, 59, 999);
+
+    // ── Fetch all data in parallel ──────────────────────────────────────────
+    const [lines, auditLogs] = await Promise.all([
+      db.hourlyCountLine.findMany({
+        where: { sheet: { date }, status: { not: "DRAFT" } },
+        include: {
+          employee: true,
+          department: true,
+          sheet: { include: { operation: true } },
+        },
+        orderBy: [
+          { department: { sortOrder: "asc" } },
+          { employee: { serialNumber: "asc" } },
+        ],
+      }),
+      // Today's audit entries with user code
+      db.auditLog.findMany({
+        where: { createdAt: { gte: date, lte: dayEnd } },
+        orderBy: { createdAt: "asc" },
+        include: { user: { select: { employeeCode: true } } },
+      }),
+    ]);
 
     // Build incentive card lookup
     const cardMap = new Map<string, number>();
@@ -254,7 +266,11 @@ export async function generateAndSendDailyReport(dateStr: string): Promise<{ ok:
     await Promise.all(
       deptIds.map(async (deptId) => {
         const card = await db.incentiveCard.findFirst({
-          where: { departmentId: deptId, effectiveFrom: { lte: date }, OR: [{ effectiveTo: null }, { effectiveTo: { gte: date } }] },
+          where: {
+            departmentId: deptId,
+            effectiveFrom: { lte: date },
+            OR: [{ effectiveTo: null }, { effectiveTo: { gte: date } }],
+          },
           orderBy: { effectiveFrom: "desc" },
         });
         cardMap.set(deptId, card?.targetPerHour ?? 0);
@@ -269,8 +285,9 @@ export async function generateAndSendDailyReport(dateStr: string): Promise<{ ok:
       const targetPerDay  = targetPerHour * 8;
       totalProduced += line.totalProduced;
       if (line.plusPieces > 0) aboveTarget++;
-      const diff = line.plusPieces - line.minusPieces;
-      const pct  = targetPerDay > 0 ? Math.round((line.totalProduced / targetPerDay) * 100 * 10) / 10 : 0;
+      const pct = targetPerDay > 0
+        ? Math.round((line.totalProduced / targetPerDay) * 100 * 10) / 10
+        : 0;
       return {
         serial: idx + 1,
         nameAm: line.employee.nameAm,
@@ -284,44 +301,71 @@ export async function generateAndSendDailyReport(dateStr: string): Promise<{ ok:
       };
     });
 
-    // Generate PDF
+    // Build audit rows for PDF page 2
+    const auditRows = auditLogs.map((log) => ({
+      time:     log.createdAt.toLocaleTimeString("en-ET", { hour: "2-digit", minute: "2-digit" }),
+      userCode: log.user.employeeCode,
+      action:   log.action,
+      entity:   log.entity,
+      entityId: log.entityId,
+      reason:   log.reason ?? "",
+    }));
+
+    // ── Build Ethiopian date strings ────────────────────────────────────────
+    const { formatAsEthDate, gregorianToEth } = await import("@/lib/ethiopian-calendar");
+    const eth = gregorianToEth(date);
+    const dateLabel  = formatAsEthDate(date);                            // "20/1/2019 ዓ.ም"
+    const dateSlug   = `${eth.day}-${eth.month}-${eth.year}`;           // "20-1-2019"
+    const filename   = `ዕለታዊ-ሪፖርት-${dateSlug}.pdf`;                   // Ethiopic filename
+
+    // ── Generate PDF ────────────────────────────────────────────────────────
     const { renderPdfToBuffer } = await import("@/lib/pdf/render");
     const { DailyProductionSheetPdf } = await import("@/lib/pdf/daily-production-sheet");
     const React = await import("react");
-    const { formatAsEthDate } = await import("@/lib/ethiopian-calendar");
 
     const buffer = await renderPdfToBuffer(
       React.default.createElement(DailyProductionSheetPdf, {
-        dateLabel: formatAsEthDate(date),
+        dateLabel,
+        dateFilename: dateSlug,
         supervisorName: session.user.nameAm ?? "",
         shift: "ቀን",
         rows,
         totalProduced,
         aboveTarget,
         totalWorkers: rows.length,
+        auditRows,
       })
     ) as Buffer;
 
-    // Send to Telegram
-    const { sendDocument, sendMessage } = await import("@/lib/automation/telegram");
+    // ── Send to Telegram ────────────────────────────────────────────────────
+    const { sendDocument } = await import("@/lib/automation/telegram");
     const managerChatId = process.env.TELEGRAM_MANAGER_CHAT_ID ?? "";
     const deptChatId    = process.env.TELEGRAM_DEPT_GROUP_CHAT_ID ?? "";
 
-    const filename = `daily-production-${dateStr}.pdf`;
-    const caption  = `📊 የዕለት ምርት ሪፖርት\nቀን: ${formatAsEthDate(date)}\nጠቅላላ: ${totalProduced.toLocaleString()} ፍሬ\nሠራተኞች: ${rows.length}\nከዒላማ በላይ: ${aboveTarget}`;
+    const caption = [
+      `📊 የዕለት ምርት ሪፖርት`,
+      `ቀን: ${dateLabel}`,
+      `ጠቅላላ ምርት: ${totalProduced.toLocaleString()} ፍሬ`,
+      `ሠራተኞች: ${rows.length}  |  ከዒላማ በላይ: ${aboveTarget}`,
+      `የሥርዓት ምዝገቦች: ${auditRows.length}`,
+    ].join("\n");
 
     const results = await Promise.allSettled([
-      managerChatId ? sendDocument(managerChatId, filename, buffer, caption) : Promise.resolve({ ok: true }),
-      deptChatId    ? sendDocument(deptChatId,    filename, buffer, caption) : Promise.resolve({ ok: true }),
+      managerChatId
+        ? sendDocument(managerChatId, filename, buffer, caption)
+        : Promise.resolve({ ok: true }),
+      deptChatId
+        ? sendDocument(deptChatId, filename, buffer, caption)
+        : Promise.resolve({ ok: true }),
     ]);
 
-    const allOk = results.every((r) => r.status === "fulfilled" && r.value.ok);
+    const allOk = results.every((r) => r.status === "fulfilled" && (r.value as { ok: boolean }).ok);
 
     // Save report job record
     const dayClose = await db.dayClose.findUnique({ where: { date } });
     if (dayClose) {
       await db.reportJob.upsert({
-        where: { type_periodDate: { type: "DAILY_PRODUCTION_SHEET", periodDate: date } },
+        where:  { type_periodDate: { type: "DAILY_PRODUCTION_SHEET", periodDate: date } },
         update: { status: allOk ? "sent" : "failed", attempts: { increment: 1 } },
         create: {
           type: "DAILY_PRODUCTION_SHEET",
@@ -333,9 +377,53 @@ export async function generateAndSendDailyReport(dateStr: string): Promise<{ ok:
     }
 
     revalidatePath("/counts/close");
-    return { ok: allOk, message: allOk ? "ሪፖርቱ ወደ Telegram ተልኳል ✓" : "ሪፖርቱ ተዘጋጅቷል — Telegram ላኪ ሊሳካ አልቻለም" };
+    return {
+      ok: allOk,
+      message: allOk
+        ? `ሪፖርቱ (${filename}) ወደ Telegram ተልኳል ✓`
+        : "ሪፖርቱ ተዘጋጅቷል — Telegram ላኪ ሊሳካ አልቻለም",
+    };
   } catch (e) {
     console.error("[generateAndSendDailyReport]", e);
     return { ok: false, message: e instanceof Error ? e.message : "ስህተት ተፈጥሯል" };
   }
+}
+
+// ─── Purge audit logs older than the current month ───────────────────────────
+// Called once per month by Admin/Super Manager from the counts/close page.
+// Keeps the current month's logs; deletes everything before that.
+
+export async function purgeMonthlyAuditLog(): Promise<{ ok: boolean; message: string; deleted: number }> {
+  "use server";
+  const session = await auth();
+  if (!session?.user) return { ok: false, message: "ተፈቅዶ አልነበረም", deleted: 0 };
+  if (session.user.role !== "ADMIN" && session.user.role !== "SUPER_MANAGER") {
+    return { ok: false, message: "ለዚህ ተግባር ፈቃድ የለዎትም", deleted: 0 };
+  }
+
+  // Delete audit logs created before the 1st of the current Gregorian month
+  const now   = new Date();
+  const cutoff = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1, 0, 0, 0));
+
+  const { count } = await db.auditLog.deleteMany({
+    where: { createdAt: { lt: cutoff } },
+  });
+
+  await db.auditLog.create({
+    data: {
+      userId:   session.user.id,
+      action:   "PURGE_AUDIT_LOG",
+      entity:   "AuditLog",
+      entityId: "monthly-purge",
+      after:    { deletedCount: count, cutoffDate: cutoff.toISOString() },
+      reason:   "ወርሃዊ የምዝገባ ጽዳት",
+    },
+  });
+
+  revalidatePath("/audit");
+  return {
+    ok: true,
+    message: `${count} የሥርዓት ምዝገቦች ተሰርዘዋል (${cutoff.toLocaleDateString("en-ET")} በፊት የነበሩ)`,
+    deleted: count,
+  };
 }
