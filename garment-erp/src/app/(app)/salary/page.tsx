@@ -49,7 +49,7 @@ export default async function SalaryPage({
       take: PAGE_SIZE,
     }),
     db.employee.count({ where }),
-    db.department.findMany({ where: { isActive: true }, orderBy: { sortOrder: "asc" }, select: { id: true, nameAm: true } }),
+    db.department.findMany({ orderBy: [{ isActive: "desc" }, { sortOrder: "asc" }], select: { id: true, nameAm: true, isActive: true } }),
     // aggregate totals separately
     db.salaryRecord.aggregate({
       where: { effectiveTo: null, employee: { isActive: true } },
@@ -147,6 +147,36 @@ export default async function SalaryPage({
             {missingSalariesCount}
           </p>
         </div>
+      </div>
+
+      {/* Department filter */}
+      <div className="erp-card p-4">
+        <form method="GET" className="flex flex-wrap items-center gap-3">
+          <span className="text-xs font-semibold text-slate-600 font-ethiopic">የስራ ክፍል፦</span>
+          <select
+            name="dept"
+            defaultValue={params.dept ?? ""}
+            className="px-3 py-2 rounded-xl border border-slate-200 text-sm font-ethiopic focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+          >
+            <option value="">ሁሉም ክፍሎች</option>
+            <optgroup label="── የምርት ክፍሎች ──">
+              {departments.filter((d) => d.isActive).map((d) => (
+                <option key={d.id} value={d.id}>{d.nameAm}</option>
+              ))}
+            </optgroup>
+            <optgroup label="── ቁጥጥርና አስተዳደር ──">
+              {departments.filter((d) => !d.isActive).map((d) => (
+                <option key={d.id} value={d.id}>{d.nameAm}</option>
+              ))}
+            </optgroup>
+          </select>
+          <button type="submit" className="px-4 py-2 bg-slate-100 text-slate-700 rounded-xl text-sm font-ethiopic hover:bg-slate-200 transition-colors font-semibold">
+            ፈልግ
+          </button>
+          {params.dept && (
+            <a href="/salary" className="text-xs text-slate-500 hover:text-slate-800 font-ethiopic px-2">ሁሉም</a>
+          )}
+        </form>
       </div>
 
       {/* Salary Table */}

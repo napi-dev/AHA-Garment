@@ -13,8 +13,8 @@ export default async function NewEmployeePage() {
   requirePermission(session.user.role, "employees:edit");
 
   const departments = await db.department.findMany({
-    where: { isActive: true },
-    orderBy: { sortOrder: "asc" },
+    // All departments including አስተዳደር so new employees can be assigned there
+    orderBy: [{ isActive: "desc" }, { sortOrder: "asc" }],
   });
 
   return (
@@ -79,11 +79,16 @@ export default async function NewEmployeePage() {
             className="input-field font-ethiopic text-slate-800"
           >
             <option value="">የሥራ ክፍል ይምረጡ</option>
-            {departments.map((d) => (
-              <option key={d.id} value={d.id}>
-                {d.nameAm}
-              </option>
-            ))}
+            <optgroup label="── የምርት ክፍሎች ──">
+              {departments.filter((d) => d.isActive).map((d) => (
+                <option key={d.id} value={d.id}>{d.nameAm}</option>
+              ))}
+            </optgroup>
+            <optgroup label="── ቁጥጥርና አስተዳደር ──">
+              {departments.filter((d) => !d.isActive).map((d) => (
+                <option key={d.id} value={d.id}>{d.nameAm}</option>
+              ))}
+            </optgroup>
           </select>
         </div>
 

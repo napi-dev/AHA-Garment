@@ -128,11 +128,24 @@ export default async function UsersPage({
                 </td>
               </tr>
             )}
-            {users.map((u) => (
+            {users.map((u) => {
+              // Show "ተቆጣጣሪ" for management/admin dept users, actual dept for floor workers
+              const deptName = u.employee?.department?.nameAm;
+              const isController = !deptName || deptName === "አስተዳደር";
+              const deptDisplay = isController ? "ተቆጣጣሪ" : deptName;
+              return (
               <tr key={u.id} className={!u.isActive ? "opacity-50" : ""}>
                 <td className="font-mono text-xs font-bold text-slate-700">{u.employeeCode}</td>
                 <td className="font-ethiopic text-slate-800 font-medium">{u.employee?.nameAm ?? "—"}</td>
-                <td className="font-ethiopic text-slate-500 text-xs">{u.employee?.department?.nameAm ?? "—"}</td>
+                <td className="font-ethiopic text-xs">
+                  {isController ? (
+                    <span className="bg-slate-100 text-slate-600 px-2 py-0.5 rounded text-xs font-ethiopic">
+                      ተቆጣጣሪ
+                    </span>
+                  ) : (
+                    <span className="text-slate-500">{deptDisplay}</span>
+                  )}
+                </td>
                 <td>
                   <span className="text-xs bg-blue-50 text-blue-700 px-2.5 py-1 rounded-full font-ethiopic font-semibold">
                     {am.roles[u.role as keyof typeof am.roles] ?? u.role}
@@ -155,7 +168,8 @@ export default async function UsersPage({
                   </div>
                 </td>
               </tr>
-            ))}
+              );
+            })}
           </tbody>
         </table>
         <div className="px-6 py-3 border-t border-slate-100 bg-slate-50/50 text-xs text-slate-500 font-ethiopic">

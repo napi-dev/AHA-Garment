@@ -41,7 +41,10 @@ export default async function EmployeesPage({
       take: PAGE_SIZE,
     }),
     db.employee.count({ where }),
-    db.department.findMany({ where: { isActive: true }, orderBy: { sortOrder: "asc" } }),
+    db.department.findMany({
+      // All departments including አስተዳደር (isActive:false) so managers appear in filter
+      orderBy: [{ isActive: "desc" }, { sortOrder: "asc" }],
+    }),
     db.employee.count({ where: { isActive: true } }),
     db.employee.count({ where: { isActive: false } }),
   ]);
@@ -141,11 +144,16 @@ export default async function EmployeesPage({
               className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 font-ethiopic text-slate-700"
             >
               <option value="">ሁሉም የስራ ክፍሎች</option>
-              {departments.map((d) => (
-                <option key={d.id} value={d.id}>
-                  {d.nameAm}
-                </option>
-              ))}
+              <optgroup label="── የምርት ክፍሎች ──">
+                {departments.filter((d) => d.isActive).map((d) => (
+                  <option key={d.id} value={d.id}>{d.nameAm}</option>
+                ))}
+              </optgroup>
+              <optgroup label="── ቁጥጥርና አስተዳደር ──">
+                {departments.filter((d) => !d.isActive).map((d) => (
+                  <option key={d.id} value={d.id}>{d.nameAm}</option>
+                ))}
+              </optgroup>
             </select>
           </div>
 
