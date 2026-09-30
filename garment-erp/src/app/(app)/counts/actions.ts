@@ -21,9 +21,9 @@ interface SaveCountsInput {
   minusPieces: number;
 }
 
-export async function saveHourlyCounts(input: SaveCountsInput): Promise<void> {
+export async function saveHourlyCounts(input: SaveCountsInput): Promise<{ ok: boolean; message: string }> {
   const session = await auth();
-  if (!session?.user) throw new Error("ተፈቅዶ አልነበረም");
+  if (!session?.user) return { ok: false, message: "ተፈቅዶ አልነበረም" };
   requirePermission(session.user.role, "counts:enter");
 
   const date = new Date(input.date);
@@ -31,7 +31,12 @@ export async function saveHourlyCounts(input: SaveCountsInput): Promise<void> {
 
   // Block if day is closed
   const dayClose = await db.dayClose.findUnique({ where: { date } });
-  if (dayClose) throw new Error("ቀኑ ተዘግቷል — ቁጥር ማስቀመጥ አይቻልም");
+  if (dayClose) {
+    return {
+      ok: false,
+      message: `ቀኑ ተዘግቷል (${new Date(dayClose.closedAt).toLocaleTimeString("en-ET", { hour: "2-digit", minute: "2-digit" })}) — ቁጥር ማስቀመጥ አይቻልም`,
+    };
+  }
 
   // Find or create the sheet for this date + operation
   // We use departmentId to find the operation mapping; if none, use a default
@@ -154,6 +159,7 @@ export async function verifyCountLine(lineId: string): Promise<void> {
   });
 
   revalidatePath("/counts");
+  return { ok: true, message: "ተቀምጧል" };
 }
 
 // ─── Close the day ────────────────────────────────────────────────────────────

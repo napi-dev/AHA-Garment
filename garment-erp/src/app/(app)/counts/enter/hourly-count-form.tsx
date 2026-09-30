@@ -2,6 +2,7 @@
 
 import { useState, useCallback } from "react";
 import { am } from "@/lib/i18n/am";
+import { formatAsEthDate } from "@/lib/ethiopian-calendar";
 import { calculateDailyCount } from "@/lib/incentive/engine";
 import { saveHourlyCounts } from "../actions";
 import { Check, Loader2, AlertCircle, Save, Target, Sparkles, Building2, Calendar, CheckCircle2 } from "lucide-react";
@@ -95,10 +96,9 @@ export function HourlyCountForm({ deptWithEmployees, date, supervisorId }: Hourl
   const totalRows    = Object.keys(initialState).length;
   const alreadySaved = Object.values(initialState).filter((r) => r.saved).length;
 
-  // Format the date nicely — convert ISO string to Ethiopian display
-  const dateDisplay = new Date(date).toLocaleDateString("en-ET", {
-    year: "numeric", month: "2-digit", day: "2-digit",
-  });
+  // Format the date nicely — use Ethiopian calendar formatter which is EAT-aware
+  const dateObj = new Date(date);
+  const dateDisplay = formatAsEthDate(dateObj);
 
   const updateRow = useCallback(
     (empId: string, field: keyof RowState, value: string) => {
@@ -139,7 +139,7 @@ export function HourlyCountForm({ deptWithEmployees, date, supervisorId }: Hourl
       }
 
       try {
-        await saveHourlyCounts({
+        const result = await saveHourlyCounts({
           date,
           employeeId: empId,
           departmentId: deptId,
@@ -152,10 +152,18 @@ export function HourlyCountForm({ deptWithEmployees, date, supervisorId }: Hourl
           plusPieces: daily.plusPieces,
           minusPieces: daily.minusPieces,
         });
-        setRows((prev) => ({
-          ...prev,
-          [empId]: { ...prev[empId], saving: false, saved: true, dirty: false, error: "" },
-        }));
+
+        if (result.ok) {
+          setRows((prev) => ({
+            ...prev,
+            [empId]: { ...prev[empId], saving: false, saved: true, dirty: false, error: "" },
+          }));
+        } else {
+          setRows((prev) => ({
+            ...prev,
+            [empId]: { ...prev[empId], saving: false, error: result.message },
+          }));
+        }
       } catch (err) {
         setRows((prev) => ({
           ...prev,
