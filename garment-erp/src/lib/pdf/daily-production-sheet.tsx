@@ -191,19 +191,19 @@ export function DailyProductionSheetPdf({
                 <Text style={abovePct ? s.cPctPos : s.cPctNeg}>
                   {row.targetPerDay > 0 ? `${row.percentOfTarget}%` : "—"}
                 </Text>
-                <Text style={s.cSig}>{""}</Text>
+                <Text style={s.cSig}>{" "}</Text>
               </View>
             );
           })}
 
           <View style={s.tfoot}>
-            <Text style={s.cSerial}>{""}</Text>
+            <Text style={s.cSerial}>{" "}</Text>
             <Text style={s.cNameWide}>{am.total}</Text>
-            <Text style={s.cTarget}>{""}</Text>
+            <Text style={s.cTarget}>{" "}</Text>
             <Text style={s.cProdBold}>{totalProduced.toLocaleString()}</Text>
-            <Text style={s.cDiff}>{""}</Text>
-            <Text style={s.cPct}>{totalWorkers > 0 ? `${aboveTarget}/${totalWorkers}` : ""}</Text>
-            <Text style={s.cSig}>{""}</Text>
+            <Text style={s.cDiff}>{" "}</Text>
+            <Text style={s.cPct}>{totalWorkers > 0 ? `${aboveTarget}/${totalWorkers}` : "—"}</Text>
+            <Text style={s.cSig}>{" "}</Text>
           </View>
         </View>
 

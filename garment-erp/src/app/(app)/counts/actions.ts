@@ -300,11 +300,13 @@ export async function generateAndSendDailyReport(dateStr: string): Promise<{ ok:
       const pct = targetPerDay > 0
         ? Math.round((line.totalProduced / targetPerDay) * 100 * 10) / 10
         : 0;
+      
+      // Ensure all fields are strings or numbers, never null
       return {
         serial: idx + 1,
-        nameAm: line.employee.nameAm ?? "—",
-        operationAm: line.sheet.operation.nameAm ?? "—",
-        machineType: line.department.nameEn ?? line.department.nameAm ?? "—",
+        nameAm: String(line.employee.nameAm ?? "—"),
+        operationAm: String(line.sheet.operation.nameAm ?? "—"),
+        machineType: String(line.department.nameEn ?? line.department.nameAm ?? "—"),
         targetPerDay,
         produced: line.totalProduced,
         plusPieces: line.plusPieces,
@@ -314,14 +316,18 @@ export async function generateAndSendDailyReport(dateStr: string): Promise<{ ok:
     });
 
     // Build audit rows for PDF page 2
-    const auditRows = auditLogs.map((log) => ({
-      time:     log.createdAt.toLocaleTimeString("en-ET", { hour: "2-digit", minute: "2-digit" }),
-      userCode: log.user?.employeeCode ?? "—",
-      action:   log.action ?? "—",
-      entity:   log.entity ?? "—",
-      entityId: log.entityId ?? "—",
-      reason:   log.reason ?? "—",
-    }));
+    const auditRows = auditLogs.map((log) => {
+      // Ensure every field is a string, never null/undefined
+      const row = {
+        time:     String(log.createdAt.toLocaleTimeString("en-ET", { hour: "2-digit", minute: "2-digit" }) ?? "—"),
+        userCode: String(log.user?.employeeCode ?? "—"),
+        action:   String(log.action ?? "—"),
+        entity:   String(log.entity ?? "—"),
+        entityId: String((log.entityId ?? "—").slice(0, 10)),
+        reason:   String(log.reason ?? "—"),
+      };
+      return row;
+    });
 
     // ── Build Ethiopian date strings ────────────────────────────────────────
     const { formatAsEthDate, gregorianToEth } = await import("@/lib/ethiopian-calendar");
@@ -335,19 +341,32 @@ export async function generateAndSendDailyReport(dateStr: string): Promise<{ ok:
     const { DailyProductionSheetPdf } = await import("@/lib/pdf/daily-production-sheet");
     const React = await import("react");
 
-    const buffer = await renderPdfToBuffer(
-      React.default.createElement(DailyProductionSheetPdf, {
-        dateLabel,
-        dateFilename: dateSlug,
-        supervisorName: session.user.nameAm ?? "",
-        shift: "ቀን",
-        rows,
-        totalProduced,
-        aboveTarget,
-        totalWorkers: rows.length,
-        auditRows,
-      })
-    ) as Buffer;
+    // Defensive check: ensure all data is serializable and has no nulls
+    console.log("[PDF DEBUG] rows count:", rows.length);
+    console.log("[PDF DEBUG] auditRows count:", auditRows.length);
+    console.log("[PDF DEBUG] Sample row:", rows[0]);
+    console.log("[PDF DEBUG] Sample audit:", auditRows[0]);
+
+    let buffer: Buffer;
+    try {
+      buffer = await renderPdfToBuffer(
+        React.default.createElement(DailyProductionSheetPdf, {
+          dateLabel: String(dateLabel),
+          dateFilename: String(dateSlug),
+          supervisorName: String(session.user.nameAm ?? "—"),
+          shift: "ቀን",
+          rows,
+          totalProduced,
+          aboveTarget,
+          totalWorkers: rows.length,
+          auditRows,
+        })
+      ) as Buffer;
+    } catch (pdfError) {
+      console.error("[PDF ERROR] Failed to render:", pdfError);
+      console.error("[PDF ERROR] Props:", { dateLabel, dateSlug, supervisorName: session.user.nameAm, rows: rows.length, auditRows: auditRows.length });
+      throw pdfError;
+    }
 
     // ── Send to Telegram ────────────────────────────────────────────────────
     const { sendDocument } = await import("@/lib/automation/telegram");
