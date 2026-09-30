@@ -318,15 +318,22 @@ export async function generateAndSendDailyReport(dateStr: string): Promise<{ ok:
     // Build audit rows for PDF page 2
     const auditRows = auditLogs.map((log) => {
       // Ensure every field is a string, never null/undefined
-      const row = {
-        time:     String(log.createdAt.toLocaleTimeString("en-ET", { hour: "2-digit", minute: "2-digit" }) ?? "—"),
+      let timeStr = "—";
+      try {
+        const t = log.createdAt.toLocaleTimeString("en-ET", { hour: "2-digit", minute: "2-digit", hour12: true });
+        timeStr = t ? String(t) : "—";
+      } catch {
+        timeStr = "—";
+      }
+      
+      return {
+        time:     timeStr,
         userCode: String(log.user?.employeeCode ?? "—"),
         action:   String(log.action ?? "—"),
         entity:   String(log.entity ?? "—"),
         entityId: String((log.entityId ?? "—").slice(0, 10)),
         reason:   String(log.reason ?? "—"),
       };
-      return row;
     });
 
     // ── Build Ethiopian date strings ────────────────────────────────────────

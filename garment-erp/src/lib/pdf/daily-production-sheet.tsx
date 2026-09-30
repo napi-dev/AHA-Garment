@@ -6,21 +6,15 @@
  * @react-pdf/renderer rules enforced:
  *  - No array styles, no object spreads in style
  *  - All <Text> children are plain strings — never undefined/null/JSX
+ *  - Using system font only (Helvetica) - no custom fonts to avoid registration issues
  */
 
 import React from "react";
-import { Document, Page, Text, View, StyleSheet, Font } from "@react-pdf/renderer";
+import { Document, Page, Text, View, StyleSheet } from "@react-pdf/renderer";
 import { am } from "@/lib/i18n/am";
-import path from "path";
 
-try {
-  Font.register({
-    family: "NotoEthiopic",
-    src: path.join(process.cwd(), "public", "fonts", "NotoSansEthiopic-Regular.ttf"),
-  });
-} catch { /* font file not present — renders without Ethiopic glyphs */ }
-
-const FONT = "NotoEthiopic";
+// Use system font only - no custom font registration
+const FONT = "Helvetica";
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
@@ -141,10 +135,17 @@ export interface DailyProductionSheetPdfProps {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export function DailyProductionSheetPdf({
-  dateLabel, supervisorName, shift, rows,
-  totalProduced, aboveTarget, totalWorkers, auditRows,
-}: DailyProductionSheetPdfProps) {
+export function DailyProductionSheetPdf(props: DailyProductionSheetPdfProps) {
+  // Destructure with explicit defaults to ensure no undefined values
+  const dateLabel = String(props.dateLabel ?? "");
+  const supervisorName = String(props.supervisorName ?? "");
+  const shift = String(props.shift ?? "ቀን");
+  const rows = props.rows ?? [];
+  const totalProduced = Number(props.totalProduced ?? 0);
+  const aboveTarget = Number(props.aboveTarget ?? 0);
+  const totalWorkers = Number(props.totalWorkers ?? 0);
+  const auditRows = props.auditRows ?? [];
+
   return (
     <Document>
       {/* ── PAGE 1: Production table (landscape) ── */}
@@ -155,8 +156,8 @@ export function DailyProductionSheetPdf({
             <Text style={s.meta}>{`ቀን: ${dateLabel}  |  ሺፍት: ${shift}  |  ሱፐርቫይዘር: ${supervisorName}`}</Text>
           </View>
           <View style={s.headerR}>
-            <Text style={s.meta}>{`ጠቅላላ ያደረሱ: ${totalProduced.toLocaleString()}`}</Text>
-            <Text style={s.meta}>{`ከዒላማ በላይ: ${aboveTarget} / ${totalWorkers}`}</Text>
+            <Text style={s.meta}>{`ጠቅላላ ያደረሱ: ${String(totalProduced)}`}</Text>
+            <Text style={s.meta}>{`ከዒላማ በላይ: ${String(aboveTarget)} / ${String(totalWorkers)}`}</Text>
           </View>
         </View>
 
@@ -174,22 +175,25 @@ export function DailyProductionSheetPdf({
           </View>
 
           {rows.map((row, idx) => {
-            const diff     = row.plusPieces > 0 ? row.plusPieces : -row.minusPieces;
-            const isAbove  = diff >= 0;
-            const abovePct = row.percentOfTarget >= 100;
+            const diff = (row.plusPieces ?? 0) > 0 ? (row.plusPieces ?? 0) : -(row.minusPieces ?? 0);
+            const isAbove = diff >= 0;
+            const pct = row.percentOfTarget ?? 0;
+            const abovePct = pct >= 100;
+            const rowKey = `row-${idx}-${row.serial ?? idx}`;
+            
             return (
-              <View key={String(idx)} style={idx % 2 === 0 ? s.trow : s.trowAlt}>
+              <View key={rowKey} style={idx % 2 === 0 ? s.trow : s.trowAlt}>
                 <Text style={s.cSerial}>{String(row.serial ?? "—")}</Text>
-                <Text style={s.cName}>{row.nameAm ?? "—"}</Text>
-                <Text style={s.cOp}>{row.operationAm ?? "—"}</Text>
-                <Text style={s.cMachine}>{row.machineType ?? "—"}</Text>
-                <Text style={s.cTarget}>{row.targetPerDay > 0 ? String(row.targetPerDay) : "—"}</Text>
+                <Text style={s.cName}>{String(row.nameAm ?? "—")}</Text>
+                <Text style={s.cOp}>{String(row.operationAm ?? "—")}</Text>
+                <Text style={s.cMachine}>{String(row.machineType ?? "—")}</Text>
+                <Text style={s.cTarget}>{(row.targetPerDay ?? 0) > 0 ? String(row.targetPerDay) : "—"}</Text>
                 <Text style={s.cProdBold}>{String(row.produced ?? 0)}</Text>
                 <Text style={isAbove ? s.cDiffPos : s.cDiffNeg}>
-                  {diff > 0 ? `+${diff}` : diff < 0 ? String(diff) : "—"}
+                  {diff > 0 ? `+${String(diff)}` : diff < 0 ? String(diff) : "—"}
                 </Text>
                 <Text style={abovePct ? s.cPctPos : s.cPctNeg}>
-                  {row.targetPerDay > 0 ? `${row.percentOfTarget}%` : "—"}
+                  {(row.targetPerDay ?? 0) > 0 ? `${String(pct)}%` : "—"}
                 </Text>
                 <Text style={s.cSig}>{" "}</Text>
               </View>
@@ -200,9 +204,9 @@ export function DailyProductionSheetPdf({
             <Text style={s.cSerial}>{" "}</Text>
             <Text style={s.cNameWide}>{am.total}</Text>
             <Text style={s.cTarget}>{" "}</Text>
-            <Text style={s.cProdBold}>{totalProduced.toLocaleString()}</Text>
+            <Text style={s.cProdBold}>{String(totalProduced)}</Text>
             <Text style={s.cDiff}>{" "}</Text>
-            <Text style={s.cPct}>{totalWorkers > 0 ? `${aboveTarget}/${totalWorkers}` : "—"}</Text>
+            <Text style={s.cPct}>{totalWorkers > 0 ? `${String(aboveTarget)}/${String(totalWorkers)}` : "—"}</Text>
             <Text style={s.cSig}>{" "}</Text>
           </View>
         </View>
@@ -215,7 +219,7 @@ export function DailyProductionSheetPdf({
       {/* ── PAGE 2: Audit log (portrait) ── */}
       <Page size="A4" orientation="portrait" style={s.pagePort}>
         <Text style={s.auditTitle}>{"የዕለት የሥርዓት ምዝገባ (Audit Log)"}</Text>
-        <Text style={s.auditMeta}>{`ቀን: ${dateLabel}  |  ጠቅላላ ምዝገቦች: ${auditRows.length}`}</Text>
+        <Text style={s.auditMeta}>{`ቀን: ${dateLabel}  |  ጠቅላላ ምዝገቦች: ${String(auditRows.length)}`}</Text>
 
         <View style={s.auditTable}>
           {/* Head */}
@@ -233,15 +237,21 @@ export function DailyProductionSheetPdf({
             </View>
           )}
 
-          {auditRows.map((row, idx) => (
-            <View key={String(idx)} style={idx % 2 === 0 ? s.auditRow : s.auditRowAlt}>
-              <Text style={s.aTime}>{row.time ?? "—"}</Text>
-              <Text style={s.aUser}>{row.userCode ?? "—"}</Text>
-              <Text style={s.aAction}>{ACTION_LABELS[row.action] ?? row.action ?? "—"}</Text>
-              <Text style={s.aEntity}>{`${row.entity ?? "—"} / ${(row.entityId ?? "—").slice(0, 10)}`}</Text>
-              <Text style={s.aReason}>{row.reason ?? "—"}</Text>
-            </View>
-          ))}
+          {auditRows.map((row, idx) => {
+            const auditKey = `audit-${idx}-${row.entityId ?? idx}`;
+            const entityIdShort = String(row.entityId ?? "—").slice(0, 10);
+            const actionLabel = ACTION_LABELS[row.action] ?? String(row.action ?? "—");
+            
+            return (
+              <View key={auditKey} style={idx % 2 === 0 ? s.auditRow : s.auditRowAlt}>
+                <Text style={s.aTime}>{String(row.time ?? "—")}</Text>
+                <Text style={s.aUser}>{String(row.userCode ?? "—")}</Text>
+                <Text style={s.aAction}>{actionLabel}</Text>
+                <Text style={s.aEntity}>{`${String(row.entity ?? "—")} / ${entityIdShort}`}</Text>
+                <Text style={s.aReason}>{String(row.reason ?? "—")}</Text>
+              </View>
+            );
+          })}
         </View>
 
         <Text style={s.pageNum}>{"ገጽ 2  |  ይህ ሰነድ ራስ-ሰር ተዘጋጅቷል"}</Text>
