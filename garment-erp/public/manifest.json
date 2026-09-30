@@ -1,7 +1,7 @@
 {
-  "name": "ልብስ ፋብሪካ ሥርዓት",
-  "short_name": "ፋብሪካ",
-  "description": "Garment Factory Production and Incentive System",
+  "name": "AHA GARMENT",
+  "short_name": "AHA",
+  "description": "AHA Garment Factory — Production and Incentive Management System",
   "start_url": "/dashboard",
   "display": "standalone",
   "orientation": "portrait-primary",

@@ -3,8 +3,8 @@ import { db } from "@/lib/db";
 import { redirect } from "next/navigation";
 import { requirePermission } from "@/lib/auth/permissions";
 import { am } from "@/lib/i18n/am";
-import { advanceBundleStage } from "./actions";
-import { LayoutGrid, Filter, ChevronRight, Tag } from "lucide-react";
+import { LayoutGrid, Filter } from "lucide-react";
+import { BundleCard } from "./bundle-card";
 
 const STAGES = [
   "RECEIVING","CUTTING","SEWING","TRIMMING",
@@ -113,9 +113,26 @@ export default async function BundleBoardPage({
                   <p className="text-xs text-slate-400 text-center py-5 font-ethiopic">ባንድል የለም</p>
                 )}
                 {stageBundles.map((b) => (
-                  <BundleCard key={b.id} bundle={b} canAdvance={canAdvance}
-                    currentStage={stage} userId={session.user.id}
-                    STAGE_AM={STAGE_AM} STAGES={STAGES} colors={colors} />
+                  <BundleCard
+                    key={b.id}
+                    bundle={{
+                      id:       b.id,
+                      bundleCode: b.bundleCode,
+                      quantity: b.quantity,
+                      cutJob: {
+                        order: {
+                          orderNumber: b.cutJob.order.orderNumber,
+                          style: { nameAm: b.cutJob.order.style.nameAm },
+                        },
+                      },
+                    }}
+                    canAdvance={canAdvance}
+                    currentStage={stage}
+                    userId={session.user.id}
+                    STAGE_AM={STAGE_AM}
+                    STAGES={STAGES}
+                    colors={colors}
+                  />
                 ))}
               </div>
             </div>
@@ -126,47 +143,3 @@ export default async function BundleBoardPage({
   );
 }
 
-function BundleCard({
-  bundle, canAdvance, currentStage, userId, STAGE_AM, STAGES, colors,
-}: {
-  bundle: Awaited<ReturnType<typeof db.bundle.findMany>>[0] & {
-    cutJob: { order: { orderNumber: string; style: { nameAm: string } } };
-  };
-  canAdvance: boolean;
-  currentStage: string;
-  userId: string;
-  STAGE_AM: Record<string, string>;
-  STAGES: readonly string[];
-  colors: { header: string; card: string; badge: string };
-}) {
-  const stageIdx  = STAGES.indexOf(currentStage as typeof STAGES[number]);
-  const nextStage = stageIdx < STAGES.length - 1 ? STAGES[stageIdx + 1] : null;
-  const action    = advanceBundleStage.bind(null, bundle.id, nextStage ?? "", userId);
-
-  return (
-    <div className={`bg-white rounded-xl p-3 border hover:shadow-sm transition-all ${colors.card}`}>
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <p className="font-mono text-xs font-bold text-slate-700 truncate">{bundle.bundleCode}</p>
-          <p className="font-ethiopic text-xs text-slate-600 truncate mt-0.5">
-            {bundle.cutJob.order.style.nameAm}
-          </p>
-          <p className="text-xs text-slate-400 tabular-nums mt-0.5">{bundle.quantity} ፍሬ</p>
-        </div>
-        {canAdvance && nextStage && (
-          <div className="flex gap-1 flex-col items-end shrink-0">
-            <a href={`/api/tag/${bundle.id}`} target="_blank" rel="noopener noreferrer"
-              className="flex items-center gap-1 text-[10px] bg-slate-100 text-slate-600 px-2 py-1 rounded-lg hover:bg-slate-200 transition-colors">
-              <Tag size={9} /> ታግ
-            </a>
-            <form action={action}>
-              <button className={`flex items-center gap-1 text-[10px] px-2 py-1 rounded-lg transition-colors font-ethiopic whitespace-nowrap font-semibold ${colors.badge}`}>
-                <ChevronRight size={9} /> {STAGE_AM[nextStage]}
-              </button>
-            </form>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}

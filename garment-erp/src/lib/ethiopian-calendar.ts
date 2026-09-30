@@ -164,9 +164,21 @@ export function formatEthDate(eth: EthDate): string {
 
 /**
  * Format a Gregorian Date as an Ethiopian date string.
+ * Converts to EAT (UTC+3) before formatting so midnight-UTC dates
+ * that represent an Ethiopian day display correctly.
  */
 export function formatAsEthDate(date: Date): string {
-  return formatEthDate(gregorianToEth(date));
+  // Shift to EAT to get the correct local date in Ethiopia
+  const eatOffset = 3 * 60 * 60 * 1000;
+  const eatDate   = new Date(date.getTime() + eatOffset);
+  // Build noon-UTC from the EAT date components
+  const noonUTC   = new Date(Date.UTC(
+    eatDate.getUTCFullYear(),
+    eatDate.getUTCMonth(),
+    eatDate.getUTCDate(),
+    12, 0, 0
+  ));
+  return formatEthDate(gregorianToEth(noonUTC));
 }
 
 /**
@@ -187,16 +199,29 @@ export function ethMonthName(month: number): string {
 }
 
 /**
- * Get current Ethiopian date using LOCAL wall-clock date (not UTC).
- * Using UTC would shift the date when the local timezone is behind UTC,
- * e.g. UTC-7 at 04:00 local = 11:00 UTC next day → wrong Ethiopian date.
+ * Get current Ethiopian date using EAT (East Africa Time = UTC+3).
+ *
+ * Ethiopia is always UTC+3 (no daylight saving).
+ * We add 3 hours to UTC to get the correct local date in Addis Ababa,
+ * then build a noon-UTC Date from that local y/m/d for gregorianToEth.
+ *
+ * This is correct regardless of the machine's system timezone setting,
+ * which is important because the Next.js server may run on UTC.
  */
 export function todayEth(): EthDate {
-  const now = new Date();
-  // Build a Date at noon UTC using local year/month/day so gregorianToEth
-  // (which reads getUTCFullYear/Month/Date) sees the correct local day.
-  const localNoon = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate(), 12, 0, 0));
-  return gregorianToEth(localNoon);
+  // Get current UTC ms, add 3 hours for EAT
+  const eatOffset = 3 * 60 * 60 * 1000;
+  const eatNow    = new Date(Date.now() + eatOffset);
+
+  // Read the EAT date components (use UTC getters because we manually shifted)
+  const y = eatNow.getUTCFullYear();
+  const m = eatNow.getUTCMonth();
+  const d = eatNow.getUTCDate();
+
+  // Build a noon-UTC Date from those components so gregorianToEth sees
+  // the correct Gregorian day via its UTC getters
+  const noonUTC = new Date(Date.UTC(y, m, d, 12, 0, 0));
+  return gregorianToEth(noonUTC);
 }
 
 // ─── Unit tests (inline — run with vitest) ────────────────────────────────────

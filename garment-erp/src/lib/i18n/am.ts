@@ -7,7 +7,7 @@
 
 export const am = {
   // ── App / General ────────────────────────────────────────────────────────
-  appName: "የልብስ ፋብሪካ አስተዳደር ሥርዓት",
+  appName: "AHA GARMENT ERP",
   loading: "በመጫን ላይ...",
   save: "አስቀምጥ",
   cancel: "ሰርዝ",

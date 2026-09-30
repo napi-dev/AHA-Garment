@@ -160,7 +160,7 @@ export async function GET(
 <body>
   <div class="tag">
     <div class="header">
-      <h1>ልብስ ፋብሪካ ሥርዓት</h1>
+      <h1>AHA GARMENT</h1>
       <h2>${bundle.bundleCode}</h2>
     </div>
 

@@ -146,7 +146,7 @@ export default async function DashboardPage() {
               እንኳን ደህና መጡ፣ {nameAm}
             </h1>
             <p className="text-slate-300 text-sm font-ethiopic max-w-xl">
-              የልብስ ፋብሪካ ዕለታዊ የምርት ፍሰት፣ የሠራተኞች መገኘትና የጥራት ቁጥጥር ዳሽቦርድ
+              AHA GARMENT — ዕለታዊ የምርት ፍሰት፣ የሠራተኞች መገኘትና የጥራት ቁጥጥር ዳሽቦርድ
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-3">

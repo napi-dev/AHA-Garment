@@ -47,11 +47,11 @@ export default function LoginPage() {
       <div className="w-full max-w-md relative z-10">
         {/* Header Branding */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-20 h-20 rounded-3xl bg-gradient-to-tr from-blue-600 via-indigo-600 to-blue-500 text-white text-3xl shadow-xl shadow-blue-500/20 mb-4 ring-4 ring-white/10">
-            <span>🧵</span>
+          <div className="inline-flex items-center justify-center w-20 h-20 rounded-3xl bg-white shadow-xl shadow-blue-500/20 mb-4 ring-4 ring-white/10 overflow-hidden">
+            <img src="/ahalogo.png" alt="AHA GARMENT" className="w-full h-full object-cover" />
           </div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-white font-ethiopic tracking-tight">
-            {am.appName}
+          <h1 className="text-2xl sm:text-3xl font-bold text-white tracking-tight">
+            AHA GARMENT
           </h1>
           <p className="text-slate-400 mt-1 text-sm font-ethiopic">
             የስፌት፣ የቆረጣ፣ የጥራትና የኢንሴንቲቭ አስተዳደር መተግበሪያ
@@ -149,12 +149,12 @@ export default function LoginPage() {
               <CheckCircle2 size={13} className="text-emerald-500" />
               የተጠበቀ የውስጥ ሥርዓት
             </span>
-            <span className="text-slate-400">v1.0 (ልብስ ፋብሪካ)</span>
+            <span className="text-slate-400">v1.0 (AHA GARMENT)</span>
           </div>
         </div>
 
         <p className="text-center text-xs text-slate-500 mt-6 font-ethiopic">
-          © {new Date().getFullYear()} የልብስ ፋብሪካ ኢአርፒ አስተዳደር ሥርዓት · መብቱ በሕግ የተጠበቀ ነው
+          © {new Date().getFullYear()} AHA GARMENT ERP · መብቱ በሕግ የተጠበቀ ነው
         </p>
       </div>
     </div>

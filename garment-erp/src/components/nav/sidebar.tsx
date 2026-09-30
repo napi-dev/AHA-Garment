@@ -119,12 +119,12 @@ export function Sidebar({
         {/* Header / Brand */}
         <div className="p-4 px-5 border-b border-slate-100 flex items-center justify-between">
           <Link href="/dashboard" className="flex items-center gap-3 group" onClick={onCloseMobile}>
-            <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-blue-700 via-blue-600 to-indigo-600 text-white flex items-center justify-center font-bold text-base shadow-sm group-hover:shadow transition-all group-hover:scale-105">
-              <span>🧵</span>
+            <div className="w-10 h-10 rounded-2xl overflow-hidden shadow-sm group-hover:shadow transition-all group-hover:scale-105 bg-white border border-slate-200">
+              <img src="/ahalogo.png" alt="AHA GARMENT" className="w-full h-full object-cover" />
             </div>
             <div>
-              <span className="font-bold text-slate-900 text-base font-ethiopic tracking-tight block leading-tight">
-                ልብስ ፋብሪካ
+              <span className="font-bold text-slate-900 text-base tracking-tight block leading-tight">
+                AHA GARMENT
               </span>
               <span className="text-slate-400 font-medium text-[11px] font-ethiopic block">
                 የኢአርፒ አስተዳደር ሥርዓት

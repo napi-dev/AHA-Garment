@@ -19,8 +19,8 @@ const notoSansEthiopic = Noto_Sans_Ethiopic({
 });
 
 export const metadata: Metadata = {
-  title: "ልብስ ፋብሪካ ሥርዓት",
-  description: "Garment Factory Production and Incentive System",
+  title: "AHA GARMENT ERP",
+  description: "AHA Garment Factory — Production and Incentive Management System",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
