@@ -20,26 +20,43 @@ export async function updateIncentiveCard(
   const dateStr       = String(formData.get("effectiveFrom") ?? new Date().toISOString().split("T")[0]);
   const effectiveFrom = new Date(dateStr + "T00:00:00Z");
 
-  // Close existing open card
-  await db.incentiveCard.updateMany({
-    where: { departmentId, effectiveTo: null },
-    data:  { effectiveTo: effectiveFrom },
+  // Check if a card already exists for this exact date — if so, update it instead of creating
+  const existing = await db.incentiveCard.findUnique({
+    where: { departmentId_effectiveFrom: { departmentId, effectiveFrom } },
   });
 
-  // Create new card
-  const card = await db.incentiveCard.create({
-    data: {
-      departmentId,
-      targetPerHour,
-      ratePerPiece: ratePerPiece.toDecimalPlaces(4),
-      effectiveFrom,
-      effectiveTo: null,
-      setByUserId: session.user.id,
-    },
+  if (existing) {
+    // Update in place — same date, just change the rates
+    await db.incentiveCard.update({
+      where: { id: existing.id },
+      data: { targetPerHour, ratePerPiece: ratePerPiece.toDecimalPlaces(4) },
+    });
+  } else {
+    // Close the current open card, then create a new one
+    await db.incentiveCard.updateMany({
+      where: { departmentId, effectiveTo: null },
+      data:  { effectiveTo: effectiveFrom },
+    });
+
+    await db.incentiveCard.create({
+      data: {
+        departmentId,
+        targetPerHour,
+        ratePerPiece: ratePerPiece.toDecimalPlaces(4),
+        effectiveFrom,
+        effectiveTo: null,
+        setByUserId: session.user.id,
+      },
+    });
+  }
+
+  const card = await db.incentiveCard.findFirst({
+    where: { departmentId, effectiveTo: null },
+    orderBy: { effectiveFrom: "desc" },
   });
 
   // Notify Super Manager if Admin made the change
-  if (session.user.role === "ADMIN") {
+  if (session.user.role === "ADMIN" && card) {
     await db.alert.create({
       data: {
         type: "UNUSUAL_COUNT",
@@ -54,7 +71,7 @@ export async function updateIncentiveCard(
       userId:   session.user.id,
       action:   "UPDATE_INCENTIVE_CARD",
       entity:   "IncentiveCard",
-      entityId: card.id,
+      entityId: card?.id ?? departmentId,
       after:    { departmentId, targetPerHour, ratePerPiece: ratePerPiece.toFixed(4), effectiveFrom: dateStr },
     },
   });

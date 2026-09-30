@@ -7,7 +7,7 @@ import { ethMonthName, formatAsEthDate } from "@/lib/ethiopian-calendar";
 import { approvePeriodAction } from "../actions";
 import Link from "next/link";
 import Decimal from "decimal.js";
-import { Award, ArrowRight, Download, CheckCircle, Calendar, Users, Calculator, AlertTriangle, ShieldCheck } from "lucide-react";
+import { Award, ArrowRight, CheckCircle, Calendar, Users, Calculator, AlertTriangle, ShieldCheck } from "lucide-react";
 
 export default async function IncentiveStatementPage({ params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
@@ -88,16 +88,6 @@ export default async function IncentiveStatementPage({ params }: { params: Promi
               </button>
             </form>
           )}
-
-          <a
-            href={`/api/pdf/incentive/${id}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="btn-secondary flex items-center gap-2 font-ethiopic"
-          >
-            <Download size={15} />
-            <span>{am.print} (PDF)</span>
-          </a>
         </div>
       </div>
 

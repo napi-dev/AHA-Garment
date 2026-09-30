@@ -5,7 +5,8 @@ import { requirePermission } from "@/lib/auth/permissions";
 import { am } from "@/lib/i18n/am";
 import { createCutJob } from "../actions";
 import Link from "next/link";
-import { Scissors, ArrowRight, Save, Info, AlertTriangle } from "lucide-react";
+import { Scissors, ArrowRight, Info } from "lucide-react";
+import { CutJobSubmitButton } from "./submit-button";
 
 export default async function NewCutJobPage({
   searchParams,
@@ -166,13 +167,7 @@ export default async function NewCutJobPage({
         )}
 
         <div className="pt-2 flex items-center gap-3">
-          <button
-            type="submit"
-            className="btn-primary flex-1 bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 font-ethiopic"
-          >
-            <Save size={16} />
-            <span>{am.save}</span>
-          </button>
+          <CutJobSubmitButton />
           <Link
             href="/cutting"
             className="btn-secondary px-6 font-ethiopic text-center"
