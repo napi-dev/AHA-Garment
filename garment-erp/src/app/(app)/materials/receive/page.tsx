@@ -12,8 +12,10 @@ export default async function ReceiveMaterialPage() {
   if (!session?.user) redirect("/login");
   requirePermission(session.user.role, "stock:edit");
 
-  const materials = await db.material.findMany({ where: { isActive: true }, orderBy: { sku: "asc" } });
-  const suppliers = await db.supplier.findMany({ where: { isActive: true }, orderBy: { nameAm: "asc" } });
+  const [materials, suppliers] = await Promise.all([
+    db.material.findMany({ where: { isActive: true }, orderBy: { sku: "asc" } }),
+    db.supplier.findMany({ where: { isActive: true }, orderBy: { nameAm: "asc" } }),
+  ]);
   const today = new Date().toISOString().split("T")[0];
 
   return (

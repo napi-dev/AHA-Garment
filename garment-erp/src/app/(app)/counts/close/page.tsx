@@ -20,19 +20,21 @@ export default async function DayClosePage() {
 
   const dayClose = await db.dayClose.findUnique({ where: { date: today } });
 
-  // Summary for today
-  const sheetCount = await db.hourlyCountSheet.count({ where: { date: today } });
-  const lineStats = await db.hourlyCountLine.aggregate({
-    where: { sheet: { date: today } },
-    _count: { _all: true },
-    _sum: { totalProduced: true, plusPieces: true, minusPieces: true },
-  });
-  const pendingLines = await db.hourlyCountLine.count({
-    where: { sheet: { date: today }, status: "SUBMITTED" },
-  });
-  const verifiedLines = await db.hourlyCountLine.count({
-    where: { sheet: { date: today }, status: "VERIFIED" },
-  });
+  // Summary for today — all in parallel
+  const [sheetCount, lineStats, pendingLines, verifiedLines] = await Promise.all([
+    db.hourlyCountSheet.count({ where: { date: today } }),
+    db.hourlyCountLine.aggregate({
+      where: { sheet: { date: today } },
+      _count: { _all: true },
+      _sum: { totalProduced: true, plusPieces: true, minusPieces: true },
+    }),
+    db.hourlyCountLine.count({
+      where: { sheet: { date: today }, status: "SUBMITTED" },
+    }),
+    db.hourlyCountLine.count({
+      where: { sheet: { date: today }, status: "VERIFIED" },
+    }),
+  ]);
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">

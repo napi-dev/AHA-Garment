@@ -166,7 +166,6 @@ export default async function SuppliersPage({
             </tbody>
           </table>
         </div>
-      </div>
         <Pagination page={page} totalPages={totalPages} buildHref={buildHref} />
       </div>
     </div>

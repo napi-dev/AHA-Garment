@@ -130,7 +130,7 @@ export default async function MaterialsPage({
             <CheckCircle2 size={16} className="text-emerald-600" />
           </div>
           <p className="text-2xl font-bold text-emerald-700 tabular-nums">
-            {materials.length - lowCount}
+            {withStock.length - lowCount}
           </p>
         </div>
 

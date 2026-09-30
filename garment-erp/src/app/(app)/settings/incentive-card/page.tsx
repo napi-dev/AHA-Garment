@@ -5,14 +5,22 @@ import { requirePermission } from "@/lib/auth/permissions";
 import { am } from "@/lib/i18n/am";
 import { formatAsEthDate } from "@/lib/ethiopian-calendar";
 import { updateIncentiveCard } from "./actions";
+import { IncentiveCardSaveButton } from "./save-button";
 import Link from "next/link";
 import Decimal from "decimal.js";
-import { Award, ArrowLeft, Calendar, Save, History, Info } from "lucide-react";
+import { Award, ArrowLeft, Calendar, History, Info, CheckCircle2 } from "lucide-react";
 
-export default async function IncentiveCardPage() {
+export default async function IncentiveCardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ saved?: string }>;
+}) {
   const session = await auth();
   if (!session?.user) redirect("/login");
   requirePermission(session.user.role, "incentive_card:edit");
+
+  const params = await searchParams;
+  const justSaved = params.saved === "1";
 
   const today = new Date().toISOString().split("T")[0];
 
@@ -63,6 +71,19 @@ export default async function IncentiveCardPage() {
           የተመኑ ለውጦች የሚጸኑት ከተጠቀሰው <strong>ሥራ ላይ የሚውልበት ቀን</strong> ጀምሮ ነው። ቀደም ሲል ለተዘጉ ወይም ለተሰሩ ቀናት የነበረው ክፍያ በወቅቱ በነበረው ተመን መሠረት ጸንቶ ይቆያል።
         </p>
       </div>
+
+      {/* Success banner — shown after save */}
+      {justSaved && (
+        <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800">
+          <CheckCircle2 size={18} className="text-emerald-600 flex-shrink-0" />
+          <p className="text-sm font-semibold font-ethiopic">
+            ኢንሴንቲቭ ካርዱ በተሳካ ሁኔታ ተቀምጧል! ከዚህ በታች ያለው ታሪክ ዝርዝር ዘምኗል።
+          </p>
+          <a href="#history" className="ml-auto text-xs font-semibold text-emerald-700 hover:underline font-ethiopic whitespace-nowrap">
+            ወደ ታሪክ ሂድ ↓
+          </a>
+        </div>
+      )}
 
       {/* Department Cards Grid or Table */}
       <div className="space-y-4">
@@ -137,13 +158,7 @@ export default async function IncentiveCardPage() {
               </div>
 
               <div className="flex items-end">
-                <button
-                  type="submit"
-                  className="btn-primary text-xs py-2.5 px-4 flex items-center gap-1.5 w-full md:w-auto justify-center"
-                >
-                  <Save size={14} />
-                  <span>{am.save}</span>
-                </button>
+                <IncentiveCardSaveButton />
               </div>
             </form>
           );
@@ -167,7 +182,7 @@ async function CardHistory() {
   if (history.length === 0) return null;
 
   return (
-    <div className="erp-card overflow-hidden">
+    <div id="history" className="erp-card overflow-hidden">
       <div className="px-6 py-4 border-b border-slate-200/80 flex items-center gap-2">
         <History size={16} className="text-slate-400" />
         <h2 className="font-bold text-slate-800 font-ethiopic text-sm">

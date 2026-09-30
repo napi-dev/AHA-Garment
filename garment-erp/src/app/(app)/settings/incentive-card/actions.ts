@@ -4,6 +4,7 @@ import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { requirePermission } from "@/lib/auth/permissions";
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import Decimal from "decimal.js";
 
 export async function updateIncentiveCard(
@@ -76,5 +77,5 @@ export async function updateIncentiveCard(
     },
   });
 
-  revalidatePath("/settings/incentive-card");
+  redirect("/settings/incentive-card?saved=1#history");
 }
