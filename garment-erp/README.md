@@ -1,5 +1,6 @@
 # ልብስ ፋብሪካ ሥርዓት — Garment Factory System
 
+
 Tablet-first, fully Amharic garment production and incentive tracking system.
 
 **Stack:** Next.js 15 · TypeScript · Prisma · PostgreSQL (Neon) · Tailwind CSS · Recharts  
