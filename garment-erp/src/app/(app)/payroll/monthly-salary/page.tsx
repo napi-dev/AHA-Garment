@@ -122,7 +122,7 @@ export default async function MonthlySalaryPage({ searchParams }: PageProps) {
       const total = baseSalary.plus(incentive);
 
       const attendances = attendanceByEmployee.get(emp.id) ?? [];
-      const presentDays = attendances.filter(a => a.status === "PRESENT").length;
+      const presentDays = attendances.filter(a => new Decimal(a.hoursWorked.toString()).greaterThan(0)).length;
 
       totalBaseSalary = totalBaseSalary.plus(baseSalary);
       totalIncentive = totalIncentive.plus(incentive);
