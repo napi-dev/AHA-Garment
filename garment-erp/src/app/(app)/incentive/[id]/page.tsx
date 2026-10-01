@@ -7,7 +7,8 @@ import { ethMonthName, formatAsEthDate } from "@/lib/ethiopian-calendar";
 import { approvePeriodAction } from "../actions";
 import Link from "next/link";
 import Decimal from "decimal.js";
-import { Award, ArrowRight, CheckCircle, Calendar, Users, Calculator, AlertTriangle, ShieldCheck } from "lucide-react";
+import { Award, ArrowRight, CheckCircle, Calendar, Users, Calculator, AlertTriangle, ShieldCheck, FileText } from "lucide-react";
+import { TelegramSendButton } from "@/components/telegram-send-button";
 
 export default async function IncentiveStatementPage({ params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
@@ -76,6 +77,21 @@ export default async function IncentiveStatementPage({ params }: { params: Promi
 
         <div className="flex items-center gap-3 flex-wrap">
           <StatusChip status={period.status} />
+
+          <Link
+            href={`/api/reports/incentive/${id}`}
+            target="_blank"
+            className="btn-secondary flex items-center gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:from-blue-700 hover:to-indigo-700 font-ethiopic"
+          >
+            <FileText size={16} />
+            <span>የክፍያ ሪፖርት አውጣ (PDF)</span>
+          </Link>
+
+          <TelegramSendButton
+            reportUrl={`/api/reports/incentive/${id}`}
+            reportTitle={`የኢንሴንቲቭ ክፍያ ሪፖርት — ቀን ${period.paymentDay}`}
+            reportDate={`${ethMonthName(period.ethMonth)} ${period.ethYear} ዓ.ም`}
+          />
 
           {canApprove && (
             <form action={approve}>

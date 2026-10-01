@@ -25,6 +25,11 @@ export default async function AttendancePage({
   const dateStr = params.date ?? effectiveToday.toISOString().split("T")[0];
   const date = new Date(dateStr + "T00:00:00Z");
 
+  // Check if the day is closed
+  const dayClose = await db.dayClose.findUnique({
+    where: { date },
+  });
+
   // Load all dept names for the selector (lightweight — no employees yet)
   const allDepts = await db.department.findMany({
     where: { isActive: true },
@@ -52,17 +57,19 @@ export default async function AttendancePage({
     : [];
 
   const canEdit =
-    session.user.role === "ADMIN" ||
+    !dayClose && // Can't edit if day is closed
+    (session.user.role === "ADMIN" ||
     session.user.role === "SUPER_MANAGER" ||
-    session.user.role === "HR_CLERK";
+    session.user.role === "HR_CLERK");
 
   const totalEmployees = departments.reduce((acc, d) => acc + d.employees.length, 0);
   const totalPresent = departments.reduce(
     (acc, d) =>
       acc +
-      d.employees.filter(
-        (e) => e.attendances[0] && Number(e.attendances[0].hoursWorked) > 0
-      ).length,
+      d.employees.filter((e) => {
+        const hours = e.attendances[0] ? Number(e.attendances[0].hoursWorked) : 0;
+        return hours > 0; // Present if hours > 0 (excludes absent=0 and leave=-1)
+      }).length,
     0
   );
 
@@ -91,6 +98,29 @@ export default async function AttendancePage({
           <DatePicker defaultValue={dateStr} />
         </div>
       </div>
+
+      {/* Day Closed Banner */}
+      {dayClose && (
+        <div className="erp-card p-5 bg-gradient-to-r from-rose-50 to-orange-50 border-l-4 border-rose-500">
+          <div className="flex items-start gap-3">
+            <div className="w-10 h-10 rounded-xl bg-rose-100 flex items-center justify-center flex-shrink-0">
+              <svg className="w-5 h-5 text-rose-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+              </svg>
+            </div>
+            <div className="flex-1">
+              <h3 className="font-bold text-rose-900 font-ethiopic text-base mb-1">
+                የዕለቱ ሥራ ተጠቃልሎ ተዘግቷል
+              </h3>
+              <p className="text-sm text-rose-800 font-ethiopic leading-relaxed">
+                የዕለቱ ሥራ በ {dayClose.closedAt.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })} ተዘግቷል። 
+                ያስቀመጡትን መረጃ ማየት ይችላሉ ነገር ግን ማስተካከል አይቻልም። 
+                ለማስተካከል ሱፐርቫይዘሩ ወይም ዋና ሥራ አስኪያጁ ቀኑን መክፈት አለባቸው።
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Department selector */}
       <div className="erp-card p-4">

@@ -79,6 +79,10 @@ export function Sidebar({
         { label: am.employees.title, href: "/employees", icon: <Users size={18} />, permission: "employees:view" },
         { label: am.nav.incentive, href: "/incentive", icon: <TrendingUp size={18} />, permission: "incentive:view" },
         { label: am.nav.salary, href: "/salary", icon: <DollarSign size={18} />, permission: "salary:view" },
+        { label: "የወር ኢንሴንቲቭ ማጠቃለያ", href: "/payroll/monthly-incentive", icon: <TrendingUp size={18} />, permission: "incentive:view" },
+        { label: "የወር ደሞዝ ማጠቃለያ", href: "/payroll/monthly-salary", icon: <DollarSign size={18} />, permission: "incentive:view" },
+        { label: "የወር መገኘት ማጠቃለያ", href: "/payroll/monthly-attendance", icon: <Clock size={18} />, permission: "attendance:view" },
+        { label: "የወር ክፍያ ሪፖርት", href: "/payroll/monthly-report", icon: <FileText size={18} />, permission: "incentive:view" },
       ],
     },
     {

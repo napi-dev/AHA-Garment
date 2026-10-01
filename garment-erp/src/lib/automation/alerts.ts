@@ -4,7 +4,7 @@
  */
 
 import { db } from "@/lib/db";
-import { sendMessage, CHATS, TEMPLATES } from "./telegram";
+import { sendMessage, sendToManagerAndAdmin, CHATS, TEMPLATES } from "./telegram";
 import Decimal from "decimal.js";
 
 // ── Low stock ────────────────────────────────────────────────────────────────
@@ -53,8 +53,9 @@ export async function checkAndSendLowStockAlert(materialId: string) {
     data: { type: "LOW_STOCK", message: msg, reference: materialId },
   });
 
-  if (CHATS.manager) await sendMessage(CHATS.manager, msg);
-  if (CHATS.dept)    await sendMessage(CHATS.dept,    msg);
+  // Send to manager (automatically sends to admin too)
+  await sendToManagerAndAdmin(msg);
+  if (CHATS.dept) await sendMessage(CHATS.dept, msg);
 }
 
 // ── Wastage alert ────────────────────────────────────────────────────────────
@@ -87,8 +88,9 @@ export async function sendWastageAlert(cutJobId: string) {
 
   await db.cutJob.update({ where: { id: cutJobId }, data: { wastageAlertSent: true } });
 
-  if (CHATS.manager) await sendMessage(CHATS.manager, msg);
-  if (CHATS.dept)    await sendMessage(CHATS.dept,    msg);
+  // Send to manager (automatically sends to admin too)
+  await sendToManagerAndAdmin(msg);
+  if (CHATS.dept) await sendMessage(CHATS.dept, msg);
 }
 
 // ── Delayed order alert ──────────────────────────────────────────────────────
@@ -123,7 +125,8 @@ export async function checkDelayedOrders() {
       data: { type: "DELAYED_ORDER", message: msg, reference: order.id },
     });
 
-    if (CHATS.manager) await sendMessage(CHATS.manager, msg);
+    // Send to manager (automatically sends to admin too)
+    await sendToManagerAndAdmin(msg);
   }
 }
 
@@ -162,14 +165,15 @@ export async function checkMissingDayClose() {
     data: { type: "DAY_NOT_CLOSED", message: msg, reference: today.toISOString() },
   });
 
-  if (CHATS.manager) await sendMessage(CHATS.manager, msg);
+  // Send to manager (automatically sends to admin too)
+  await sendToManagerAndAdmin(msg);
 }
 
 // ── Resolve alert (Admin / Super Manager marks as resolved) ──────────────────
 
 export async function resolveAlert(alertId: string) {
-  await db.alert.update({
+  // Delete the alert from database when "ፍታ" button is clicked
+  await db.alert.delete({
     where: { id: alertId },
-    data: { resolvedAt: new Date() },
   });
 }

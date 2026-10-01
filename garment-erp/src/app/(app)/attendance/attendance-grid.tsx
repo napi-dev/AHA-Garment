@@ -41,6 +41,7 @@ type RowState = {
 
 const HOUR_OPTIONS = [
   { label: am.attendance.absent,   value: "0" },
+  { label: "ፈቃድ (Leave)",         value: "-1" },
   { label: "4 ሰዓት",                value: "4" },
   { label: "5 ሰዓት",                value: "5" },
   { label: "6 ሰዓት",                value: "6" },
@@ -110,7 +111,10 @@ export function AttendanceGrid({ departments, date, canEdit, userId }: Attendanc
   return (
     <div className="space-y-6">
       {departments.map((dept) => {
-        const presentCount = dept.employees.filter((e) => rows[e.id]?.hours !== "0").length;
+        const presentCount = dept.employees.filter((e) => {
+          const hours = rows[e.id]?.hours;
+          return hours !== "0" && hours !== "-1";
+        }).length;
 
         return (
           <div key={dept.id} className="erp-card overflow-hidden shadow-sm">
@@ -170,6 +174,7 @@ export function AttendanceGrid({ departments, date, canEdit, userId }: Attendanc
                     const row = rows[emp.id];
                     if (!row) return null;
                     const isAbsent = row.hours === "0";
+                    const isLeave = row.hours === "-1";
 
                     return (
                       <tr
@@ -177,6 +182,8 @@ export function AttendanceGrid({ departments, date, canEdit, userId }: Attendanc
                         className={`transition-colors ${
                           isAbsent
                             ? "bg-rose-50/30"
+                            : isLeave
+                            ? "bg-amber-50/30"
                             : row.saved
                             ? "hover:bg-slate-50"
                             : "bg-amber-50/20 hover:bg-amber-50/40"
@@ -197,6 +204,8 @@ export function AttendanceGrid({ departments, date, canEdit, userId }: Attendanc
                             className={`w-full rounded-xl border px-3 py-2 text-xs font-medium focus:outline-none focus:ring-2 font-ethiopic transition-all ${
                               isAbsent
                                 ? "border-rose-200 bg-rose-50/80 text-rose-700 focus:ring-rose-400"
+                                : isLeave
+                                ? "border-amber-200 bg-amber-50/80 text-amber-700 focus:ring-amber-400"
                                 : "border-slate-200 bg-white text-slate-800 focus:ring-blue-400 hover:border-slate-300"
                             }`}
                           >

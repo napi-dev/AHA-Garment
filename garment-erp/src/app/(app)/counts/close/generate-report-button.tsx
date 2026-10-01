@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { FileText, Calendar, Printer, ExternalLink } from "lucide-react";
 import { formatAsEthDate, todayISOStringEAT } from "@/lib/ethiopian-calendar";
+import { TelegramSendButton } from "@/components/telegram-send-button";
 
 interface Props {
   date: string; // ISO string — default date (today or working date)
@@ -59,7 +60,7 @@ export function GenerateReportButton({ date: defaultDate }: Props) {
           <ul className="space-y-0.5 text-slate-600">
             <li>• <kbd className="px-1.5 py-0.5 bg-white border rounded text-xs">Ctrl + P</kbd> — የህትመት መስኮት ለመክፈት</li>
             <li>• "Destination" ላይ <strong>"Save as PDF"</strong> ይምረጡ</li>
-            <li>• ሪፖርቱ 2 ገጾች አሉት (ምርት + የሥርዓት ምዝገባ)</li>
+            <li>• ሪፖርቱ 4 ገጾች አሉት (ምርት + መገኘት + ደሞዝ + የሥርዓት ምዝገባ)</li>
           </ul>
         </div>
       </div>
@@ -71,6 +72,13 @@ export function GenerateReportButton({ date: defaultDate }: Props) {
         <ExternalLink size={16} />
         <span>ሪፖርት ክፈት እና አትም</span>
       </button>
+
+      <TelegramSendButton
+        reportUrl={`/api/reports/daily/${selectedDate}`}
+        reportTitle="የዕለት ምርት ሪፖርት"
+        reportDate={displayDate}
+        className="w-full"
+      />
     </div>
   );
 }

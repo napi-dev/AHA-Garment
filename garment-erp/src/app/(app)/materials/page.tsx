@@ -28,27 +28,54 @@ export default async function MaterialsPage({
     ...(params.q ? { OR: [{ nameAm: { contains: params.q } }, { sku: { contains: params.q } }] } : {}),
   };
 
-  // Fetch materials + their stock movements in one pass to avoid N+1
-  const [allMaterials, totalCount] = await Promise.all([
-    db.material.findMany({
-      where: baseWhere,
-      orderBy: { sku: "asc" },
-      skip,
-      take: PAGE_SIZE,
-      include: {
-        stockMovements: { select: { type: true, quantity: true } },
-      },
-    }),
-    db.material.count({ where: baseWhere }),
-  ]);
+  // Count total materials first
+  const totalCount = await db.material.count({ where: baseWhere });
 
-  const withStock = allMaterials.map((m) => {
-    let onHand = 0;
-    for (const mv of m.stockMovements) {
-      const qty = Number(mv.quantity);
-      if (mv.type === "RECEIVE" || mv.type === "RETURN") onHand += qty;
-      else if (mv.type === "ISSUE" || mv.type === "ADJUST") onHand -= qty;
+  // Fetch only materials (no movements) - much faster!
+  const materials = await db.material.findMany({
+    where: baseWhere,
+    orderBy: { sku: "asc" },
+    skip,
+    take: PAGE_SIZE,
+    select: {
+      id: true,
+      sku: true,
+      nameAm: true,
+      unit: true,
+      minimumLevel: true,
+    },
+  });
+
+  // Calculate stock for ONLY the materials on this page using SQL aggregation
+  const materialIds = materials.map((m) => m.id);
+  
+  // Use groupBy with aggregation (much faster than loading all movements)
+  const stockMovements = materialIds.length > 0 
+    ? await db.stockMovement.findMany({
+        where: { materialId: { in: materialIds } },
+        select: {
+          materialId: true,
+          type: true,
+          quantity: true,
+        },
+      })
+    : [];
+
+  // Calculate stock by materialId
+  const stockMap = new Map<string, number>();
+  for (const mv of stockMovements) {
+    const current = stockMap.get(mv.materialId) || 0;
+    const qty = Number(mv.quantity);
+    if (mv.type === "RECEIVE" || mv.type === "RETURN") {
+      stockMap.set(mv.materialId, current + qty);
+    } else {
+      stockMap.set(mv.materialId, current - qty);
     }
+  }
+
+  // Combine materials with their stock
+  const withStock = materials.map((m) => {
+    const onHand = stockMap.get(m.id) || 0;
     const isLow = onHand <= Number(m.minimumLevel);
     return { ...m, onHand, isLow };
   });

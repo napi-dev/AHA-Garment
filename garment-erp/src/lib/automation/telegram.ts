@@ -73,9 +73,30 @@ export async function sendDocument(
 /** Chat IDs from env (typed for clarity). */
 export const CHATS = {
   manager: process.env.TELEGRAM_MANAGER_CHAT_ID ?? "",
+  admin: process.env.TELEGRAM_ADMIN_CHAT_ID ?? "",
   dept:    process.env.TELEGRAM_DEPT_GROUP_CHAT_ID ?? "",
   dev:     process.env.TELEGRAM_DEV_CHAT_ID ?? "",
 } as const;
+
+/** 
+ * Send message to manager AND admin automatically.
+ * Use this instead of sendMessage(CHATS.manager, ...) to ensure admin gets all manager messages.
+ */
+export async function sendToManagerAndAdmin(text: string) {
+  const results = [];
+  
+  // Send to manager
+  if (CHATS.manager) {
+    results.push(await sendMessage(CHATS.manager, text));
+  }
+  
+  // Also send to admin (if different from manager)
+  if (CHATS.admin && CHATS.admin !== CHATS.manager) {
+    results.push(await sendMessage(CHATS.admin, text));
+  }
+  
+  return results;
+}
 
 /** Notify the dev chat on job failure. */
 export async function notifyDevError(jobType: string, error: string) {

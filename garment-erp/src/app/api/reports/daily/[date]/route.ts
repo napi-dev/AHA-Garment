@@ -36,6 +36,42 @@ export async function GET(
     ],
   });
 
+  // Fetch attendance data
+  const attendances = await db.attendance.findMany({
+    where: { date },
+    include: {
+      employee: {
+        include: {
+          department: { select: { nameAm: true } },
+        },
+      },
+    },
+    orderBy: [
+      { employee: { department: { sortOrder: "asc" } } },
+      { employee: { serialNumber: "asc" } },
+    ],
+  });
+
+  // Fetch salary records
+  const salaryRecords = await db.salaryRecord.findMany({
+    where: {
+      employee: { isActive: true },
+      effectiveFrom: { lte: date },
+      OR: [{ effectiveTo: null }, { effectiveTo: { gte: date } }],
+    },
+    include: {
+      employee: {
+        include: {
+          department: { select: { nameAm: true } },
+        },
+      },
+    },
+    orderBy: [
+      { employee: { department: { sortOrder: "asc" } } },
+      { employee: { serialNumber: "asc" } },
+    ],
+  });
+
   // Fetch audit logs
   const auditLogs = await db.auditLog.findMany({
     where: { createdAt: { gte: date, lte: dayEnd } },
@@ -43,8 +79,8 @@ export async function GET(
     include: { user: { select: { employeeCode: true } } },
   });
 
-  // Get incentive cards
-  const cardMap = new Map<string, number>();
+  // Get incentive cards (for target AND rate)
+  const cardMap = new Map<string, { target: number; rate: number }>();
   const deptIds = [...new Set(lines.map((l) => l.departmentId))];
   for (const deptId of deptIds) {
     const card = await db.incentiveCard.findFirst({
@@ -55,21 +91,29 @@ export async function GET(
       },
       orderBy: { effectiveFrom: "desc" },
     });
-    cardMap.set(deptId, card?.targetPerHour ?? 0);
+    cardMap.set(deptId, {
+      target: card?.targetPerHour ?? 0,
+      rate: card?.ratePerPiece ?? 0,
+    });
   }
 
   let totalProduced = 0;
   let aboveTarget = 0;
+  let totalIncentive = 0;
 
   const rows = lines.map((line, idx) => {
-    const targetPerHour = cardMap.get(line.departmentId) ?? 0;
-    const targetPerDay = targetPerHour * 8;
+    const cardData = cardMap.get(line.departmentId) ?? { target: 0, rate: 0 };
+    const targetPerDay = cardData.target * 8;
     totalProduced += line.totalProduced;
     if (line.plusPieces > 0) aboveTarget++;
     const pct = targetPerDay > 0
       ? Math.round((line.totalProduced / targetPerDay) * 100 * 10) / 10
       : 0;
     const diff = line.plusPieces > 0 ? line.plusPieces : -line.minusPieces;
+    
+    // Calculate incentive: only use plusPieces (positive pieces) × rate
+    const incentive = line.plusPieces > 0 ? line.plusPieces * cardData.rate : 0;
+    totalIncentive += incentive;
 
     return {
       serial: idx + 1,
@@ -80,6 +124,38 @@ export async function GET(
       produced: line.totalProduced,
       diff,
       pct,
+      rate: cardData.rate,
+      incentive,
+    };
+  });
+
+  // Prepare attendance rows
+  const attendanceRows = attendances.map((att, idx) => {
+    const hours = Number(att.hoursWorked);
+    let status = "—";
+    if (hours === -1) status = "ፈቃድ";
+    else if (hours === 0) status = "ቅዳሜ/ዕረፍት";
+    else if (hours > 0) status = "ተገኝቷል";
+
+    return {
+      serial: idx + 1,
+      serialNumber: att.employee.serialNumber,
+      nameAm: att.employee.nameAm,
+      deptAm: att.employee.department?.nameAm ?? "—",
+      hoursWorked: hours === -1 ? "—" : hours > 0 ? hours.toString() : "0",
+      status,
+    };
+  });
+
+  // Prepare salary rows
+  const salaryRows = salaryRecords.map((sal, idx) => {
+    return {
+      serial: idx + 1,
+      serialNumber: sal.employee.serialNumber,
+      nameAm: sal.employee.nameAm,
+      deptAm: sal.employee.department?.nameAm ?? "—",
+      amount: sal.amount,
+      effectiveFrom: sal.effectiveFrom.toLocaleDateString("am-ET"),
     };
   });
 
@@ -133,7 +209,7 @@ export async function GET(
     };
   });
 
-  // Generate printable HTML
+  // Generate printable HTML with 4 pages
   const html = `
 <!DOCTYPE html>
 <html lang="am">
@@ -146,19 +222,14 @@ export async function GET(
       size: A4 landscape;
       margin: 15mm;
     }
-    @page:first {
-      size: A4 landscape;
-    }
     @media print {
       body { margin: 0; }
       .page-break { page-break-before: always; }
-      @page { size: A4 portrait; }
-      .landscape { size: A4 landscape; }
     }
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
       font-family: Arial, sans-serif;
-      font-size: 9pt;
+      font-size: 8.5pt;
       color: #1a1a1a;
       line-height: 1.3;
     }
@@ -174,7 +245,7 @@ export async function GET(
       border-bottom: 2px solid #333;
     }
     .header-left h1 {
-      font-size: 14pt;
+      font-size: 13pt;
       margin-bottom: 4px;
     }
     .header-left .meta, .header-right .meta {
@@ -187,7 +258,7 @@ export async function GET(
     table {
       width: 100%;
       border-collapse: collapse;
-      font-size: 8pt;
+      font-size: 7.5pt;
     }
     thead {
       background: #f3f4f6;
@@ -195,7 +266,7 @@ export async function GET(
     }
     th, td {
       border: 0.5pt solid #d1d5db;
-      padding: 4px 6px;
+      padding: 3px 5px;
       text-align: left;
     }
     th.center, td.center {
@@ -211,26 +282,14 @@ export async function GET(
     }
     .positive { color: #059669; }
     .negative { color: #dc2626; }
+    .amber { color: #d97706; }
     .footer {
       margin-top: 10px;
       font-size: 7pt;
       color: #6b7280;
       text-align: right;
     }
-    .audit-page {
-      padding: 24px;
-    }
-    .audit-title {
-      font-size: 13pt;
-      font-weight: bold;
-      margin-bottom: 8px;
-    }
-    .audit-meta {
-      font-size: 8pt;
-      color: #666;
-      margin-bottom: 12px;
-    }
-    .no-audit {
+    .no-data {
       padding: 20px;
       text-align: center;
       color: #9ca3af;
@@ -238,8 +297,8 @@ export async function GET(
   </style>
 </head>
 <body>
-  <!-- Page 1: Production Sheet (Landscape) -->
-  <div class="page landscape">
+  <!-- Page 1: Production Sheet with Rate & Incentive (Landscape) -->
+  <div class="page">
     <div class="header">
       <div class="header-left">
         <h1>የሠራተኞች ዕለታዊ ምርት ሰሌዳ</h1>
@@ -248,21 +307,24 @@ export async function GET(
       <div class="header-right">
         <div class="meta">ጠቅላላ ያደረሱ: ${totalProduced.toLocaleString()}</div>
         <div class="meta">ከዒላማ በላይ: ${aboveTarget} / ${rows.length}</div>
+        <div class="meta">ጠቅላላ ኢንሴንቲቭ: ${totalIncentive.toFixed(2)} ብር</div>
       </div>
     </div>
 
     <table>
       <thead>
         <tr>
-          <th class="center" style="width: 4%;">ተ.ቁ.</th>
-          <th style="width: 18%;">ሙሉ ስም</th>
-          <th style="width: 16%;">ሥራ</th>
-          <th style="width: 12%;">ማሽን</th>
-          <th class="center" style="width: 10%;">ዒላማ/ቀን</th>
-          <th class="center" style="width: 10%;">አደረሱ</th>
-          <th class="center" style="width: 10%;">ልዩነት</th>
-          <th class="center" style="width: 8%;">%</th>
-          <th style="width: 12%;">ፊርማ</th>
+          <th class="center" style="width: 3%;">ተ.ቁ.</th>
+          <th style="width: 15%;">ሙሉ ስም</th>
+          <th style="width: 13%;">ሥራ</th>
+          <th style="width: 10%;">ማሽን</th>
+          <th class="center" style="width: 8%;">ዒላማ/ቀን</th>
+          <th class="center" style="width: 8%;">አደረሱ</th>
+          <th class="center" style="width: 8%;">ልዩነት</th>
+          <th class="center" style="width: 6%;">%</th>
+          <th class="center" style="width: 9%;">በፍሬ ተመን<br/>(ብር/ፍሬ)</th>
+          <th class="center" style="width: 10%;">ኢንሴንቲቭ<br/>(ብር)</th>
+          <th style="width: 10%;">ፊርማ</th>
         </tr>
       </thead>
       <tbody>
@@ -280,6 +342,10 @@ export async function GET(
           <td class="center ${row.pct >= 100 ? 'positive' : 'negative'}">
             ${row.targetPerDay > 0 ? `${row.pct}%` : "—"}
           </td>
+          <td class="center">${row.rate > 0 ? row.rate.toFixed(2) : "—"}</td>
+          <td class="center ${row.incentive > 0 ? 'positive' : ''}">
+            <strong>${row.incentive > 0 ? row.incentive.toFixed(2) : "0.00"}</strong>
+          </td>
           <td></td>
         </tr>
         `).join('')}
@@ -292,35 +358,143 @@ export async function GET(
           <td></td>
           <td class="center">${rows.length > 0 ? `${aboveTarget}/${rows.length}` : "—"}</td>
           <td></td>
+          <td class="center"><strong>${totalIncentive.toFixed(2)}</strong></td>
+          <td></td>
         </tr>
       </tfoot>
     </table>
 
     <div class="footer">
-      ዒላማ = በሰዓት ዒላማ × 8 ሰዓቶች  |  ልዩነት = ያደረሱ − ዒላማ  |  ገጽ 1
+      ኢንሴንቲቭ = ትርፍ ፍሬዎች × በፍሬ ተመን  |  ልዩነት = ያደረሱ − ዒላማ  |  ገጽ 1/4
     </div>
   </div>
 
-  <!-- Page 2: Audit Log (Portrait) -->
-  <div class="page audit-page page-break">
-    <div class="audit-title">የዕለት የሥርዓት ምዝገባ (Audit Log)</div>
-    <div class="audit-meta">ቀን: ${dateLabel}  |  ጠቅላላ ምዝገቦች: ${auditRows.length}</div>
+  <!-- Page 2: Attendance (Landscape) -->
+  <div class="page page-break">
+    <div class="header">
+      <div class="header-left">
+        <h1>የዕለት መገኘት ሰሌዳ</h1>
+        <div class="meta">ቀን: ${dateLabel}  |  የተመዘገቡ: ${attendanceRows.length} ሰዎች</div>
+      </div>
+      <div class="header-right">
+        <div class="meta">ተገኝተዋል: ${attendanceRows.filter(a => a.status === "ተገኝቷል").length}</div>
+        <div class="meta">ፈቃድ: ${attendanceRows.filter(a => a.status === "ፈቃድ").length}</div>
+      </div>
+    </div>
 
-    ${auditRows.length === 0 ? `
-      <div class="no-audit">ዛሬ ምንም የሥርዓት ምዝገባ አልተካሄደም</div>
+    ${attendanceRows.length === 0 ? `
+      <div class="no-data">ለዚህ ቀን የመገኘት መረጃ አልተመዘገበም</div>
     ` : `
       <table>
         <thead>
           <tr>
-            <th style="width: 12%;">ሰዓት</th>
-            <th style="width: 12%;">ተጠቃሚ</th>
-            <th style="width: 24%;">ድርጊት</th>
-            <th style="width: 22%;">ዓይነት / መለያ</th>
-            <th style="width: 30%;">ማብራሪያ</th>
+            <th class="center" style="width: 6%;">ተ.ቁ.</th>
+            <th class="center" style="width: 10%;">መታወቂያ</th>
+            <th style="width: 30%;">ሙሉ ስም</th>
+            <th style="width: 24%;">የሥራ ክፍል</th>
+            <th class="center" style="width: 12%;">የሥራ ሰዓት</th>
+            <th class="center" style="width: 18%;">ሁኔታ</th>
           </tr>
         </thead>
         <tbody>
-          ${auditRows.map((row, idx) => `
+          ${attendanceRows.map(att => `
+          <tr>
+            <td class="center">${att.serial}</td>
+            <td class="center">${att.serialNumber}</td>
+            <td>${att.nameAm}</td>
+            <td>${att.deptAm}</td>
+            <td class="center">${att.hoursWorked}</td>
+            <td class="center ${att.status === "ተገኝቷል" ? "positive" : att.status === "ፈቃድ" ? "amber" : ""}">
+              ${att.status}
+            </td>
+          </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    `}
+
+    <div class="footer">
+      ተገኝቷል = የሥራ ሰዓት > 0  |  ፈቃድ = በእገዳ ላይ  |  ቅዳሜ/ዕረፍት = 0 ሰዓት  |  ገጽ 2/4
+    </div>
+  </div>
+
+  <!-- Page 3: Salary Records (Landscape) -->
+  <div class="page page-break">
+    <div class="header">
+      <div class="header-left">
+        <h1>የደሞዝ መረጃ ሰሌዳ</h1>
+        <div class="meta">ቀን: ${dateLabel}  |  የተመዘገቡ: ${salaryRows.length} ሰዎች</div>
+      </div>
+      <div class="header-right">
+        <div class="meta">ጠቅላላ ደሞዝ: ${salaryRows.reduce((sum, s) => sum + s.amount, 0).toLocaleString()} ብር</div>
+      </div>
+    </div>
+
+    ${salaryRows.length === 0 ? `
+      <div class="no-data">የደሞዝ መረጃ አልተገኘም</div>
+    ` : `
+      <table>
+        <thead>
+          <tr>
+            <th class="center" style="width: 6%;">ተ.ቁ.</th>
+            <th class="center" style="width: 12%;">መታወቂያ</th>
+            <th style="width: 30%;">ሙሉ ስም</th>
+            <th style="width: 24%;">የሥራ ክፍል</th>
+            <th class="center" style="width: 14%;">ደሞዝ (ብር)</th>
+            <th class="center" style="width: 14%;">ከ ቀን ጀምሮ</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${salaryRows.map(sal => `
+          <tr>
+            <td class="center">${sal.serial}</td>
+            <td class="center">${sal.serialNumber}</td>
+            <td>${sal.nameAm}</td>
+            <td>${sal.deptAm}</td>
+            <td class="center"><strong>${sal.amount.toLocaleString()}</strong></td>
+            <td class="center">${sal.effectiveFrom}</td>
+          </tr>
+          `).join('')}
+        </tbody>
+        <tfoot>
+          <tr>
+            <td colspan="4" class="center"><strong>ጠቅላላ ወርሃዊ ደሞዝ</strong></td>
+            <td class="center"><strong>${salaryRows.reduce((sum, s) => sum + s.amount, 0).toLocaleString()}</strong></td>
+            <td></td>
+          </tr>
+        </tfoot>
+      </table>
+    `}
+
+    <div class="footer">
+      ይህ ቋሚ ደሞዝ ብቻ ነው። ኢንሴንቲቭ፣ ተቀናሽ እና ቅጣት ሌላ ይታሰባል  |  ገጽ 3/4
+    </div>
+  </div>
+
+  <!-- Page 4: Audit Log (Portrait style but landscape page) -->
+  <div class="page page-break">
+    <div class="header">
+      <div class="header-left">
+        <h1>የዕለት የሥርዓት ምዝገባ (Audit Log)</h1>
+        <div class="meta">ቀን: ${dateLabel}  |  ጠቅላላ ምዝገቦች: ${auditRows.length}</div>
+      </div>
+    </div>
+
+    ${auditRows.length === 0 ? `
+      <div class="no-data">ዛሬ ምንም የሥርዓት ምዝገባ አልተካሄደም</div>
+    ` : `
+      <table>
+        <thead>
+          <tr>
+            <th style="width: 10%;">ሰዓት</th>
+            <th style="width: 10%;">ተጠቃሚ</th>
+            <th style="width: 22%;">ድርጊት</th>
+            <th style="width: 20%;">ዓይነት / መለያ</th>
+            <th style="width: 38%;">ማብራሪያ</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${auditRows.map(row => `
           <tr>
             <td>${row.time}</td>
             <td><strong>${row.userCode}</strong></td>
@@ -334,7 +508,7 @@ export async function GET(
     `}
 
     <div class="footer" style="margin-top: 16px;">
-      ገጽ 2  |  ይህ ሰነድ ራስ-ሰር ተዘጋጅቷል  |  ${new Date().toLocaleDateString('am-ET')}
+      ገጽ 4/4  |  ይህ ሰነድ ራስ-ሰር ተዘጋጅቷል  |  ${new Date().toLocaleDateString('am-ET')}
     </div>
   </div>
 
