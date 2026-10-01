@@ -10,16 +10,15 @@
   "lang": "am",
   "icons": [
     {
-      "src": "/icons/icon-192.png",
-      "sizes": "192x192",
+      "src": "/ahalogo.png",
+      "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "/icons/icon-512.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "any maskable"
+      "src": "/ahagarment.ico",
+      "sizes": "48x48",
+      "type": "image/x-icon"
     }
   ],
   "screenshots": [],
@@ -30,14 +29,14 @@
       "short_name": "ቁጥር",
       "description": "ዕለታዊ ቁጥር ያስቀምጡ",
       "url": "/counts/enter",
-      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+      "icons": [{ "src": "/ahalogo.png", "sizes": "512x512" }]
     },
     {
       "name": "ባንድሎች",
       "short_name": "ባንድሎች",
       "description": "የቀጥታ ረድፍ ሰሌዳ",
       "url": "/production/bundles",
-      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+      "icons": [{ "src": "/ahalogo.png", "sizes": "512x512" }]
     }
   ]
 }

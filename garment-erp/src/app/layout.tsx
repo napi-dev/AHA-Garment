@@ -22,10 +22,18 @@ export const metadata: Metadata = {
   title: "AHA GARMENT ERP",
   description: "AHA Garment Factory — Production and Incentive Management System",
   manifest: "/manifest.json",
+  icons: {
+    icon: [
+      { url: "/ahagarment.ico", sizes: "any" },
+      { url: "/ahalogo.png", type: "image/png", sizes: "512x512" },
+    ],
+    shortcut: "/ahagarment.ico",
+    apple: "/ahalogo.png",
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "ፋብሪካ",
+    title: "AHA GARMENT",
   },
 };
 
