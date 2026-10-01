@@ -4,10 +4,9 @@ import { redirect } from "next/navigation";
 import { requirePermission } from "@/lib/auth/permissions";
 import { am } from "@/lib/i18n/am";
 import { HourlyCountForm } from "./hourly-count-form";
-import { Clock, Lock, ArrowLeft, Building2, Calendar, ChevronLeft, ChevronRight, AlertCircle } from "lucide-react";
-import Link from "next/link";
+import { DateNavigator } from "./date-navigator";
+import { Clock, Lock, Building2 } from "lucide-react";
 import { getEffectiveDate } from "@/lib/date-override/effective-date";
-import { formatAsEthDate, todayISOStringEAT } from "@/lib/ethiopian-calendar";
 
 export default async function CountEntryPage({
   searchParams,
@@ -33,7 +32,8 @@ export default async function CountEntryPage({
   selectedDate.setUTCHours(0, 0, 0, 0);
 
   const selectedDateISO = selectedDate.toISOString().split("T")[0]; // YYYY-MM-DD
-  const todayISO = (await getEffectiveDate()).toISOString().split("T")[0];
+  const today = await getEffectiveDate();
+  const todayISO = today.toISOString().split("T")[0];
   const isToday = selectedDateISO === todayISO;
 
   // ─── Check if selected day is closed ────────────────────────────────────────
@@ -85,6 +85,7 @@ export default async function CountEntryPage({
         <DateNavigator currentDate={selectedDateISO} isToday={isToday} deptId={dept.id} />
         {isDayClosed && <DayClosedBanner closedAt={dayClose.closedAt} />}
         <HourlyCountForm
+          key={`${selectedDateISO}-${dept.id}`}
           deptWithEmployees={[{
             deptId: dept.id,
             deptNameAm: dept.nameAm,
@@ -175,6 +176,7 @@ export default async function CountEntryPage({
       </div>
 
       <HourlyCountForm
+        key={`${selectedDateISO}-${selectedDeptId}`}
         deptWithEmployees={selectedDept ? [{
           deptId: selectedDept.id,
           deptNameAm: selectedDept.nameAm,
@@ -208,101 +210,6 @@ function PageHeader() {
         <p className="text-slate-500 text-sm mt-0.5 font-ethiopic">
           የእያንዳንዱን የስፌትና ምርት ሠራተኛ የሰዓት ውጤት እዚህ ይመዝግቡ
         </p>
-      </div>
-    </div>
-  );
-}
-
-// ─── Date Navigator ───────────────────────────────────────────────────────────
-
-interface DateNavigatorProps {
-  currentDate: string; // YYYY-MM-DD
-  isToday: boolean;
-  deptId?: string;
-}
-
-function DateNavigator({ currentDate, isToday, deptId }: DateNavigatorProps) {
-  const dateObj = new Date(currentDate + "T12:00:00Z");
-  const ethDisplay = formatAsEthDate(dateObj);
-
-  // Calculate prev/next dates
-  const prevDate = new Date(dateObj);
-  prevDate.setUTCDate(prevDate.getUTCDate() - 1);
-  const nextDate = new Date(dateObj);
-  nextDate.setUTCDate(nextDate.getUTCDate() + 1);
-
-  const prevDateISO = prevDate.toISOString().split("T")[0];
-  const nextDateISO = nextDate.toISOString().split("T")[0];
-  const maxDateISO = todayISOStringEAT().split("T")[0];
-
-  // Build URLs preserving dept
-  const buildUrl = (date: string) => {
-    const params = new URLSearchParams();
-    params.set("date", date);
-    if (deptId) params.set("dept", deptId);
-    return `/counts/enter?${params.toString()}`;
-  };
-
-  return (
-    <div className="erp-card p-5 border-blue-200 bg-gradient-to-r from-blue-50/50 to-indigo-50/30">
-      <div className="flex items-center justify-between gap-4 flex-wrap">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center shadow-sm">
-            <Calendar size={18} />
-          </div>
-          <div>
-            <p className="text-xs text-slate-500 font-ethiopic mb-0.5">የምርት ቀን</p>
-            <p className="text-lg font-bold text-slate-900 font-ethiopic">{ethDisplay}</p>
-          </div>
-          {isToday ? (
-            <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700 border border-emerald-200 font-ethiopic">
-              የአሁኑ ቀን
-            </span>
-          ) : (
-            <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-700 border border-amber-200 font-ethiopic">
-              የቀድሞ ቀን
-            </span>
-          )}
-        </div>
-
-        <div className="flex items-center gap-2">
-          <Link
-            href={buildUrl(prevDateISO)}
-            className="px-3 py-2 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 transition-colors text-slate-700 flex items-center gap-1.5 text-xs font-semibold font-ethiopic shadow-sm"
-          >
-            <ChevronLeft size={14} />
-            <span>ቀዳሚ ቀን</span>
-          </Link>
-
-          <form method="GET" className="inline-block">
-            {deptId && <input type="hidden" name="dept" value={deptId} />}
-            <input
-              type="date"
-              name="date"
-              defaultValue={currentDate}
-              max={maxDateISO}
-              onChange={(e) => {
-                if (e.target.value) {
-                  e.target.form?.requestSubmit();
-                }
-              }}
-              className="px-3 py-2 rounded-xl border border-slate-200 text-sm font-mono bg-white hover:border-slate-300 transition-colors shadow-sm"
-            />
-          </form>
-
-          <Link
-            href={buildUrl(nextDateISO)}
-            className={`px-3 py-2 rounded-xl border text-xs font-semibold font-ethiopic flex items-center gap-1.5 shadow-sm ${
-              nextDateISO > maxDateISO
-                ? "bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed"
-                : "bg-white border-slate-200 hover:bg-slate-50 transition-colors text-slate-700"
-            }`}
-            {...(nextDateISO > maxDateISO ? { "aria-disabled": "true", onClick: (e) => e.preventDefault() } : {})}
-          >
-            <span>ቀጣይ ቀን</span>
-            <ChevronRight size={14} />
-          </Link>
-        </div>
       </div>
     </div>
   );

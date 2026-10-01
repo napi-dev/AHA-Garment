@@ -121,6 +121,8 @@ export async function saveHourlyCounts(input: SaveCountsInput): Promise<{ ok: bo
 
   revalidatePath("/counts");
   revalidatePath("/dashboard");
+  
+  return { ok: true, message: "ተቀምጧል" };
 }
 
 // ─── Verify a count line (Production Manager) ────────────────────────────────

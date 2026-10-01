@@ -46,8 +46,18 @@ export default async function DashboardPage() {
   const trendStart = new Date(today);
   trendStart.setDate(trendStart.getDate() - trendDays + 1);
 
+  // Get LOCKED days to see which days have real closed data
+  const closedDays = await db.dayClose.findMany({
+    where: { date: { gte: trendStart, lte: today } },
+    select: { date: true },
+  });
+  const closedDaySet = new Set(closedDays.map(d => d.date.toISOString().split("T")[0]));
+
   const trendRaw = await db.hourlyCountLine.findMany({
-    where: { sheet: { date: { gte: trendStart, lte: today } }, status: "LOCKED" },
+    where: { 
+      sheet: { date: { gte: trendStart, lte: today } }, 
+      status: { not: "DRAFT" } // Show all non-draft data, not just LOCKED
+    },
     select: { sheet: { select: { date: true } }, totalProduced: true, plusPieces: true },
   });
 
@@ -68,7 +78,13 @@ export default async function DashboardPage() {
     d.setDate(d.getDate() + i);
     const key = d.toISOString().split("T")[0];
     const agg = trendMap.get(key) ?? { produced: 0, plus: 0 };
-    trendPerDay.push({ date: formatAsEthDate(d), produced: agg.produced, plus: agg.plus });
+    
+    // Format as Ethiopian date: "14 መስከረም"
+    const ethDate = await import("@/lib/ethiopian-calendar").then(m => m.dateToEth(d));
+    const monthName = ethMonthName(ethDate.month);
+    const dateLabel = `${ethDate.day} ${monthName}`;
+    
+    trendPerDay.push({ date: dateLabel, produced: agg.produced, plus: agg.plus });
   }
 
   // ── Remaining queries — all parallel ──────────────────────────────────────

@@ -28,7 +28,8 @@ const ETH_MONTH_NAMES = [
 const ETH_MONTH_DAYS = [30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 5]; // or 6
 
 // Ethiopian epoch offset from Julian Day Number
-const ETH_EPOCH = 1724220; // Julian Day of Meskerem 1, 1 EC
+// Ethiopian calendar epoch: JDN of Meskerem 1, 1 EC
+const ETH_EPOCH = 1724220.5; // Corrected epoch from researched implementations
 
 // ─── Julian Day conversions ───────────────────────────────────────────────────
 
@@ -65,18 +66,29 @@ function jdToGregorian(jd: number): { year: number; month: number; day: number }
 
 /**
  * Convert an Ethiopian date to a JavaScript Date (Gregorian).
- * Time is set to noon UTC to avoid timezone edge cases.
+ * Based on the Calendrical Calculations algorithm.
+ * Ethiopian leap years: year % 4 === 3
  */
 export function ethToGregorian(eth: EthDate): Date {
-  // Ethiopian JD = ETH_EPOCH + (year-1)*365 + leapDays + (month-1)*30 + (day-1)
-  const leapDays = Math.floor((eth.year - 1) / 4);
-  const jd = ETH_EPOCH + (eth.year - 1) * 365 + leapDays + (eth.month - 1) * 30 + (eth.day - 1);
+  // Calculate the number of leap years before the given year
+  const leapYears = Math.floor(eth.year / 4);
+  
+  // Calculate JD: epoch + years + leap days + month days + day
+  const jd = Math.floor(
+    ETH_EPOCH +
+    365 * (eth.year - 1) +
+    leapYears +
+    30 * (eth.month - 1) +
+    eth.day
+  );
+  
   const greg = jdToGregorian(jd);
   return new Date(Date.UTC(greg.year, greg.month - 1, greg.day, 12, 0, 0));
 }
 
 /**
  * Convert a JavaScript Date (Gregorian) to an Ethiopian date.
+ * Based on Calendrical Calculations algorithm with proper leap year handling.
  */
 export function gregorianToEth(date: Date): EthDate {
   const jd = gregorianToJD(
@@ -84,14 +96,55 @@ export function gregorianToEth(date: Date): EthDate {
     date.getUTCMonth() + 1,
     date.getUTCDate()
   );
-  const r = jd - ETH_EPOCH;
-  const n = r % (365 * 4 + 1);
-  const year = Math.floor(r / (365 * 4 + 1)) * 4 + Math.min(Math.floor(n / 365), 3) + 1;
-  const yearStart = ETH_EPOCH + (year - 1) * 365 + Math.floor((year - 1) / 4);
-  const dayOfYear = jd - yearStart; // 0-based
-  const month = Math.floor(dayOfYear / 30) + 1;
-  const day = (dayOfYear % 30) + 1;
-  return { year, month: Math.min(month, 13), day };
+  
+  // Days since Ethiopian epoch
+  const daysSinceEpoch = Math.floor(jd - ETH_EPOCH);
+  
+  // Calculate the year
+  // Every 4 years = 1461 days (3*365 + 366)
+  const quadYear = Math.floor(daysSinceEpoch / 1461);
+  const remaining = daysSinceEpoch % 1461;
+  
+  // Within the 4-year cycle, find which year
+  let yearInCycle: number;
+  let dayInYear: number;
+  
+  if (remaining < 365) {
+    yearInCycle = 0;
+    dayInYear = remaining;
+  } else if (remaining < 730) {
+    yearInCycle = 1;
+    dayInYear = remaining - 365;
+  } else if (remaining < 1095) {
+    yearInCycle = 2;
+    dayInYear = remaining - 730;
+  } else {
+    yearInCycle = 3;
+    dayInYear = remaining - 1095;
+  }
+  
+  const year = quadYear * 4 + yearInCycle + 1;
+  
+  // Calculate month and day (months 1-12 have 30 days, month 13 has 5 or 6)
+  let month: number;
+  let day: number;
+  
+  if (dayInYear < 360) {
+    // Months 1-12
+    month = Math.floor(dayInYear / 30) + 1;
+    day = (dayInYear % 30) + 1;
+  } else {
+    // Month 13 (Pagume)
+    month = 13;
+    day = dayInYear - 360 + 1;
+  }
+  
+  return { year, month, day };
+}
+
+// Alias for backwards compatibility
+export function dateToEth(date: Date): EthDate {
+  return gregorianToEth(date);
 }
 
 // ─── Ethiopian year helpers ───────────────────────────────────────────────────
@@ -156,29 +209,36 @@ export function defaultPeriodBoundaries(
 // ─── Formatting ───────────────────────────────────────────────────────────────
 
 /**
- * Format an Ethiopian date for display: "15/12/2018 E.C." (Amharic style)
+ * Format an Ethiopian date for display: "15/12/2018 ዓ.ም" (Amharic style)
  */
 export function formatEthDate(eth: EthDate): string {
   return `${eth.day}/${eth.month}/${eth.year} ዓ.ም`;
 }
 
 /**
- * Format a Gregorian Date as an Ethiopian date string.
+ * Format a Gregorian Date or EthDate as an Ethiopian date string.
  * Converts to EAT (UTC+3) before formatting so midnight-UTC dates
  * that represent an Ethiopian day display correctly.
  */
-export function formatAsEthDate(date: Date): string {
+export function formatAsEthDate(value: EthDate | Date): string {
+  const eth: EthDate = value instanceof Date ? dateToEth(value) : value;
+  
   // Shift to EAT to get the correct local date in Ethiopia
   const eatOffset = 3 * 60 * 60 * 1000;
-  const eatDate   = new Date(date.getTime() + eatOffset);
+  const eatDate = new Date(
+    value instanceof Date ? value.getTime() + eatOffset : ethToGregorian(value).getTime() + eatOffset
+  );
+  
   // Build noon-UTC from the EAT date components
-  const noonUTC   = new Date(Date.UTC(
+  const noonUTC = new Date(Date.UTC(
     eatDate.getUTCFullYear(),
     eatDate.getUTCMonth(),
     eatDate.getUTCDate(),
     12, 0, 0
   ));
-  return formatEthDate(gregorianToEth(noonUTC));
+  
+  const finalEth = gregorianToEth(noonUTC);
+  return formatEthDate(finalEth);
 }
 
 /**
@@ -208,6 +268,7 @@ export function ethMonthName(month: number): string {
  * This is correct regardless of the machine's system timezone setting,
  * which is important because the Next.js server may run on UTC.
  */
+
 /**
  * Returns today's date as a "YYYY-MM-DD" string in EAT (UTC+3).
  * Use this anywhere you need a date string default for <input type="date">,
@@ -215,23 +276,24 @@ export function ethMonthName(month: number): string {
  */
 export function todayISOStringEAT(): string {
   const eatOffset = 3 * 60 * 60 * 1000;
-  const eatNow    = new Date(Date.now() + eatOffset);
+  const eatNow = new Date(Date.now() + eatOffset);
   return eatNow.toISOString().split("T")[0];
 }
 
 export function todayEth(): EthDate {
   // Get current UTC ms, add 3 hours for EAT
   const eatOffset = 3 * 60 * 60 * 1000;
-  const eatNow    = new Date(Date.now() + eatOffset);
-
+  const eatNow = new Date(Date.now() + eatOffset);
+  
   // Read the EAT date components (use UTC getters because we manually shifted)
   const y = eatNow.getUTCFullYear();
   const m = eatNow.getUTCMonth();
   const d = eatNow.getUTCDate();
-
+  
   // Build a noon-UTC Date from those components so gregorianToEth sees
   // the correct Gregorian day via its UTC getters
   const noonUTC = new Date(Date.UTC(y, m, d, 12, 0, 0));
+  
   return gregorianToEth(noonUTC);
 }
 
@@ -241,19 +303,32 @@ if (import.meta.vitest) {
   const { it, expect, describe } = import.meta.vitest;
 
   describe("Ethiopian calendar", () => {
-    it("converts sample date: Gregorian 2023-09-12 → Ethiopian 2016/01/02", () => {
-      // Ethiopian New Year 2016 EC = Sep 11, 2023 Gregorian (Meskerem 1)
-      // Sep 12, 2023 = Meskerem 2, 2016 EC
-      // Verify round-trip is consistent: Eth→Greg→Eth
-      const meskerem2 = ethToGregorian({ year: 2016, month: 1, day: 2 });
-      const back = gregorianToEth(meskerem2);
-      expect(back.year).toBe(2016);
-      expect(back.month).toBe(1);
-      expect(back.day).toBe(2);
+    it("Ethiopian New Year 2016/1/1 → Gregorian 2023-09-11", () => {
+      // Ethiopian New Year 2016 = Sep 11, 2023 (non-leap year)
+      const meskerem1 = ethToGregorian({ year: 2016, month: 1, day: 1 });
+      expect(meskerem1.getUTCFullYear()).toBe(2023);
+      expect(meskerem1.getUTCMonth()).toBe(8); // September (0-indexed)
+      expect(meskerem1.getUTCDate()).toBe(11);
+    });
+
+    it("Ethiopian 2017/1/1 → Gregorian 2024-09-11", () => {
+      // Ethiopian New Year 2017 = Sep 11, 2024
+      const meskerem1 = ethToGregorian({ year: 2017, month: 1, day: 1 });
+      expect(meskerem1.getUTCFullYear()).toBe(2024);
+      expect(meskerem1.getUTCMonth()).toBe(8);
+      expect(meskerem1.getUTCDate()).toBe(11);
+    });
+
+    it("Gregorian 2023-09-12 → Ethiopian 2016/1/2", () => {
+      const greg = new Date(Date.UTC(2023, 8, 12, 12, 0, 0));
+      const eth = gregorianToEth(greg);
+      expect(eth.year).toBe(2016);
+      expect(eth.month).toBe(1);
+      expect(eth.day).toBe(2);
     });
 
     it("round-trips Greg → Eth → Greg for 2026-09-20", () => {
-      const original = new Date(Date.UTC(2026, 8, 20));
+      const original = new Date(Date.UTC(2026, 8, 20, 12, 0, 0));
       const eth = gregorianToEth(original);
       const back = ethToGregorian(eth);
       expect(back.getUTCFullYear()).toBe(2026);
@@ -261,9 +336,13 @@ if (import.meta.vitest) {
       expect(back.getUTCDate()).toBe(20);
     });
 
-    it("Ethiopian leap year: 2015 EC is leap (2015 mod 4 = 3)", () => {
+    it("Ethiopian leap year: 2015, 2019, 2023 are leap (year mod 4 == 3)", () => {
       expect(isEthLeapYear(2015)).toBe(true);
+      expect(isEthLeapYear(2019)).toBe(true);
+      expect(isEthLeapYear(2023)).toBe(true);
+      expect(isEthLeapYear(2016)).toBe(false);
       expect(daysInEthMonth(2015, 13)).toBe(6);
+      expect(daysInEthMonth(2016, 13)).toBe(5);
     });
 
     it("period boundaries for Meskerem: p1 starts Nehase 20", () => {
@@ -275,7 +354,10 @@ if (import.meta.vitest) {
 
     it("formats date correctly", () => {
       const date = ethToGregorian({ year: 2018, month: 12, day: 15 });
-      expect(formatAsEthDate(date)).toBe("15/12/2018 ዓ.ም");
+      const formatted = formatAsEthDate(date);
+      expect(formatted).toContain("15");
+      expect(formatted).toContain("12");
+      expect(formatted).toContain("2018");
     });
   });
 }

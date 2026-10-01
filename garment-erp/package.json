@@ -15,6 +15,8 @@
     "db:seed-phase2": "tsx src/lib/db/seed-phase2.ts",
     "db:backfill-codes": "tsx src/lib/db/backfill-codes.ts",
     "db:fix-admin-dept": "tsx src/lib/db/fix-admin-dept.ts",
+    "db:seed-test-counts": "tsx src/lib/db/seed-test-counts.ts",
+    "db:check-counts": "tsx src/lib/db/check-counts.ts",
     "test": "vitest run",
     "test:watch": "vitest"
   },
