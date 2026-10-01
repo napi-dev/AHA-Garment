@@ -5,7 +5,7 @@ import { am } from "@/lib/i18n/am";
 import { formatAsEthDate } from "@/lib/ethiopian-calendar";
 import { calculateDailyCount } from "@/lib/incentive/engine";
 import { saveHourlyCounts } from "../actions";
-import { Check, Loader2, AlertCircle, Save, Target, Sparkles, Building2, Calendar, CheckCircle2 } from "lucide-react";
+import { Check, Loader2, AlertCircle, Save, Target, Sparkles, Building2, Calendar, CheckCircle2, Lock } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -36,6 +36,7 @@ interface HourlyCountFormProps {
   deptWithEmployees: DeptGroup[];
   date: string;
   supervisorId: string;
+  isReadOnly?: boolean; // True when day is closed
 }
 
 type HourKey = "h1"|"h2"|"h3"|"h4"|"h5"|"h6"|"h7"|"h8";
@@ -78,7 +79,7 @@ function lineToRow(line: ExistingLine): RowState {
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export function HourlyCountForm({ deptWithEmployees, date, supervisorId }: HourlyCountFormProps) {
+export function HourlyCountForm({ deptWithEmployees, date, supervisorId, isReadOnly = false }: HourlyCountFormProps) {
   // Build initial state: { [employeeId]: RowState }
   const initialState: Record<string, RowState> = {};
   for (const dept of deptWithEmployees) {
@@ -190,6 +191,12 @@ export function HourlyCountForm({ deptWithEmployees, date, supervisorId }: Hourl
             <p className="text-xs text-slate-500 font-ethiopic mb-0.5">የቁጥር መሙላት ቀን</p>
             <p className="text-base font-bold text-slate-900 font-mono">{dateDisplay}</p>
           </div>
+          {isReadOnly && (
+            <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-purple-100 text-purple-700 border border-purple-200 font-ethiopic flex items-center gap-1">
+              <Lock size={12} />
+              ተዘግቷል
+            </span>
+          )}
         </div>
 
         {alreadySaved > 0 && (
@@ -201,9 +208,9 @@ export function HourlyCountForm({ deptWithEmployees, date, supervisorId }: Hourl
           </div>
         )}
 
-        {alreadySaved === 0 && (
+        {alreadySaved === 0 && !isReadOnly && (
           <span className="text-xs text-slate-400 font-ethiopic">
-            ለዛሬ ገና የተመዘገበ ቁጥር የለም
+            ለዚህ ቀን ገና የተመዘገበ ቁጥር የለም
           </span>
         )}
       </div>
@@ -217,6 +224,7 @@ export function HourlyCountForm({ deptWithEmployees, date, supervisorId }: Hourl
           setActiveEmpId={setActiveEmpId}
           updateRow={updateRow}
           saveRow={saveRow}
+          isReadOnly={isReadOnly}
         />
       ))}
     </div>
@@ -232,9 +240,10 @@ interface DeptSectionProps {
   setActiveEmpId: (id: string | null) => void;
   updateRow: (empId: string, field: keyof RowState, value: string) => void;
   saveRow: (empId: string, deptId: string, targetPerHour: number) => Promise<void>;
+  isReadOnly?: boolean;
 }
 
-function DeptSection({ dept, rows, activeEmpId, setActiveEmpId, updateRow, saveRow }: DeptSectionProps) {
+function DeptSection({ dept, rows, activeEmpId, setActiveEmpId, updateRow, saveRow, isReadOnly = false }: DeptSectionProps) {
   return (
     <div className="erp-card overflow-hidden shadow-sm">
       {/* Dept header */}
@@ -297,6 +306,7 @@ function DeptSection({ dept, rows, activeEmpId, setActiveEmpId, updateRow, saveR
                 onFocus={() => setActiveEmpId(emp.id)}
                 updateRow={updateRow}
                 saveRow={saveRow}
+                isReadOnly={isReadOnly}
               />
             ))}
           </tbody>
@@ -317,6 +327,7 @@ interface EmployeeRowProps {
   onFocus: () => void;
   updateRow: (empId: string, field: keyof RowState, value: string) => void;
   saveRow: (empId: string, deptId: string, targetPerHour: number) => Promise<void>;
+  isReadOnly?: boolean;
 }
 
 function EmployeeRow({
@@ -328,6 +339,7 @@ function EmployeeRow({
   onFocus,
   updateRow,
   saveRow,
+  isReadOnly = false,
 }: EmployeeRowProps) {
   // Compute running totals from current row input
   const hours = HOUR_KEYS.map((k) => (row[k] !== "" ? parseInt(row[k], 10) : null));
@@ -367,13 +379,14 @@ function EmployeeRow({
             value={row[hk]}
             onChange={(e) => updateRow(emp.id, hk, e.target.value)}
             onBlur={() => {
-              if (row.dirty) saveRow(emp.id, deptId, targetPerHour);
+              if (row.dirty && !isReadOnly) saveRow(emp.id, deptId, targetPerHour);
             }}
             className="w-13 text-center rounded-xl border border-slate-200 py-1.5 text-xs font-bold
               focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 tabular-nums
               disabled:bg-slate-50 disabled:text-slate-400 bg-white hover:border-slate-300 transition-all"
-            disabled={row.saving}
+            disabled={row.saving || isReadOnly}
             placeholder="—"
+            readOnly={isReadOnly}
           />
         </td>
       ))}
@@ -406,11 +419,12 @@ function EmployeeRow({
           value={row.mistakes}
           onChange={(e) => updateRow(emp.id, "mistakes", e.target.value)}
           onBlur={() => {
-            if (row.dirty) saveRow(emp.id, deptId, targetPerHour);
+            if (row.dirty && !isReadOnly) saveRow(emp.id, deptId, targetPerHour);
           }}
           className="w-12 text-center rounded-xl border border-amber-200 py-1.5 text-xs font-bold text-amber-900
             focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 tabular-nums bg-white"
-          disabled={row.saving}
+          disabled={row.saving || isReadOnly}
+          readOnly={isReadOnly}
         />
       </td>
 
@@ -424,7 +438,7 @@ function EmployeeRow({
           <span className="inline-flex items-center gap-1 text-rose-600 text-xs font-ethiopic" title={row.error}>
             <AlertCircle size={14} />
           </span>
-        ) : row.dirty ? (
+        ) : row.dirty && !isReadOnly ? (
           <button
             onClick={() => saveRow(emp.id, deptId, targetPerHour)}
             className="inline-flex items-center gap-1 text-xs bg-blue-600 text-white px-2.5 py-1 rounded-lg hover:bg-blue-700 transition-colors font-ethiopic shadow-xs active:scale-95"
