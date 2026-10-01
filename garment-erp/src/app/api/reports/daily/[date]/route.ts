@@ -93,7 +93,7 @@ export async function GET(
     });
     cardMap.set(deptId, {
       target: card?.targetPerHour ?? 0,
-      rate: card?.ratePerPiece ?? 0,
+      rate: card?.ratePerPiece ? Number(card.ratePerPiece.toString()) : 0,
     });
   }
 
@@ -154,7 +154,7 @@ export async function GET(
       serialNumber: sal.employee.serialNumber,
       nameAm: sal.employee.nameAm,
       deptAm: sal.employee.department?.nameAm ?? "—",
-      amount: sal.amount,
+      amount: Number(sal.amount.toString()),
       effectiveFrom: sal.effectiveFrom.toLocaleDateString("am-ET"),
     };
   });

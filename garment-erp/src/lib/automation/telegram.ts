@@ -58,7 +58,7 @@ export async function sendDocument(
     const form = new FormData();
     form.append("chat_id",  chatId);
     form.append("caption",  caption.slice(0, 1024)); // Telegram caption limit
-    form.append("document", new Blob([buffer]), filename);
+    form.append("document", new Blob([new Uint8Array(buffer)]), filename);
 
     const res  = await fetch(`${BASE_URL}/sendDocument`, { method: "POST", body: form });
     const data = await res.json();

@@ -105,8 +105,14 @@ export async function GET(
 
     // Get attendance count
     const attendances = attendanceByEmployee.get(line.employeeId) ?? [];
-    const presentDays = attendances.filter(a => a.status === "PRESENT").length;
-    const absentDays = attendances.filter(a => a.status === "ABSENT").length;
+    const presentDays = attendances.filter(a => {
+      const hours = Number(a.hoursWorked.toString());
+      return hours > 0;
+    }).length;
+    const absentDays = attendances.filter(a => {
+      const hours = Number(a.hoursWorked.toString());
+      return hours === 0;
+    }).length;
 
     return {
       serial: idx + 1,

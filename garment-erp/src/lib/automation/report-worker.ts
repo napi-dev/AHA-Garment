@@ -163,8 +163,15 @@ async function buildDailyProductionPdf(date: Date) {
 
   const buffer = await renderPdfToBuffer(
     React.createElement(DailyProductionSheetPdf, {
-      dateLabel: formatAsEthDate(date), supervisorName: "", shift: "ቀን",
-      rows, totalProduced, aboveTarget, totalWorkers: rows.length,
+      dateLabel: formatAsEthDate(date),
+      dateFilename: date.toISOString().split("T")[0].replace(/\//g, "-"),
+      supervisorName: "",
+      shift: "ቀን",
+      rows,
+      totalProduced,
+      aboveTarget,
+      totalWorkers: rows.length,
+      auditRows: [],
     })
   );
   return { buffer, filename: `${date.toISOString().split("T")[0]}_daily-production.pdf` };
