@@ -75,12 +75,14 @@ export async function GET(
   const buffer = await renderPdfToBuffer(
     React.createElement(DailyProductionSheetPdf, {
       dateLabel:      formatAsEthDate(date),
+      dateFilename:   dateStr.replace(/\//g, "-"),
       supervisorName: "",
       shift:          "ቀን",
       rows,
       totalProduced,
       aboveTarget,
       totalWorkers:   rows.length,
+      auditRows:      [], // Empty audit rows for now
     })
   );
 
