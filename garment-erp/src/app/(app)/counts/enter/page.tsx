@@ -8,6 +8,16 @@ import { DateNavigator } from "./date-navigator";
 import { Clock, Lock, Building2 } from "lucide-react";
 import { getEffectiveDate } from "@/lib/date-override/effective-date";
 
+// Type for existing hourly count line
+type ExistingLine = {
+  id: string;
+  h1: number | null; h2: number | null; h3: number | null; h4: number | null;
+  h5: number | null; h6: number | null; h7: number | null; h8: number | null;
+  status: string;
+  mistakes: number;
+  mistakeReason: string | null;
+};
+
 export default async function CountEntryPage({
   searchParams,
 }: {
@@ -94,7 +104,7 @@ export default async function CountEntryPage({
               id: e.id,
               serialNumber: e.serialNumber,
               nameAm: e.nameAm,
-              existingLine: e.hourlyCounts[0] ?? null,
+              existingLine: (e.hourlyCounts[0] ?? null) as ExistingLine | null,
             })),
           }]}
           date={selectedDate.toISOString()}
@@ -181,11 +191,11 @@ export default async function CountEntryPage({
           deptId: selectedDept.id,
           deptNameAm: selectedDept.nameAm,
           targetPerHour: card?.targetPerHour ?? 0,
-          employees: (employees as Awaited<ReturnType<typeof db.employee.findMany>>).map((e) => ({
+          employees: employees.map((e) => ({
             id: e.id,
             serialNumber: e.serialNumber,
             nameAm: e.nameAm,
-            existingLine: (e as { hourlyCounts?: unknown[] }).hourlyCounts?.[0] ?? null,
+            existingLine: (e.hourlyCounts[0] ?? null) as ExistingLine | null,
           })),
         }] : []}
         date={selectedDate.toISOString()}

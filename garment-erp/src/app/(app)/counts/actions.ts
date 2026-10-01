@@ -127,7 +127,7 @@ export async function saveHourlyCounts(input: SaveCountsInput): Promise<{ ok: bo
 
 // ─── Verify a count line (Production Manager) ────────────────────────────────
 
-export async function verifyCountLine(lineId: string): Promise<void> {
+export async function verifyCountLine(lineId: string): Promise<{ ok: boolean; message: string }> {
   const session = await auth();
   if (!session?.user) throw new Error("ተፈቅዶ አልነበረም");
   requirePermission(session.user.role, "counts:verify");
@@ -404,16 +404,34 @@ export async function generateAndSendDailyReport(dateStr: string): Promise<{ ok:
     // Save report job record
     const dayClose = await db.dayClose.findUnique({ where: { date } });
     if (dayClose) {
-      await db.reportJob.upsert({
-        where:  { type_periodDate: { type: "DAILY_PRODUCTION_SHEET", periodDate: date } },
-        update: { status: allOk ? "sent" : "failed", attempts: { increment: 1 } },
-        create: {
+      // Find existing report job
+      const existingJob = await db.reportJob.findFirst({
+        where: {
           type: "DAILY_PRODUCTION_SHEET",
           periodDate: date,
-          status: allOk ? "sent" : "failed",
-          dayCloseId: dayClose.id,
         },
       });
+
+      if (existingJob) {
+        // Update existing
+        await db.reportJob.update({
+          where: { id: existingJob.id },
+          data: {
+            status: allOk ? "sent" : "failed",
+            retryCount: { increment: 1 },
+          },
+        });
+      } else {
+        // Create new
+        await db.reportJob.create({
+          data: {
+            type: "DAILY_PRODUCTION_SHEET",
+            periodDate: date,
+            status: allOk ? "sent" : "failed",
+            dayCloseId: dayClose.id,
+          },
+        });
+      }
     }
 
     revalidatePath("/counts/close");
