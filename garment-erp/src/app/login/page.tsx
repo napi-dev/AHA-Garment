@@ -117,6 +117,7 @@ function LoginForm() {
 }
 
 export default function LoginPage() {
+  return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-slate-900 relative overflow-hidden px-4 py-8">
       {/* Subtle Tailor Grid & Light Effects */}
       <div className="absolute inset-0 stitch-pattern opacity-10 pointer-events-none" />
