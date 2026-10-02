@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { sendMessage } from "@/lib/automation/telegram";
 
+export const dynamic = "force-dynamic";
+
 /**
  * POST /api/telegram/send-report
  * Sends a report URL via Telegram with inline button
