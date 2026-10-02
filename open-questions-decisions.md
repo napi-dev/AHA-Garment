@@ -1,5 +1,6 @@
 # Open questions: decisions and defaults
 
+
 *Addendum to the Garment production and incentive system, Master plan v2.0 (revised). Version 2.1, September 20, 2026.*
 
 ## 1. Where things stand
