@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { renderPdfToBuffer } from "@/lib/pdf/render";
-import { DailyProductionSheetPdf } from "@/lib/pdf/daily-production-sheet";
 import { formatAsEthDate } from "@/lib/ethiopian-calendar";
-import React from "react";
+
+export const dynamic = "force-dynamic";
 
 export async function GET(
   _req: NextRequest,
@@ -71,6 +70,11 @@ export async function GET(
       percentOfTarget: pct,
     };
   });
+
+  // Dynamic import to avoid build-time issues with @react-pdf/renderer
+  const { renderPdfToBuffer } = await import("@/lib/pdf/render");
+  const { DailyProductionSheetPdf } = await import("@/lib/pdf/daily-production-sheet");
+  const React = await import("react");
 
   const buffer = await renderPdfToBuffer(
     React.createElement(DailyProductionSheetPdf, {
