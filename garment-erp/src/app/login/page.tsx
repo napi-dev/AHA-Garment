@@ -4,7 +4,7 @@ import { useState, Suspense } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { am } from "@/lib/i18n/am";
-import { Lock, User, Loader2, Sparkles, CheckCircle2 } from "lucide-react";
+import { Lock, User, Loader2, Sparkles, CheckCircle2, Eye, EyeOff } from "lucide-react";
 
 function LoginForm() {
   const router = useRouter();
@@ -13,6 +13,7 @@ function LoginForm() {
 
   const [code, setCode] = useState("");
   const [pin, setPin] = useState("");
+  const [showPin, setShowPin] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -72,10 +73,10 @@ function LoginForm() {
           <Lock size={14} className="text-slate-500" />
           {am.login.pin}
         </label>
-        <div className="relative">
+        <div className="relative flex items-center">
           <input
             id="pin"
-            type="password"
+            type={showPin ? "text" : "password"}
             inputMode="numeric"
             pattern="[0-9]*"
             maxLength={6}
@@ -84,8 +85,16 @@ function LoginForm() {
             placeholder={am.login.pinPlaceholder}
             autoComplete="current-password"
             required
-            className="w-full px-4 py-3 rounded-2xl border border-slate-200 focus:outline-none focus:ring-4 focus:ring-blue-500/20 focus:border-blue-600 text-2xl font-bold tracking-[0.4em] text-center bg-slate-50/50 hover:bg-white focus:bg-white transition-all font-mono"
+            className="w-full px-12 py-3 rounded-2xl border border-slate-200 focus:outline-none focus:ring-4 focus:ring-blue-500/20 focus:border-blue-600 text-2xl font-bold tracking-[0.4em] text-center bg-slate-50/50 hover:bg-white focus:bg-white transition-all font-mono"
           />
+          <button
+            type="button"
+            onClick={() => setShowPin((prev) => !prev)}
+            aria-label={showPin ? "Hide PIN" : "Show PIN"}
+            className="absolute right-3.5 p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+          >
+            {showPin ? <EyeOff size={18} /> : <Eye size={18} />}
+          </button>
         </div>
       </div>
 
