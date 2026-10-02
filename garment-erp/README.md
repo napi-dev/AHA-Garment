@@ -6,6 +6,7 @@ Tablet-first, fully Amharic garment production and incentive tracking system.
 **Stack:** Next.js 15 · TypeScript · Prisma · PostgreSQL (Neon) · Tailwind CSS · Recharts  
 **Version:** Phase 3 complete — September 2026
 
+
 ---
 
 ## Quick start
