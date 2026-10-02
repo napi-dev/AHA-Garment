@@ -4,6 +4,8 @@ import { db } from "@/lib/db";
 import { formatAsEthDate, ethMonthName } from "@/lib/ethiopian-calendar";
 import Decimal from "decimal.js";
 
+export const dynamic = "force-dynamic";
+
 /**
  * GET /api/reports/incentive/[id]
  * Returns a printable HTML report for incentive period with:

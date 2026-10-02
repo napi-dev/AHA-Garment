@@ -3,6 +3,8 @@ import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { formatAsEthDate, gregorianToEth } from "@/lib/ethiopian-calendar";
 
+export const dynamic = "force-dynamic";
+
 /**
  * GET /api/reports/daily/[date]
  * Returns a printable HTML report for the daily production sheet

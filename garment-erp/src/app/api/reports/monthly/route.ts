@@ -4,6 +4,8 @@ import { db } from "@/lib/db";
 import { ethMonthName, formatAsEthDate } from "@/lib/ethiopian-calendar";
 import Decimal from "decimal.js";
 
+export const dynamic = "force-dynamic";
+
 /**
  * GET /api/reports/monthly?year=2017&month=1
  * Returns a comprehensive monthly report with:
