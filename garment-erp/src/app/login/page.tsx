@@ -117,6 +117,19 @@ function LoginForm() {
 }
 
 export default function LoginPage() {
+  const [imgError, setImgError] = useState(false);
+  const [imgSrc, setImgSrc] = useState("/ahalogo.png");
+
+  const handleImageError = () => {
+    console.error("Failed to load image:", imgSrc);
+    if (imgSrc === "/ahalogo.png") {
+      // Try with explicit public path
+      setImgSrc("/ahalogo.png?v=" + Date.now());
+    } else {
+      setImgError(true);
+    }
+  };
+
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-slate-900 relative overflow-hidden px-4 py-8">
       {/* Subtle Tailor Grid & Light Effects */}
@@ -128,12 +141,19 @@ export default function LoginPage() {
         {/* Header Branding */}
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-20 h-20 rounded-3xl bg-white shadow-xl shadow-blue-500/20 mb-4 ring-4 ring-white/10 overflow-hidden">
-            <img 
-              src="/ahalogo.png" 
-              alt="AHA GARMENT" 
-              className="w-full h-full object-cover"
-              loading="eager"
-            />
+            {!imgError ? (
+              <img 
+                src={imgSrc}
+                alt="AHA GARMENT" 
+                className="w-full h-full object-cover"
+                loading="eager"
+                onError={handleImageError}
+              />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center bg-blue-600 text-white font-bold text-2xl">
+                AHA
+              </div>
+            )}
           </div>
           <h1 className="text-2xl sm:text-3xl font-bold text-white tracking-tight">
             AHA GARMENT

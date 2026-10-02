@@ -1,7 +1,7 @@
 {
   "name": "AHA GARMENT",
   "short_name": "AHA",
-  "description": "AHA Garment Factory — Production and Incentive Management System",
+  "description": "AHA Garment Factory - Production and Incentive Management System",
   "start_url": "/dashboard",
   "display": "standalone",
   "orientation": "portrait-primary",
@@ -25,18 +25,28 @@
   "categories": ["productivity", "business"],
   "shortcuts": [
     {
-      "name": "ቁጥር አስገባ",
-      "short_name": "ቁጥር",
-      "description": "ዕለታዊ ቁጥር ያስቀምጡ",
+      "name": "Enter Counts",
+      "short_name": "Counts",
+      "description": "Enter daily production counts",
       "url": "/counts/enter",
-      "icons": [{ "src": "/ahalogo.png", "sizes": "512x512" }]
+      "icons": [
+        {
+          "src": "/ahalogo.png",
+          "sizes": "512x512"
+        }
+      ]
     },
     {
-      "name": "ባንድሎች",
-      "short_name": "ባንድሎች",
-      "description": "የቀጥታ ረድፍ ሰሌዳ",
+      "name": "Bundles",
+      "short_name": "Bundles",
+      "description": "Production line dashboard",
       "url": "/production/bundles",
-      "icons": [{ "src": "/ahalogo.png", "sizes": "512x512" }]
+      "icons": [
+        {
+          "src": "/ahalogo.png",
+          "sizes": "512x512"
+        }
+      ]
     }
   ]
 }
