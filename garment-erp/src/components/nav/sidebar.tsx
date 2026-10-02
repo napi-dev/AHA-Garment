@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
 import type { Role } from "@prisma/client";
@@ -124,7 +125,13 @@ export function Sidebar({
         <div className="p-4 px-5 border-b border-slate-100 flex items-center justify-between">
           <Link href="/dashboard" className="flex items-center gap-3 group" onClick={onCloseMobile}>
             <div className="w-10 h-10 rounded-2xl overflow-hidden shadow-sm group-hover:shadow transition-all group-hover:scale-105 bg-white border border-slate-200">
-              <img src="/ahalogo.png" alt="AHA GARMENT" className="w-full h-full object-cover" />
+              <Image 
+                src="/ahalogo.png" 
+                alt="AHA GARMENT" 
+                width={40} 
+                height={40} 
+                className="w-full h-full object-cover"
+              />
             </div>
             <div>
               <span className="font-bold text-slate-900 text-base tracking-tight block leading-tight">

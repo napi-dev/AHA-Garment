@@ -3,6 +3,7 @@
 import { useState, Suspense } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
+import Image from "next/image";
 import { am } from "@/lib/i18n/am";
 import { Lock, User, Loader2, Sparkles, CheckCircle2 } from "lucide-react";
 
@@ -128,7 +129,15 @@ export default function LoginPage() {
         {/* Header Branding */}
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-20 h-20 rounded-3xl bg-white shadow-xl shadow-blue-500/20 mb-4 ring-4 ring-white/10 overflow-hidden">
-            <img src="/ahalogo.png" alt="AHA GARMENT" className="w-full h-full object-cover" />
+            <Image 
+              src="/ahalogo.png" 
+              alt="AHA GARMENT" 
+              width={80} 
+              height={80} 
+              className="w-full h-full object-cover"
+              priority
+              quality={95}
+            />
           </div>
           <h1 className="text-2xl sm:text-3xl font-bold text-white tracking-tight">
             AHA GARMENT
