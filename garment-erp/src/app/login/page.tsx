@@ -136,7 +136,7 @@ export default function LoginPage() {
               height={80} 
               className="w-full h-full object-cover"
               priority
-              quality={95}
+              unoptimized
             />
           </div>
           <h1 className="text-2xl sm:text-3xl font-bold text-white tracking-tight">
