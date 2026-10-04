@@ -4,17 +4,18 @@ import { useState } from "react";
 import { am } from "@/lib/i18n/am";
 import { saveAttendance, bulkAttendance } from "./actions";
 import { Check, Loader2, AlertCircle, Users, CheckCircle2, XCircle } from "lucide-react";
+import type { AttendanceStatus } from "@prisma/client";
 
 interface AttendanceRecord {
   id: string;
-  hoursWorked: number;
-  lineId: string;
+  status: AttendanceStatus;
 }
 
 interface EmpRow {
   id: string;
   serialNumber: number;
   nameAm: string;
+  jobName: string;
   attendance: AttendanceRecord | null;
 }
 
@@ -32,21 +33,17 @@ interface AttendanceGridProps {
 }
 
 type RowState = {
-  hours: string;
-  line: string;
+  status: AttendanceStatus;
   saving: boolean;
   saved: boolean;
   error: string;
 };
 
-const HOUR_OPTIONS = [
-  { label: am.attendance.absent,   value: "0" },
-  { label: "ፈቃድ (Leave)",         value: "-1" },
-  { label: "4 ሰዓት",                value: "4" },
-  { label: "5 ሰዓት",                value: "5" },
-  { label: "6 ሰዓት",                value: "6" },
-  { label: "7 ሰዓት",                value: "7" },
-  { label: am.attendance.fullShift, value: "8" },
+const STATUS_OPTIONS: Array<{ label: string; value: AttendanceStatus; color: string }> = [
+  { label: "አለ (Present)", value: "PRESENT", color: "emerald" },
+  { label: "ቀሪ (Absent)", value: "ABSENT_UNAUTHORIZED", color: "rose" },
+  { label: "ፈቃድ (Leave)", value: "ABSENT_AUTHORIZED", color: "amber" },
+  { label: "ሕመም (Sick)", value: "SICK_LEAVE", color: "purple" },
 ];
 
 export function AttendanceGrid({ departments, date, canEdit, userId }: AttendanceGridProps) {
@@ -55,8 +52,7 @@ export function AttendanceGrid({ departments, date, canEdit, userId }: Attendanc
   for (const d of departments) {
     for (const e of d.employees) {
       init[e.id] = {
-        hours: e.attendance ? String(e.attendance.hoursWorked) : "8",
-        line: e.attendance?.lineId ?? "",
+        status: e.attendance?.status ?? "PRESENT",
         saving: false,
         saved: !!e.attendance,
         error: "",
@@ -66,8 +62,8 @@ export function AttendanceGrid({ departments, date, canEdit, userId }: Attendanc
   const [rows, setRows] = useState<Record<string, RowState>>(init);
   const [bulkSaving, setBulkSaving] = useState(false);
 
-  function update(empId: string, field: keyof RowState, value: string) {
-    setRows((p) => ({ ...p, [empId]: { ...p[empId], [field]: value, saved: false } }));
+  function update(empId: string, status: AttendanceStatus) {
+    setRows((p) => ({ ...p, [empId]: { ...p[empId], status, saved: false } }));
   }
 
   async function save(empId: string) {
@@ -77,8 +73,7 @@ export function AttendanceGrid({ departments, date, canEdit, userId }: Attendanc
       await saveAttendance({
         date,
         employeeId: empId,
-        hoursWorked: parseFloat(row.hours),
-        lineId: row.line || null,
+        status: row.status,
         enteredById: userId,
       });
       setRows((p) => ({ ...p, [empId]: { ...p[empId], saving: false, saved: true } }));
@@ -90,16 +85,16 @@ export function AttendanceGrid({ departments, date, canEdit, userId }: Attendanc
     }
   }
 
-  async function bulkSaveDept(deptId: string, hours: number) {
+  async function bulkSaveDept(deptId: string, status: AttendanceStatus) {
     const dept = departments.find((d) => d.id === deptId);
     if (!dept) return;
     setBulkSaving(true);
     const empIds = dept.employees.map((e) => e.id);
     try {
-      await bulkAttendance({ date, employeeIds: empIds, hoursWorked: hours, enteredById: userId });
+      await bulkAttendance({ date, employeeIds: empIds, status, enteredById: userId });
       setRows((p) => {
         const next = { ...p };
-        for (const id of empIds) next[id] = { ...next[id], hours: String(hours), saved: true };
+        for (const id of empIds) next[id] = { ...next[id], status, saved: true };
         return next;
       });
     } catch (_) {
@@ -108,12 +103,16 @@ export function AttendanceGrid({ departments, date, canEdit, userId }: Attendanc
     setBulkSaving(false);
   }
 
+  function getStatusColor(status: AttendanceStatus): string {
+    const opt = STATUS_OPTIONS.find(o => o.value === status);
+    return opt?.color ?? "slate";
+  }
+
   return (
     <div className="space-y-6">
       {departments.map((dept) => {
         const presentCount = dept.employees.filter((e) => {
-          const hours = rows[e.id]?.hours;
-          return hours !== "0" && hours !== "-1";
+          return rows[e.id]?.status === "PRESENT";
         }).length;
 
         return (
@@ -138,20 +137,20 @@ export function AttendanceGrid({ departments, date, canEdit, userId }: Attendanc
                 <div className="flex items-center gap-2">
                   <span className="text-xs font-medium text-slate-500 font-ethiopic">የጋራ መመዝገቢያ፦</span>
                   <button
-                    onClick={() => bulkSaveDept(dept.id, 8)}
+                    onClick={() => bulkSaveDept(dept.id, "PRESENT")}
                     disabled={bulkSaving}
                     className="inline-flex items-center gap-1.5 text-xs bg-emerald-600 text-white px-3 py-1.5 rounded-xl hover:bg-emerald-700 active:scale-95 transition-all font-ethiopic shadow-xs"
                   >
                     <CheckCircle2 size={13} />
-                    <span>{am.attendance.fullShift}</span>
+                    <span>ሁሉም አለ</span>
                   </button>
                   <button
-                    onClick={() => bulkSaveDept(dept.id, 0)}
+                    onClick={() => bulkSaveDept(dept.id, "ABSENT_UNAUTHORIZED")}
                     disabled={bulkSaving}
                     className="inline-flex items-center gap-1.5 text-xs bg-rose-50 text-rose-700 border border-rose-200 px-3 py-1.5 rounded-xl hover:bg-rose-100 active:scale-95 transition-all font-ethiopic shadow-xs"
                   >
                     <XCircle size={13} />
-                    <span>{am.attendance.absent}</span>
+                    <span>ሁሉም ቀሪ</span>
                   </button>
                 </div>
               )}
@@ -164,8 +163,8 @@ export function AttendanceGrid({ departments, date, canEdit, userId }: Attendanc
                   <tr className="border-b border-slate-200/80 bg-white text-slate-500 font-ethiopic text-xs">
                     <th className="p-3.5 text-center font-medium w-16">{am.serialNumber}</th>
                     <th className="p-3.5 text-right font-medium">{am.employees.name}</th>
-                    <th className="p-3.5 text-center font-medium w-48">{am.attendance.hoursWorked}</th>
-                    <th className="p-3.5 text-center font-medium w-36">{am.attendance.line}</th>
+                    <th className="p-3.5 text-center font-medium w-32">ስራ</th>
+                    <th className="p-3.5 text-center font-medium w-56">ክትትል ሁኔታ</th>
                     <th className="p-3.5 text-center font-medium w-24">ሁኔታ</th>
                   </tr>
                 </thead>
@@ -173,20 +172,21 @@ export function AttendanceGrid({ departments, date, canEdit, userId }: Attendanc
                   {dept.employees.map((emp) => {
                     const row = rows[emp.id];
                     if (!row) return null;
-                    const isAbsent = row.hours === "0";
-                    const isLeave = row.hours === "-1";
+                    
+                    const color = getStatusColor(row.status);
+                    const bgClass = row.status === "PRESENT" 
+                      ? "hover:bg-slate-50"
+                      : row.status === "ABSENT_UNAUTHORIZED"
+                      ? "bg-rose-50/30"
+                      : row.status === "ABSENT_AUTHORIZED"
+                      ? "bg-amber-50/30"
+                      : "bg-purple-50/30";
 
                     return (
                       <tr
                         key={emp.id}
                         className={`transition-colors ${
-                          isAbsent
-                            ? "bg-rose-50/30"
-                            : isLeave
-                            ? "bg-amber-50/30"
-                            : row.saved
-                            ? "hover:bg-slate-50"
-                            : "bg-amber-50/20 hover:bg-amber-50/40"
+                          row.saved ? bgClass : "bg-amber-50/20 hover:bg-amber-50/40"
                         }`}
                       >
                         <td className="p-3.5 text-center text-slate-400 text-xs font-mono font-medium">
@@ -195,56 +195,52 @@ export function AttendanceGrid({ departments, date, canEdit, userId }: Attendanc
                         <td className="p-3.5 font-ethiopic text-slate-800 font-semibold text-sm">
                           {emp.nameAm}
                         </td>
+                        <td className="p-3.5 text-center text-slate-600 text-xs font-ethiopic">
+                          {emp.jobName}
+                        </td>
                         <td className="p-3.5">
                           <select
-                            value={row.hours}
-                            onChange={(e) => update(emp.id, "hours", e.target.value)}
-                            onBlur={() => canEdit && save(emp.id)}
+                            value={row.status}
+                            onChange={(e) => {
+                              update(emp.id, e.target.value as AttendanceStatus);
+                              if (canEdit) {
+                                // Auto-save on change
+                                setTimeout(() => save(emp.id), 100);
+                              }
+                            }}
                             disabled={!canEdit || row.saving}
                             className={`w-full rounded-xl border px-3 py-2 text-xs font-medium focus:outline-none focus:ring-2 font-ethiopic transition-all ${
-                              isAbsent
+                              row.status === "PRESENT"
+                                ? "border-emerald-200 bg-emerald-50/80 text-emerald-700 focus:ring-emerald-400"
+                                : row.status === "ABSENT_UNAUTHORIZED"
                                 ? "border-rose-200 bg-rose-50/80 text-rose-700 focus:ring-rose-400"
-                                : isLeave
+                                : row.status === "ABSENT_AUTHORIZED"
                                 ? "border-amber-200 bg-amber-50/80 text-amber-700 focus:ring-amber-400"
-                                : "border-slate-200 bg-white text-slate-800 focus:ring-blue-400 hover:border-slate-300"
+                                : "border-purple-200 bg-purple-50/80 text-purple-700 focus:ring-purple-400"
                             }`}
                           >
-                            {HOUR_OPTIONS.map((o) => (
+                            {STATUS_OPTIONS.map((o) => (
                               <option key={o.value} value={o.value}>
                                 {o.label}
                               </option>
                             ))}
                           </select>
                         </td>
-                        <td className="p-3.5">
-                          <input
-                            type="text"
-                            value={row.line}
-                            placeholder="መስመር ቁ."
-                            onChange={(e) => update(emp.id, "line", e.target.value)}
-                            onBlur={() => canEdit && save(emp.id)}
-                            disabled={!canEdit || row.saving}
-                            className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs text-center font-medium focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white hover:border-slate-300 transition-all font-ethiopic"
-                          />
-                        </td>
                         <td className="p-3.5 text-center">
                           {row.saving ? (
                             <span className="inline-flex items-center gap-1 text-blue-500 text-xs font-ethiopic">
                               <Loader2 size={13} className="animate-spin" />
-                              <span>በመመዝገብ...</span>
                             </span>
                           ) : row.error ? (
                             <span className="inline-flex items-center gap-1 text-rose-600 text-xs font-ethiopic" title={row.error}>
                               <AlertCircle size={13} />
-                              <span>ስህተት</span>
                             </span>
                           ) : row.saved ? (
                             <span className="inline-flex items-center gap-1 text-emerald-600 text-xs font-medium font-ethiopic">
                               <Check size={14} className="stroke-[2.5]" />
-                              <span>ተመዝግቧል</span>
                             </span>
                           ) : (
-                            <span className="text-slate-400 text-xs font-ethiopic">አልተመዘገበም</span>
+                            <span className="text-slate-400 text-xs font-ethiopic">—</span>
                           )}
                         </td>
                       </tr>

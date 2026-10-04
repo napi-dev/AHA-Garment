@@ -1,13 +1,14 @@
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { redirect } from "next/navigation";
-import { requirePermission } from "@/lib/auth/permissions";
+import { getPageAccess } from "@/lib/auth/permissions";
 import { am } from "@/lib/i18n/am";
 import { formatAsEthDate } from "@/lib/ethiopian-calendar";
 import { getEffectiveDate } from "@/lib/date-override/effective-date";
 import { AttendanceGrid } from "./attendance-grid";
 import { DatePicker } from "./date-picker";
 import { Users, Calendar, CheckCircle2, Building2 } from "lucide-react";
+import type { AttendanceStatus } from "@prisma/client";
 
 export default async function AttendancePage({
   searchParams,
@@ -16,7 +17,12 @@ export default async function AttendancePage({
 }) {
   const session = await auth();
   if (!session?.user) redirect("/login");
-  requirePermission(session.user.role, "attendance:view");
+  
+  // Check page access
+  const access = getPageAccess(session.user.role, "/attendance");
+  if (access === "none") {
+    redirect("/dashboard");
+  }
 
   const params = await searchParams;
 
@@ -25,22 +31,25 @@ export default async function AttendancePage({
   const dateStr = params.date ?? effectiveToday.toISOString().split("T")[0];
   const date = new Date(dateStr + "T00:00:00Z");
 
-  // Check if the day is closed
-  const dayClose = await db.dayClose.findUnique({
-    where: { date },
+  // Check if attendance is locked for this date
+  const isLocked = await db.attendanceSubmission.findFirst({
+    where: { 
+      date,
+      supervisorId: session.user.id,
+    },
   });
 
-  // Load all dept names for the selector (lightweight — no employees yet)
+  // Load all dept names for the selector
   const allDepts = await db.department.findMany({
-    where: { isActive: true },
-    orderBy: { sortOrder: "asc" },
+    where: { isActive: true, flowOrder: { not: null } }, // Only flow departments
+    orderBy: { flowOrder: "asc" },
     select: { id: true, nameAm: true },
   });
 
-  // Determine which dept to show — default to first dept
+  // Determine which dept to show
   const selectedDeptId = params.dept ?? allDepts[0]?.id ?? "";
 
-  // Load only the selected department's employees + their attendance for this date
+  // Load selected department's employees + their attendance for this date
   const departments = selectedDeptId
     ? await db.department.findMany({
         where: { id: selectedDeptId, isActive: true },
@@ -50,25 +59,26 @@ export default async function AttendancePage({
             orderBy: { serialNumber: "asc" },
             include: {
               attendances: { where: { date } },
+              job: { select: { nameAm: true } },
             },
           },
         },
       })
     : [];
 
-  const canEdit =
-    !dayClose && // Can't edit if day is closed
-    (session.user.role === "ADMIN" ||
-    session.user.role === "SUPER_MANAGER" ||
-    session.user.role === "HR_CLERK");
+  const canEdit = !isLocked && (
+    session.user.role === "ADMIN" ||
+    session.user.role === "PRODUCTION_MANAGER" ||
+    session.user.role === "LINE_SUPERVISOR"
+  );
 
   const totalEmployees = departments.reduce((acc, d) => acc + d.employees.length, 0);
   const totalPresent = departments.reduce(
     (acc, d) =>
       acc +
       d.employees.filter((e) => {
-        const hours = e.attendances[0] ? Number(e.attendances[0].hoursWorked) : 0;
-        return hours > 0; // Present if hours > 0 (excludes absent=0 and leave=-1)
+        const att = e.attendances[0];
+        return att && att.status === "PRESENT";
       }).length,
     0
   );
@@ -99,23 +109,22 @@ export default async function AttendancePage({
         </div>
       </div>
 
-      {/* Day Closed Banner */}
-      {dayClose && (
-        <div className="erp-card p-5 bg-gradient-to-r from-rose-50 to-orange-50 border-l-4 border-rose-500">
+      {/* Locked Banner */}
+      {isLocked && (
+        <div className="erp-card p-5 bg-gradient-to-r from-purple-50 to-indigo-50 border-l-4 border-purple-500">
           <div className="flex items-start gap-3">
-            <div className="w-10 h-10 rounded-xl bg-rose-100 flex items-center justify-center flex-shrink-0">
-              <svg className="w-5 h-5 text-rose-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <div className="w-10 h-10 rounded-xl bg-purple-100 flex items-center justify-center flex-shrink-0">
+              <svg className="w-5 h-5 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
               </svg>
             </div>
             <div className="flex-1">
-              <h3 className="font-bold text-rose-900 font-ethiopic text-base mb-1">
-                የዕለቱ ሥራ ተጠቃልሎ ተዘግቷል
+              <h3 className="font-bold text-purple-900 font-ethiopic text-base mb-1">
+                ክትትሉ ተቆልፏል
               </h3>
-              <p className="text-sm text-rose-800 font-ethiopic leading-relaxed">
-                የዕለቱ ሥራ በ {dayClose.closedAt.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })} ተዘግቷል። 
-                ያስቀመጡትን መረጃ ማየት ይችላሉ ነገር ግን ማስተካከል አይቻልም። 
-                ለማስተካከል ሱፐርቫይዘሩ ወይም ዋና ሥራ አስኪያጁ ቀኑን መክፈት አለባቸው።
+              <p className="text-sm text-purple-800 font-ethiopic leading-relaxed">
+                የዚህ ቀን ክትትል በ {isLocked.submittedAt.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })} ተቆልፏል። 
+                ያስቀመጡትን መረጃ ማየት ይችላሉ ነገር ግን ማስተካከል አይቻልም።
               </p>
             </div>
           </div>
@@ -159,11 +168,11 @@ export default async function AttendancePage({
             id: e.id,
             serialNumber: e.serialNumber,
             nameAm: e.nameAm,
+            jobName: e.job?.nameAm ?? "—",
             attendance: e.attendances[0]
               ? {
                   id: e.attendances[0].id,
-                  hoursWorked: Number(e.attendances[0].hoursWorked),
-                  lineId: e.attendances[0].lineId ?? "",
+                  status: e.attendances[0].status,
                 }
               : null,
           })),

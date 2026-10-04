@@ -1,11 +1,11 @@
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { redirect } from "next/navigation";
-import { requirePermission } from "@/lib/auth/permissions";
+import { getPageAccess } from "@/lib/auth/permissions";
 import { am } from "@/lib/i18n/am";
 import { HourlyCountForm } from "./hourly-count-form";
 import { DateNavigator } from "./date-navigator";
-import { Clock, Lock, Building2 } from "lucide-react";
+import { Clock, Lock, Briefcase } from "lucide-react";
 import { getEffectiveDate } from "@/lib/date-override/effective-date";
 
 // Type for existing hourly count line
