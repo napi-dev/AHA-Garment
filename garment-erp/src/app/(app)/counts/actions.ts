@@ -2,15 +2,15 @@
 
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { requirePermission } from "@/lib/auth/permissions";
 import { revalidatePath } from "next/cache";
+import { requirePageAccess } from "@/lib/auth/permissions-v2";
 
-// ─── Save hourly counts for a single worker ───────────────────────────────────
+// ─── Save hourly box for a single worker ─────────────────────────────────────
 
-interface SaveCountsInput {
-  date: string;         // ISO string
+interface SaveHourlyBoxInput {
+  date: string;         // ISO string YYYY-MM-DD
   employeeId: string;
-  departmentId: string;
+  jobId: string;        // v2: points to Job (not Department)
   supervisorId: string;
   hours: (number | null)[];  // 8 elements, null = absent that hour
   mistakes: number;
@@ -21,13 +21,17 @@ interface SaveCountsInput {
   minusPieces: number;
 }
 
-export async function saveHourlyCounts(input: SaveCountsInput): Promise<{ ok: boolean; message: string }> {
+export async function saveHourlyBox(input: SaveHourlyBoxInput): Promise<{ ok: boolean; message: string }> {
   const session = await auth();
   if (!session?.user) return { ok: false, message: "ተፈቅዶ አልነበረም" };
-  requirePermission(session.user.role, "counts:enter");
+  
+  // v2: check permission using new system
+  const access = await requirePageAccess(session.user.role, "/counts/enter");
+  if (!access.allowed) {
+    return { ok: false, message: "ለዚህ ገጽ ፈቃድ የለዎትም" };
+  }
 
-  const date = new Date(input.date);
-  date.setHours(0, 0, 0, 0);
+  const date = new Date(input.date + "T00:00:00Z");
 
   // Block if day is closed
   const dayClose = await db.dayClose.findUnique({ where: { date } });
@@ -38,44 +42,28 @@ export async function saveHourlyCounts(input: SaveCountsInput): Promise<{ ok: bo
     };
   }
 
-  // Find or create the sheet for this date + operation
-  // We use departmentId to find the operation mapping; if none, use a default
-  const opMapping = await db.operationDeptMapping.findFirst({
-    where: { departmentId: input.departmentId },
-    include: { operation: true },
+  // Verify job exists and is active
+  const job = await db.job.findUnique({
+    where: { id: input.jobId },
+    include: { department: true },
   });
 
-  let operationId: string;
-  if (opMapping) {
-    operationId = opMapping.operationId;
-  } else {
-    // Create/find an "Unmapped" operation
-    const unmapped = await db.operation.upsert({
-      where: { nameEn: "Unmapped" },
-      update: {},
-      create: { nameEn: "Unmapped", nameAm: "ያልተዛመደ", sortOrder: 99 },
-    });
-    operationId = unmapped.id;
+  if (!job || !job.isActive) {
+    return { ok: false, message: "የተመረጠው ስራ ንቁ አይደለም" };
   }
-
-  // Upsert the sheet
-  const sheet = await db.hourlyCountSheet.upsert({
-    where: { date_operationId: { date, operationId } },
-    update: {},
-    create: {
-      date,
-      operationId,
-      supervisorId: input.supervisorId,
-      status: "DRAFT",
-    },
-  });
 
   const [h1, h2, h3, h4, h5, h6, h7, h8] = input.hours;
 
-  // Upsert the count line
-  await db.hourlyCountLine.upsert({
-    where: { sheetId_employeeId: { sheetId: sheet.id, employeeId: input.employeeId } },
+  // Upsert the hourly box
+  await db.hourlyBox.upsert({
+    where: {
+      date_employeeId: {
+        date,
+        employeeId: input.employeeId,
+      },
+    },
     update: {
+      jobId: input.jobId,
       h1, h2, h3, h4, h5, h6, h7, h8,
       totalProduced: input.totalProduced,
       targetForDay: input.targetForDay,
@@ -83,13 +71,13 @@ export async function saveHourlyCounts(input: SaveCountsInput): Promise<{ ok: bo
       minusPieces: input.minusPieces,
       mistakes: input.mistakes,
       mistakeReason: input.mistakeReason,
-      status: "SUBMITTED",
-      enteredById: session.user.id,
+      supervisorId: input.supervisorId,
+      updatedAt: new Date(),
     },
     create: {
-      sheetId: sheet.id,
+      date,
       employeeId: input.employeeId,
-      departmentId: input.departmentId,
+      jobId: input.jobId,
       h1, h2, h3, h4, h5, h6, h7, h8,
       totalProduced: input.totalProduced,
       targetForDay: input.targetForDay,
@@ -97,8 +85,7 @@ export async function saveHourlyCounts(input: SaveCountsInput): Promise<{ ok: bo
       minusPieces: input.minusPieces,
       mistakes: input.mistakes,
       mistakeReason: input.mistakeReason,
-      status: "SUBMITTED",
-      enteredById: session.user.id,
+      supervisorId: input.supervisorId,
     },
   });
 
@@ -106,16 +93,17 @@ export async function saveHourlyCounts(input: SaveCountsInput): Promise<{ ok: bo
   await db.auditLog.create({
     data: {
       userId: session.user.id,
-      action: "SAVE_HOURLY_COUNT",
-      entity: "HourlyCountLine",
+      action: "SAVE_HOURLY_BOX",
+      entity: "HourlyBox",
       entityId: input.employeeId,
       after: {
         date: input.date,
+        jobId: input.jobId,
         totalProduced: input.totalProduced,
         plusPieces: input.plusPieces,
         minusPieces: input.minusPieces,
       },
-      actedAsManager: ["ADMIN", "SUPER_MANAGER", "PRODUCTION_MANAGER"].includes(session.user.role),
+      actedAsManager: ["ADMIN", "PRODUCTION_MANAGER", "ORDER_PLACER"].includes(session.user.role),
     },
   });
 
@@ -125,54 +113,19 @@ export async function saveHourlyCounts(input: SaveCountsInput): Promise<{ ok: bo
   return { ok: true, message: "ተቀምጧል" };
 }
 
-// ─── Verify a count line (Production Manager) ────────────────────────────────
-
-export async function verifyCountLine(lineId: string): Promise<{ ok: boolean; message: string }> {
-  const session = await auth();
-  if (!session?.user) throw new Error("ተፈቅዶ አልነበረም");
-  requirePermission(session.user.role, "counts:verify");
-
-  const line = await db.hourlyCountLine.findUnique({ where: { id: lineId } });
-  if (!line) throw new Error("ቁጥሩ አልተገኘም");
-  if (line.status === "LOCKED") throw new Error("ቁጥሩ ተቆልፏል");
-
-  // Update the line status; verifiedById is tracked on HourlyCountSheet
-  await db.hourlyCountLine.update({
-    where: { id: lineId },
-    data: { status: "VERIFIED" },
-  });
-
-  // Also mark the sheet as verified by this user
-  if (line.sheetId) {
-    await db.hourlyCountSheet.update({
-      where: { id: line.sheetId },
-      data: { verifiedById: session.user.id, verifiedAt: new Date() },
-    });
-  }
-
-  await db.auditLog.create({
-    data: {
-      userId: session.user.id,
-      action: "VERIFY_COUNT",
-      entity: "HourlyCountLine",
-      entityId: lineId,
-      after: { status: "VERIFIED" },
-    },
-  });
-
-  revalidatePath("/counts");
-  return { ok: true, message: "ተቀምጧል" };
-}
-
 // ─── Close the day ────────────────────────────────────────────────────────────
+// v2: simplified — no separate sheet locking, just lock HourlyBox records
 
 export async function closeDay(dateStr: string, notes?: string): Promise<{ ok: boolean; message: string }> {
   const session = await auth();
   if (!session?.user) return { ok: false, message: "ተፈቅዶ አልነበረም" };
-  requirePermission(session.user.role, "counts:verify");
+  
+  const access = await requirePageAccess(session.user.role, "/counts/close");
+  if (!access.allowed) {
+    return { ok: false, message: "ለዚህ ገጽ ፈቃድ የለዎትም" };
+  }
 
-  const date = new Date(dateStr);
-  date.setHours(0, 0, 0, 0);
+  const date = new Date(dateStr + "T00:00:00Z");
 
   const existing = await db.dayClose.findUnique({ where: { date } });
   if (existing) {
@@ -182,25 +135,26 @@ export async function closeDay(dateStr: string, notes?: string): Promise<{ ok: b
     };
   }
 
-  // Lock all sheets for this date
-  const sheets = await db.hourlyCountSheet.findMany({ where: { date } });
-  for (const sheet of sheets) {
-    await db.hourlyCountSheet.update({
-      where: { id: sheet.id },
-      data: { status: "LOCKED", closedAt: new Date() },
+  // Use transaction to ensure atomicity
+  const dayClose = await db.$transaction(async (tx) => {
+    // Create day close record
+    const dc = await tx.dayClose.create({
+      data: { date, closedById: session.user.id, notes },
     });
-    await db.hourlyCountLine.updateMany({
-      where: { sheetId: sheet.id, status: { not: "LOCKED" } },
-      data: { status: "LOCKED" },
-    });
-  }
 
-  // Create day close record
-  const dayClose = await db.dayClose.create({
-    data: { date, closedById: session.user.id, notes },
+    // Lock all hourly boxes for this date
+    await tx.hourlyBox.updateMany({
+      where: { date },
+      data: { isLocked: true },
+    });
+
+    return dc;
+  }, {
+    maxWait: 10000,
+    timeout: 30000,
   });
 
-  // Queue report jobs
+  // Queue report jobs (outside transaction for speed)
   const reportTypes = [
     "DAILY_PRODUCTION_SHEET",
     "DAILY_PIECE_COUNT",
@@ -236,33 +190,93 @@ export async function closeDay(dateStr: string, notes?: string): Promise<{ ok: b
   return { ok: true, message: "ቀኑ ተዘግቷል" };
 }
 
-// ─── Generate daily PDF report and send to Telegram ──────────────────────────
+// ─── Reopen a closed day (Admin only) ────────────────────────────────────────
+// v2: added this utility for emergency reopening
 
-export async function generateAndSendDailyReport(dateStr: string): Promise<{ ok: boolean; message: string }> {
-  "use server";
+export async function reopenDay(dateStr: string, reason: string): Promise<{ ok: boolean; message: string }> {
   const session = await auth();
   if (!session?.user) return { ok: false, message: "ተፈቅዶ አልነበረም" };
-  requirePermission(session.user.role, "counts:verify");
+  
+  if (session.user.role !== "ADMIN") {
+    return { ok: false, message: "ይህ ተግባር ለአድሚን ብቻ ነው" };
+  }
+
+  const date = new Date(dateStr + "T00:00:00Z");
+
+  const dayClose = await db.dayClose.findUnique({ where: { date } });
+  if (!dayClose) {
+    return { ok: false, message: "ይህ ቀን ተዘግቶ አልነበረም" };
+  }
+
+  await db.$transaction(async (tx) => {
+    // Delete the day close record
+    await tx.dayClose.delete({ where: { id: dayClose.id } });
+
+    // Unlock all hourly boxes for this date
+    await tx.hourlyBox.updateMany({
+      where: { date },
+      data: { isLocked: false },
+    });
+
+    // Delete pending/failed report jobs
+    await tx.reportJob.deleteMany({
+      where: {
+        dayCloseId: dayClose.id,
+        status: { in: ["pending", "failed"] },
+      },
+    });
+  }, {
+    maxWait: 10000,
+    timeout: 30000,
+  });
+
+  await db.auditLog.create({
+    data: {
+      userId: session.user.id,
+      action: "REOPEN_DAY",
+      entity: "DayClose",
+      entityId: dayClose.id,
+      reason,
+      after: { date: dateStr },
+    },
+  });
+
+  revalidatePath("/counts");
+  revalidatePath("/dashboard");
+  return { ok: true, message: "ቀኑ ተከፈተ — አሁን ማስተካከል ይችላሉ" };
+}
+
+// ─── Generate daily PDF report and send to Telegram ──────────────────────────
+// v2: updated to use HourlyBox and Job instead of HourlyCountLine and Department
+
+export async function generateAndSendDailyReport(dateStr: string): Promise<{ ok: boolean; message: string }> {
+  const session = await auth();
+  if (!session?.user) return { ok: false, message: "ተፈቅዶ አልነበረም" };
+  
+  const access = await requirePageAccess(session.user.role, "/counts/close");
+  if (!access.allowed) {
+    return { ok: false, message: "ለዚህ ገጽ ፈቃድ የለዎትም" };
+  }
 
   try {
-    const date = new Date(dateStr);
-    date.setUTCHours(0, 0, 0, 0);
+    const date = new Date(dateStr + "T00:00:00Z");
 
     // Day boundaries for audit log query
     const dayEnd = new Date(date);
     dayEnd.setUTCHours(23, 59, 59, 999);
 
     // ── Fetch all data in parallel ──────────────────────────────────────────
-    const [lines, auditLogs] = await Promise.all([
-      db.hourlyCountLine.findMany({
-        where: { sheet: { date }, status: { not: "DRAFT" } },
+    const [boxes, auditLogs] = await Promise.all([
+      db.hourlyBox.findMany({
+        where: { date },
         include: {
           employee: true,
-          department: true,
-          sheet: { include: { operation: true } },
+          job: {
+            include: { department: true },
+          },
         },
         orderBy: [
-          { department: { sortOrder: "asc" } },
+          { job: { department: { sortOrder: "asc" } } },
           { employee: { serialNumber: "asc" } },
         ],
       }),
@@ -274,52 +288,33 @@ export async function generateAndSendDailyReport(dateStr: string): Promise<{ ok:
       }),
     ]);
 
-    // Build incentive card lookup
-    const cardMap = new Map<string, number>();
-    const deptIds = [...new Set(lines.map((l) => l.departmentId))];
-    await Promise.all(
-      deptIds.map(async (deptId) => {
-        const card = await db.incentiveCard.findFirst({
-          where: {
-            departmentId: deptId,
-            effectiveFrom: { lte: date },
-            OR: [{ effectiveTo: null }, { effectiveTo: { gte: date } }],
-          },
-          orderBy: { effectiveFrom: "desc" },
-        });
-        cardMap.set(deptId, card?.targetPerHour ?? 0);
-      })
-    );
-
     let totalProduced = 0;
     let aboveTarget   = 0;
 
-    const rows = lines.map((line, idx) => {
-      const targetPerHour = cardMap.get(line.departmentId) ?? 0;
-      const targetPerDay  = targetPerHour * 8;
-      totalProduced += line.totalProduced;
-      if (line.plusPieces > 0) aboveTarget++;
-      const pct = targetPerDay > 0
-        ? Math.round((line.totalProduced / targetPerDay) * 100 * 10) / 10
+    const rows = boxes.map((box, idx) => {
+      totalProduced += box.totalProduced;
+      if (box.plusPieces > 0) aboveTarget++;
+      
+      const pct = box.targetForDay > 0
+        ? Math.round((box.totalProduced / box.targetForDay) * 100 * 10) / 10
         : 0;
       
       // Ensure all fields are strings or numbers, never null
       return {
         serial: idx + 1,
-        nameAm: String(line.employee.nameAm ?? "—"),
-        operationAm: String(line.sheet.operation.nameAm ?? "—"),
-        machineType: String(line.department.nameEn ?? line.department.nameAm ?? "—"),
-        targetPerDay,
-        produced: line.totalProduced,
-        plusPieces: line.plusPieces,
-        minusPieces: line.minusPieces,
+        nameAm: String(box.employee.nameAm ?? "—"),
+        operationAm: String(box.job.department.nameAm ?? "—"),  // v2: department is flow stage
+        machineType: String(box.job.nameAm ?? "—"),            // v2: job is actual work type
+        targetPerDay: box.targetForDay,
+        produced: box.totalProduced,
+        plusPieces: box.plusPieces,
+        minusPieces: box.minusPieces,
         percentOfTarget: pct,
       };
     });
 
     // Build audit rows for PDF page 2
     const auditRows = auditLogs.map((log) => {
-      // Ensure every field is a string, never null/undefined
       let timeStr = "—";
       try {
         const t = log.createdAt.toLocaleTimeString("en-ET", { hour: "2-digit", minute: "2-digit", hour12: true });
@@ -350,11 +345,8 @@ export async function generateAndSendDailyReport(dateStr: string): Promise<{ ok:
     const { DailyProductionSheetPdf } = await import("@/lib/pdf/daily-production-sheet");
     const React = await import("react");
 
-    // Defensive check: ensure all data is serializable and has no nulls
     console.log("[PDF DEBUG] rows count:", rows.length);
     console.log("[PDF DEBUG] auditRows count:", auditRows.length);
-    console.log("[PDF DEBUG] Sample row:", rows[0]);
-    console.log("[PDF DEBUG] Sample audit:", auditRows[0]);
 
     let buffer: Buffer;
     try {
@@ -373,7 +365,6 @@ export async function generateAndSendDailyReport(dateStr: string): Promise<{ ok:
       ) as Buffer;
     } catch (pdfError) {
       console.error("[PDF ERROR] Failed to render:", pdfError);
-      console.error("[PDF ERROR] Props:", { dateLabel, dateSlug, supervisorName: session.user.nameAm, rows: rows.length, auditRows: auditRows.length });
       throw pdfError;
     }
 
@@ -404,7 +395,6 @@ export async function generateAndSendDailyReport(dateStr: string): Promise<{ ok:
     // Save report job record
     const dayClose = await db.dayClose.findUnique({ where: { date } });
     if (dayClose) {
-      // Find existing report job
       const existingJob = await db.reportJob.findFirst({
         where: {
           type: "DAILY_PRODUCTION_SHEET",
@@ -413,7 +403,6 @@ export async function generateAndSendDailyReport(dateStr: string): Promise<{ ok:
       });
 
       if (existingJob) {
-        // Update existing
         await db.reportJob.update({
           where: { id: existingJob.id },
           data: {
@@ -422,7 +411,6 @@ export async function generateAndSendDailyReport(dateStr: string): Promise<{ ok:
           },
         });
       } else {
-        // Create new
         await db.reportJob.create({
           data: {
             type: "DAILY_PRODUCTION_SHEET",
@@ -448,14 +436,13 @@ export async function generateAndSendDailyReport(dateStr: string): Promise<{ ok:
 }
 
 // ─── Purge audit logs older than the current month ───────────────────────────
-// Called once per month by Admin/Super Manager from the counts/close page.
-// Keeps the current month's logs; deletes everything before that.
+// v2: no changes from v1, kept as-is
 
 export async function purgeMonthlyAuditLog(): Promise<{ ok: boolean; message: string; deleted: number }> {
-  "use server";
   const session = await auth();
   if (!session?.user) return { ok: false, message: "ተፈቅዶ አልነበረም", deleted: 0 };
-  if (session.user.role !== "ADMIN" && session.user.role !== "SUPER_MANAGER") {
+  
+  if (session.user.role !== "ADMIN") {
     return { ok: false, message: "ለዚህ ተግባር ፈቃድ የለዎትም", deleted: 0 };
   }
 

@@ -1,9 +1,11 @@
 /**
- * AHA Garment - Permission System
+ * AHA Garment v2 - Permission System
  * 
  * Two-part permission system:
  * 1. Page Access Map - which roles can access which pages
  * 2. canControl() - which roles can control which departments
+ * 
+ * Based on §2 of the master plan.
  * 
  * ⚠️ SECURITY: Every server action MUST check permissions.
  * Hiding a menu item is NOT security.
@@ -12,7 +14,7 @@
 import type { Role } from "@prisma/client";
 
 // ═══════════════════════════════════════════════════════════
-// Page Access Matrix
+// Page Access Matrix (§2.2)
 // ═══════════════════════════════════════════════════════════
 
 type PageAccess = "full" | "view" | "own" | "mini" | "none";
@@ -198,7 +200,7 @@ const PAGE_ACCESS: Record<string, PagePermission> = {
   
   "/incentive": {
     ADMIN: "full", // close + approve
-    PRODUCTION_MANAGER: "own", // close only
+    PRODUCTION_MANAGER: "own", // close only (Q13)
     ORDER_PLACER: "none",
     LINE_SUPERVISOR: "none",
     CUTTING_MANAGER: "none",
@@ -279,8 +281,13 @@ const PAGE_ACCESS: Record<string, PagePermission> = {
 
 /**
  * Check if a role can access a page
+ * 
+ * @param role User's role
+ * @param path Page path (e.g. "/dashboard")
+ * @returns PageAccess level or null if page not in matrix
  */
 export function getPageAccess(role: Role, path: string): PageAccess | null {
+  // Normalize path (remove trailing slash, query params)
   const normalizedPath = path.split("?")[0].replace(/\/$/, "");
   
   // Check exact match first
@@ -288,7 +295,7 @@ export function getPageAccess(role: Role, path: string): PageAccess | null {
     return PAGE_ACCESS[normalizedPath][role];
   }
   
-  // Check parent paths
+  // Check parent paths (e.g. /production/orders → /production)
   const pathParts = normalizedPath.split("/").filter(Boolean);
   for (let i = pathParts.length; i > 0; i--) {
     const parentPath = "/" + pathParts.slice(0, i).join("/");
@@ -301,58 +308,57 @@ export function getPageAccess(role: Role, path: string): PageAccess | null {
 }
 
 /**
- * Check if a user can access a page (async version returns result object)
+ * Check if a user can access a page (throws if denied)
+ * Use this at the top of page.tsx or server actions
  */
-export async function requirePageAccess(
-  role: Role,
-  path: string,
-  requiredLevel: PageAccess = "full"
-): Promise<{ allowed: boolean; message?: string }> {
-  const access = getPageAccess(role, path);
-  
-  if (access === "none" || access === null) {
-    return { allowed: false, message: "የመዳረሻ ፍቃድ የለም - Access denied" };
-  }
-  
-  // If specific level required, check it
-  if (requiredLevel !== "mini" && requiredLevel !== "own" && access !== "full") {
-    return { allowed: false, message: "የመዳረሻ ፍቃድ የለም - Insufficient permissions" };
-  }
-  
-  return { allowed: true };
-}
-
-/**
- * Sync version that throws on permission denial
- */
-export function requirePermission(role: Role, path: string): void {
+export function requirePageAccess(role: Role, path: string, requiredLevel: PageAccess = "full"): void {
   const access = getPageAccess(role, path);
   
   if (access === "none" || access === null) {
     throw new Error("የመዳረሻ ፍቃድ የለም - Access denied");
   }
+  
+  // If specific level required, check it
+  if (requiredLevel !== "mini" && requiredLevel !== "own" && access !== "full") {
+    throw new Error("የቂመዳረሻ ፍቃድ የለም - Insufficient permissions");
+  }
 }
 
 // ═══════════════════════════════════════════════════════════
-// Department Control
+// Department Control (§3.3)
 // ═══════════════════════════════════════════════════════════
 
 /**
  * Check if a role can control a department
+ * 
+ * @param role User's role
+ * @param departmentControllers Array of roles that can control this department
+ * @returns boolean
+ * 
+ * Usage:
+ *   const dept = await db.department.findUnique({ where: { id } });
+ *   if (!canControl(session.user.role, dept.controllers)) {
+ *     throw new Error("Cannot control this department");
+ *   }
  */
 export function canControl(role: Role, departmentControllers: Role[]): boolean {
+  // Owner can always control everything
   if (role === "ADMIN") return true;
+  
+  // Check if role is in the department's controller list
   return departmentControllers.includes(role);
 }
 
 /**
  * Get all departments a role can control
+ * Useful for filtering in queries
  */
 export async function getControllableDepartments(
   role: Role,
   db: any
 ): Promise<string[]> {
   if (role === "ADMIN") {
+    // Owner can control all departments
     const allDepts = await db.department.findMany({
       where: { isActive: true },
       select: { id: true },
@@ -360,6 +366,7 @@ export async function getControllableDepartments(
     return allDepts.map((d: any) => d.id);
   }
   
+  // Find departments where this role is a controller
   const depts = await db.department.findMany({
     where: {
       isActive: true,
@@ -372,9 +379,13 @@ export async function getControllableDepartments(
 }
 
 // ═══════════════════════════════════════════════════════════
-// Alert Visibility
+// Alert Visibility (§7)
 // ═══════════════════════════════════════════════════════════
 
+/**
+ * Check if a role should see a specific alert type
+ * Based on §7 of the master plan
+ */
 export function canSeeAlert(role: Role, alertType: string): boolean {
   const alertMatrix: Record<string, Role[]> = {
     LOW_STOCK: ["ADMIN", "PRODUCTION_MANAGER", "STORE_KEEPER"],
@@ -401,37 +412,71 @@ export function canSeeAlert(role: Role, alertType: string): boolean {
 // Specific Permission Checks
 // ═══════════════════════════════════════════════════════════
 
+/**
+ * Can this role approve incentive periods?
+ * v2: Owner only (Q13)
+ */
 export function canApproveIncentive(role: Role): boolean {
   return role === "ADMIN";
 }
 
+/**
+ * Can this role close incentive periods?
+ * v2: Owner and PMG (Q13)
+ */
 export function canCloseIncentive(role: Role): boolean {
   return role === "ADMIN" || role === "PRODUCTION_MANAGER";
 }
 
+/**
+ * Can this role edit salary amounts?
+ * v2: Owner only (§2.1)
+ */
 export function canEditSalary(role: Role): boolean {
   return role === "ADMIN";
 }
 
+/**
+ * Can this role edit the attendance bonus setting?
+ * v2: Owner only
+ */
 export function canEditBonus(role: Role): boolean {
   return role === "ADMIN";
 }
 
+/**
+ * Can this role purge audit log?
+ * v2: Owner only (§4.14)
+ */
 export function canPurgeAudit(role: Role): boolean {
   return role === "ADMIN";
 }
 
+/**
+ * Can this role delete alerts?
+ * v2: Owner and PMG (§7)
+ */
 export function canResolveAlert(role: Role): boolean {
   return role === "ADMIN" || role === "PRODUCTION_MANAGER";
 }
 
 // ═══════════════════════════════════════════════════════════
-// Helper: Permission Error
+// Helper: Throw if unauthorized
 // ═══════════════════════════════════════════════════════════
 
 export class PermissionError extends Error {
   constructor(message = "የመዳረሻ ፍቃድ የለም - Access denied") {
     super(message);
     this.name = "PermissionError";
+  }
+}
+
+/**
+ * Throw if role cannot perform action
+ * Use in server actions for clean error handling
+ */
+export function requirePermission(condition: boolean, message?: string): asserts condition {
+  if (!condition) {
+    throw new PermissionError(message);
   }
 }
