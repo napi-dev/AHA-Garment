@@ -17,7 +17,7 @@ export default async function MonthlySummaryPage({
 }) {
   const session = await auth();
   if (!session?.user) redirect("/login");
-  requirePermission(session.user.role, "incentive:view");
+  requirePermission(session.user.role, "/incentive");
 
   const params = await searchParams;
   const eth = await getEffectiveEthDate();
@@ -43,7 +43,7 @@ export default async function MonthlySummaryPage({
     string,
     {
       nameAm: string;
-      sortOrder: number;
+      flowOrder: number;
       workers: Set<string>;
       p1Calc: Decimal;
       p1Pay: Decimal;

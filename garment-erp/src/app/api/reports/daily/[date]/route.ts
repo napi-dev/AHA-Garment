@@ -25,15 +25,15 @@ export async function GET(
   dayEnd.setUTCHours(23, 59, 59, 999);
 
   // Fetch production data
-  const lines = await db.hourlyCountLine.findMany({
-    where: { sheet: { date }, status: { not: "DRAFT" } },
+  const lines = await db.hourlyBox.findMany({
+    where: { date },
     include: {
       employee: true,
       department: true,
-      sheet: { include: { operation: true } },
+      job: true,
     },
     orderBy: [
-      { department: { sortOrder: "asc" } },
+      { department: { flowOrder: "asc" } },
       { employee: { serialNumber: "asc" } },
     ],
   });
@@ -49,7 +49,7 @@ export async function GET(
       },
     },
     orderBy: [
-      { employee: { department: { sortOrder: "asc" } } },
+      { employee: { department: { flowOrder: "asc" } } },
       { employee: { serialNumber: "asc" } },
     ],
   });
@@ -69,7 +69,7 @@ export async function GET(
       },
     },
     orderBy: [
-      { employee: { department: { sortOrder: "asc" } } },
+      { employee: { department: { flowOrder: "asc" } } },
       { employee: { serialNumber: "asc" } },
     ],
   });
@@ -83,17 +83,17 @@ export async function GET(
 
   // Get incentive cards (for target AND rate)
   const cardMap = new Map<string, { target: number; rate: number }>();
-  const deptIds = [...new Set(lines.map((l) => l.departmentId))];
-  for (const deptId of deptIds) {
+  const jobIds = [...new Set(lines.map((l) => l.jobId).filter(Boolean))];
+  for (const jobId of jobIds) {
     const card = await db.incentiveCard.findFirst({
       where: {
-        departmentId: deptId,
+        jobId,
         effectiveFrom: { lte: date },
         OR: [{ effectiveTo: null }, { effectiveTo: { gte: date } }],
       },
       orderBy: { effectiveFrom: "desc" },
     });
-    cardMap.set(deptId, {
+    cardMap.set(jobId, {
       target: card?.targetPerHour ?? 0,
       rate: card?.ratePerPiece ? Number(card.ratePerPiece.toString()) : 0,
     });
@@ -103,9 +103,9 @@ export async function GET(
   let aboveTarget = 0;
   let totalIncentive = 0;
 
-  const rows = lines.map((line, idx) => {
-    const cardData = cardMap.get(line.departmentId) ?? { target: 0, rate: 0 };
-    const targetPerDay = cardData.target * 8;
+  const rows = lines.map((line, idx: number) => {
+    const cardData = (line.jobId ? cardMap.get(line.jobId) : null) ?? { target: 0, rate: 0 };
+    const targetPerDay = line.targetForDay > 0 ? line.targetForDay : cardData.target * 8;
     totalProduced += line.totalProduced;
     if (line.plusPieces > 0) aboveTarget++;
     const pct = targetPerDay > 0
@@ -120,7 +120,7 @@ export async function GET(
     return {
       serial: idx + 1,
       nameAm: line.employee.nameAm,
-      operationAm: line.sheet.operation.nameAm,
+      operationAm: line.job?.nameAm ?? "—",
       machineType: line.department.nameEn ?? line.department.nameAm,
       targetPerDay,
       produced: line.totalProduced,
@@ -132,25 +132,25 @@ export async function GET(
   });
 
   // Prepare attendance rows
-  const attendanceRows = attendances.map((att, idx) => {
-    const hours = Number(att.hoursWorked);
-    let status = "—";
-    if (hours === -1) status = "ፈቃድ";
-    else if (hours === 0) status = "ቅዳሜ/ዕረፍት";
-    else if (hours > 0) status = "ተገኝቷል";
+  const attendanceRows = attendances.map((att, idx: number) => {
+    let statusLabel = "—";
+    if (att.status === "PRESENT") statusLabel = "አለ";
+    else if (att.status === "ABSENT_UNAUTHORIZED") statusLabel = "ቀሪ";
+    else if (att.status === "ABSENT_AUTHORIZED") statusLabel = "ፈቃድ";
+    else if (att.status === "SICK_LEAVE") statusLabel = "የሃኪም ማስረጃ";
 
     return {
       serial: idx + 1,
       serialNumber: att.employee.serialNumber,
       nameAm: att.employee.nameAm,
       deptAm: att.employee.department?.nameAm ?? "—",
-      hoursWorked: hours === -1 ? "—" : hours > 0 ? hours.toString() : "0",
-      status,
+      hoursWorked: att.status === "PRESENT" ? "8" : "0",
+      status: statusLabel,
     };
   });
 
   // Prepare salary rows
-  const salaryRows = salaryRecords.map((sal, idx) => {
+  const salaryRows = salaryRecords.map((sal, idx: number) => {
     return {
       serial: idx + 1,
       serialNumber: sal.employee.serialNumber,
@@ -330,7 +330,7 @@ export async function GET(
         </tr>
       </thead>
       <tbody>
-        ${rows.map(row => `
+        ${rows.map((row: any) => `
         <tr>
           <td class="center">${row.serial}</td>
           <td>${row.nameAm}</td>

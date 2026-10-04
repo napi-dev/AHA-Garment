@@ -95,10 +95,8 @@ export async function createCutJob(formData: FormData) {
     await db.alert.create({
       data: {
         type:      "CONSUMPTION",
-        title:     `የጨርቅ ብክነት ማስጠንቀቂያ — ${order.orderNo}`,
-        message:   `ለትዕዛዝ ${order.orderNo} የተመዘገበው የጨርቅ ፍጆታ (${consumptionDec.toFixed(3)} ኪ.ግ/ፍሬ) ከተፈቀደው ወሰን (${limitDec.toFixed(2)}) በልጧል!`,
-        entityId:  job.id,
-        roles:     ["ADMIN", "PRODUCTION_MANAGER", "CUTTING_MANAGER"],
+        message:   `የጨርቅ ብክነት ማስጠንቀቂያ — ለትዕዛዝ ${order.orderNo} የተመዘገበው የጨርቅ ፍጆታ (${consumptionDec.toFixed(3)} ኪ.ግ/ፍሬ) ከተፈቀደው ወሰን (${limitDec.toFixed(2)}) በልጧል!`,
+        reference: job.id,
       },
     });
   }

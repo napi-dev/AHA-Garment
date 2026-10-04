@@ -49,7 +49,7 @@ export async function GET(
           card: true,
         },
         orderBy: [
-          { employee: { department: { sortOrder: "asc" } } },
+          { employee: { department: { flowOrder: "asc" } } },
           { employee: { serialNumber: "asc" } }
         ],
       },
@@ -64,7 +64,7 @@ export async function GET(
   const attendanceData = await db.attendance.findMany({
     where: {
       date: { gte: period.startDate, lte: period.endDate },
-      employeeId: { in: period.lines.map(l => l.employeeId) }
+      employeeId: { in: period.lines.map((l: any) => l.employeeId) }
     },
     include: {
       employee: true
@@ -87,7 +87,7 @@ export async function GET(
   let totalIncentive = new Decimal(0);
   let totalSalary = new Decimal(0);
   
-  const rows = period.lines.map((line, idx) => {
+  const rows = period.lines.map((line: any, idx: number) => {
     const ratePerPiece = parseFloat(line.ratePerPiece.toString());
     const diff = line.plusPieces - line.minusPieces;
     
@@ -107,14 +107,8 @@ export async function GET(
 
     // Get attendance count
     const attendances = attendanceByEmployee.get(line.employeeId) ?? [];
-    const presentDays = attendances.filter(a => {
-      const hours = Number(a.hoursWorked.toString());
-      return hours > 0;
-    }).length;
-    const absentDays = attendances.filter(a => {
-      const hours = Number(a.hoursWorked.toString());
-      return hours === 0;
-    }).length;
+    const presentDays = attendances.filter((a: any) => a.status === "PRESENT").length;
+    const absentDays = attendances.filter((a: any) => a.status === "ABSENT_UNAUTHORIZED" || a.status === "ABSENT_AUTHORIZED").length;
 
     return {
       serial: idx + 1,
@@ -264,7 +258,7 @@ export async function GET(
         </tr>
       </thead>
       <tbody>
-        ${rows.map(row => `
+        ${rows.map((row: any) => `
         <tr ${row.isSuspended ? 'class="suspended"' : ''}>
           <td class="center">${row.serial}</td>
           <td>${row.nameAm}</td>
@@ -333,7 +327,7 @@ export async function GET(
         </tr>
       </thead>
       <tbody>
-        ${rows.map(row => `
+        ${rows.map((row: any) => `
         <tr>
           <td class="center">${row.serial}</td>
           <td>${row.nameAm}</td>
@@ -351,9 +345,9 @@ export async function GET(
       <tfoot>
         <tr>
           <td colspan="4" class="right"><strong>ጠቅላላ:</strong></td>
-          <td class="center"><strong>${rows.reduce((sum, r) => sum + r.presentDays, 0)}</strong></td>
-          <td class="center"><strong>${rows.reduce((sum, r) => sum + r.absentDays, 0)}</strong></td>
-          <td class="center"><strong>${rows.reduce((sum, r) => sum + r.presentDays + r.absentDays, 0)}</strong></td>
+          <td class="center"><strong>${rows.reduce((sum: number, r: any) => sum + r.presentDays, 0)}</strong></td>
+          <td class="center"><strong>${rows.reduce((sum: number, r: any) => sum + r.absentDays, 0)}</strong></td>
+          <td class="center"><strong>${rows.reduce((sum: number, r: any) => sum + r.presentDays + r.absentDays, 0)}</strong></td>
           <td></td>
         </tr>
       </tfoot>
@@ -395,7 +389,7 @@ export async function GET(
         </tr>
       </thead>
       <tbody>
-        ${rows.map(row => `
+        ${rows.map((row: any) => `
         <tr ${row.isSuspended ? 'class="suspended"' : ''}>
           <td class="center">${row.serial}</td>
           <td>${row.nameAm}</td>

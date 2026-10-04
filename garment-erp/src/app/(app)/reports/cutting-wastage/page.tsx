@@ -15,7 +15,7 @@ export default async function CuttingWastageReportPage({
 }) {
   const session = await auth();
   if (!session?.user) redirect("/login");
-  requirePermission(session.user.role, "reports:view");
+  requirePermission(session.user.role, "/reports");
 
   const params  = await searchParams;
   const today   = todayISOStringEAT();
@@ -26,17 +26,17 @@ export default async function CuttingWastageReportPage({
 
   const jobs = await db.cutJob.findMany({
     where: { date: { gte: from, lte: to } },
-    include: { order: { include: { style: true } } },
+    include: { order: true },
     orderBy: { date: "desc" },
   });
 
-  const limitSetting = await db.appSetting.findUnique({ where: { key: "wastage_alert_pct" } });
-  const limit = parseFloat(limitSetting?.value ?? "5.0");
+  const limitSetting = await db.appSetting.findUnique({ where: { key: "cutting_wastage_limit" } });
+  const limit = parseFloat(limitSetting?.value ?? "1.0");
 
-  const aboveLimit = jobs.filter((j) => Number(j.wastagePct) > limit).length;
+  const aboveLimit = jobs.filter((j) => Number(j.consumption) > limit).length;
   const totalPieces = jobs.reduce((s, j) => s + j.piecesCut, 0);
-  const avgWaste    = jobs.length > 0
-    ? jobs.reduce((s, j) => s + Number(j.wastagePct), 0) / jobs.length
+  const avgConsumption = jobs.length > 0
+    ? jobs.reduce((s, j) => s + Number(j.consumption), 0) / jobs.length
     : 0;
 
   return (
@@ -64,7 +64,7 @@ export default async function CuttingWastageReportPage({
               {am.reports.CUTTING_WASTAGE}
             </h1>
             <p className="text-slate-500 font-ethiopic text-sm mt-0.5">
-              የጨርቅ አጠቃቀም፣ የተቆረጠ የፍሬ ብዛት እና ከሚፈቀደው {limit}% በላይ የሆኑ ብክነቶች ትንተና
+              የጨርቅ አጠቃቀም፣ የተቆረጠ የፍሬ ብዛት እና ከሚፈቀደው {limit} ኪ.ግ/ፍሬ በላይ የሆኑ ብክነቶች ትንተና
             </p>
           </div>
 
@@ -131,14 +131,14 @@ export default async function CuttingWastageReportPage({
               <TrendingDown size={16} />
             </div>
           </div>
-          <p className={`text-2xl font-bold tabular-nums mt-2 ${avgWaste > limit ? "text-rose-600" : "text-emerald-600"}`}>
-            {avgWaste.toFixed(2)}%
+          <p className={`text-2xl font-bold tabular-nums mt-2 ${avgConsumption > limit ? "text-rose-600" : "text-emerald-600"}`}>
+            {avgConsumption.toFixed(3)}
           </p>
         </div>
 
         <div className="erp-card p-5">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500 font-ethiopic">&gt; {limit}% ወሰን ያለፉ</span>
+            <span className="text-xs font-semibold text-slate-500 font-ethiopic">&gt; {limit} ወሰን ያለፉ</span>
             <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${aboveLimit > 0 ? "bg-rose-50 text-rose-600" : "bg-emerald-50 text-emerald-600"}`}>
               {aboveLimit > 0 ? <AlertTriangle size={16} /> : <CheckCircle2 size={16} />}
             </div>
@@ -156,10 +156,9 @@ export default async function CuttingWastageReportPage({
             <tr>
               <th>ቀን</th>
               <th>የትዕዛዝ ቁጥር</th>
-              <th>ስታይል</th>
               <th className="text-right">የወጣ ጨርቅ (ኪ.ግ)</th>
               <th className="text-right">የተቆረጠ ፍሬ</th>
-              <th className="text-center">ብክነት %</th>
+              <th className="text-center">ፍጆታ (ኪ.ግ/ፍሬ)</th>
               <th className="text-center">{am.status}</th>
             </tr>
           </thead>
@@ -172,27 +171,24 @@ export default async function CuttingWastageReportPage({
               </tr>
             )}
             {jobs.map((j) => {
-              const waste = Number(j.wastagePct);
-              const isOver = waste > limit;
+              const cons = Number(j.consumption);
+              const isOver = cons > limit;
               return (
                 <tr key={j.id} className={isOver ? "bg-rose-50/30" : ""}>
                   <td className="font-medium text-slate-800 font-ethiopic text-sm">
                     {formatAsEthDate(j.date)}
                   </td>
                   <td className="font-mono text-xs font-semibold text-slate-700">
-                    {j.order.orderNumber}
-                  </td>
-                  <td className="font-medium text-slate-800 font-ethiopic">
-                    {j.order.style.nameAm}
+                    {j.order.orderNo}
                   </td>
                   <td className="tabular-nums font-semibold text-slate-900 text-right">
-                    {Number(j.weightUsed).toFixed(3)}
+                    {Number(j.kgReceived).toFixed(3)}
                   </td>
                   <td className="tabular-nums font-semibold text-slate-900 text-right">
                     {j.piecesCut.toLocaleString()}
                   </td>
                   <td className={`tabular-nums font-bold text-center ${isOver ? "text-rose-600" : "text-emerald-700"}`}>
-                    {waste.toFixed(2)}%
+                    {cons.toFixed(3)}
                   </td>
                   <td className="text-center">
                     {isOver ? (
@@ -212,9 +208,9 @@ export default async function CuttingWastageReportPage({
           {jobs.length > 0 && (
             <tfoot>
               <tr className="bg-slate-50 font-bold border-t border-slate-200">
-                <td colSpan={4} className="p-3 text-right font-ethiopic text-slate-700">{am.total}</td>
+                <td colSpan={3} className="p-3 text-right font-ethiopic text-slate-700">{am.total}</td>
                 <td className="p-3 tabular-nums text-right text-slate-900">{totalPieces.toLocaleString()}</td>
-                <td className="p-3 tabular-nums text-center text-slate-900">{avgWaste.toFixed(2)}%</td>
+                <td className="p-3 tabular-nums text-center text-slate-900">{avgConsumption.toFixed(3)}</td>
                 <td></td>
               </tr>
             </tfoot>

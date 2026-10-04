@@ -88,7 +88,7 @@ async function buildIncentiveStatementPdf(periodId: string) {
       lines: {
         include: { employee: { include: { department: true } } },
         orderBy: [
-          { employee: { department: { sortOrder: "asc" } } },
+          { employee: { department: { flowOrder: "asc" } } },
           { employee: { serialNumber: "asc" } },
         ],
       },
@@ -98,7 +98,7 @@ async function buildIncentiveStatementPdf(periodId: string) {
 
   let totalCalc = new Decimal(0);
   let totalPay  = new Decimal(0);
-  const lines = period.lines.map((line, idx) => {
+  const lines = period.lines.map((line: any, idx: number) => {
     totalCalc = totalCalc.plus(line.calculated.toString());
     totalPay  = totalPay.plus(line.payable.toString());
     return {
@@ -129,32 +129,33 @@ async function buildIncentiveStatementPdf(periodId: string) {
 }
 
 async function buildDailyProductionPdf(date: Date) {
-  const lines = await db.hourlyCountLine.findMany({
-    where: { sheet: { date }, status: { not: "DRAFT" } },
-    include: { employee: true, department: true, sheet: { include: { operation: true } } },
-    orderBy: [{ department: { sortOrder: "asc" } }, { employee: { serialNumber: "asc" } }],
+  const lines = await db.hourlyBox.findMany({
+    where: { date },
+    include: { employee: true, department: true, job: true },
+    orderBy: [{ department: { flowOrder: "asc" } }, { employee: { serialNumber: "asc" } }],
   });
 
   const cardMap = new Map<string, number>();
   for (const line of lines) {
-    if (!cardMap.has(line.departmentId)) {
+    if (line.jobId && !cardMap.has(line.jobId)) {
       const card = await db.incentiveCard.findFirst({
-        where: { departmentId: line.departmentId, effectiveFrom: { lte: date },
+        where: { jobId: line.jobId, effectiveFrom: { lte: date },
           OR: [{ effectiveTo: null }, { effectiveTo: { gte: date } }] },
         orderBy: { effectiveFrom: "desc" },
       });
-      cardMap.set(line.departmentId, card?.targetPerHour ?? 0);
+      cardMap.set(line.jobId, card?.targetPerHour ?? 0);
     }
   }
 
   let totalProduced = 0, aboveTarget = 0;
-  const rows = lines.map((line, idx) => {
-    const tpd = (cardMap.get(line.departmentId) ?? 0) * 8;
+  const rows = lines.map((line: any, idx: number) => {
+    const targetPerHour = (line.jobId ? cardMap.get(line.jobId) : null) ?? (line.targetForDay ? Math.round(line.targetForDay / 8) : 0);
+    const tpd = line.targetForDay > 0 ? line.targetForDay : targetPerHour * 8;
     totalProduced += line.totalProduced;
     if (line.plusPieces > 0) aboveTarget++;
     return {
       serial: idx + 1, nameAm: line.employee.nameAm,
-      operationAm: line.sheet.operation.nameAm, machineType: line.department.nameEn ?? "",
+      operationAm: line.job?.nameAm ?? "", machineType: line.department.nameEn ?? "",
       targetPerDay: tpd, produced: line.totalProduced,
       plusPieces: line.plusPieces, minusPieces: line.minusPieces,
       percentOfTarget: tpd > 0 ? Math.round((line.totalProduced / tpd) * 1000) / 10 : 0,

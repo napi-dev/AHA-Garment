@@ -26,7 +26,7 @@ export default async function ReportsPage() {
     db.material.count({ where: { isActive: true } }),
     db.alert.count({ where: { type: "LOW_STOCK", resolvedAt: null } }),
     db.cutJob.count({ where: { date: today } }),
-    db.prodOrder.count({ where: { isActive: true } }),
+    db.prodOrder.count({ where: { status: "ACTIVE" } }),
     db.reportJob.count({ where: { status: "pending" } }),
   ]);
 

@@ -5,67 +5,45 @@ import { db } from "@/lib/db";
 import { requirePermission } from "@/lib/auth/permissions";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import type { BundleStage } from "@prisma/client";
 
-// ── Submit inspection (pass or fail + defects) ───────────────────────────────
-export async function submitInspection(
-  bundleId: string,
-  inspectorId: string,
-  formData: FormData
-) {
+// ── Record a new defect ───────────────────────────────────────────────────────
+export async function recordDefect(formData: FormData) {
   const session = await auth();
   if (!session?.user) throw new Error("ተፈቅዶ አልነበረም");
-  requirePermission(session.user.role, "qc:edit");
+  requirePermission(session.user.role, "/quality");
 
-  const passed = formData.get("passed") === "true";
-  const notes  = String(formData.get("notes") ?? "").trim() || null;
+  const orderId           = String(formData.get("orderId") ?? "").trim();
+  const defectType        = String(formData.get("defectType") ?? "").trim();
+  const responsibleDeptId = String(formData.get("responsibleDeptId") ?? "").trim();
+  const responsibleEmpId  = String(formData.get("responsibleEmpId") ?? "").trim() || null;
+  const piecesAffected    = parseInt(String(formData.get("piecesAffected") ?? "0"), 10);
+  const dateStr           = String(formData.get("date") ?? new Date().toISOString().split("T")[0]);
+  const date              = new Date(dateStr + "T00:00:00Z");
+  const notes             = String(formData.get("notes") ?? "").trim() || null;
 
-  // Collect defect rows
-  const defects: Array<{ type: string; stage: BundleStage; pieces: number }> = [];
-  for (let i = 0; i < 3; i++) {
-    const type   = String(formData.get(`defect_type_${i}`)   ?? "").trim();
-    const stage  = String(formData.get(`defect_stage_${i}`)  ?? "").trim();
-    const pieces = parseInt(String(formData.get(`defect_pieces_${i}`) ?? "0"), 10);
-    if (type && stage && pieces > 0) {
-      defects.push({ type, stage: stage as BundleStage, pieces });
-    }
+  if (!orderId || !defectType || !responsibleDeptId || piecesAffected < 1) {
+    throw new Error("ሁሉም አስፈላጊ መስኮች በትክክል መሞላት አለባቸው");
   }
 
-  const inspection = await db.qcInspection.create({
+  const defect = await db.defect.create({
     data: {
-      bundleId,
-      inspectedById: session.user.id,
-      passed,
+      orderId,
+      defectType,
+      responsibleDeptId,
+      responsibleEmpId,
+      piecesAffected,
+      date,
       notes,
-      defects: {
-        create: defects.map((d) => ({
-          defectType: d.type,
-          responsibleStage: d.stage,
-          piecesAffected: d.pieces,
-        })),
-      },
-    },
-  });
-
-  // Advance bundle: passed → STYLING_HITPRESS; failed → send back to SEWING
-  const nextStage: BundleStage = passed ? "STYLING_HITPRESS" : "SEWING";
-  await db.bundle.update({
-    where: { id: bundleId },
-    data: {
-      currentStage: nextStage,
-      stageLogs: {
-        create: { stage: nextStage, enteredById: session.user.id },
-      },
     },
   });
 
   await db.auditLog.create({
     data: {
       userId:   session.user.id,
-      action:   "QC_INSPECTION",
-      entity:   "QcInspection",
-      entityId: inspection.id,
-      after:    { bundleId, passed, defectCount: defects.length },
+      action:   "RECORD_DEFECT",
+      entity:   "Defect",
+      entityId: defect.id,
+      after:    { orderId, defectType, piecesAffected },
     },
   });
 
@@ -77,7 +55,7 @@ export async function submitInspection(
 export async function markRepaired(defectId: string) {
   const session = await auth();
   if (!session?.user) throw new Error("ተፈቅዶ አልነበረም");
-  requirePermission(session.user.role, "qc:edit");
+  requirePermission(session.user.role, "/quality");
 
   await db.defect.update({
     where: { id: defectId },

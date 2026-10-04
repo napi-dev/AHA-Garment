@@ -7,18 +7,6 @@ import { formatAsEthDate } from "@/lib/ethiopian-calendar";
 import Link from "next/link";
 import { Factory, ArrowLeft, AlertTriangle, Layers, Calendar, CheckCircle2, Clock } from "lucide-react";
 
-const STAGE_AM: Record<string, string> = {
-  RECEIVING: "ጥሬ ዕቃ",
-  CUTTING: "ቆረጣ",
-  SEWING: "ስፌት",
-  TRIMMING: "ለቀማ",
-  QUALITY_CONTROL: "ጥራት",
-  STYLING_HITPRESS: "ሂትፕረስ",
-  IRONING: "ካውያ",
-  PACKING: "ማሸግ",
-  DELIVERY: "ማድረስ",
-};
-
 export default async function OrderStatusReportPage({
   searchParams,
 }: {
@@ -26,7 +14,7 @@ export default async function OrderStatusReportPage({
 }) {
   const session = await auth();
   if (!session?.user) redirect("/login");
-  requirePermission(session.user.role, "reports:view");
+  requirePermission(session.user.role, "/reports");
 
   const params     = await searchParams;
   const activeOnly = params.status !== "all";
@@ -36,26 +24,20 @@ export default async function OrderStatusReportPage({
   const today      = new Date(Date.UTC(eatNow.getUTCFullYear(), eatNow.getUTCMonth(), eatNow.getUTCDate(), 0, 0, 0));
 
   const orders = await db.prodOrder.findMany({
-    where: { ...(activeOnly ? { isActive: true } : {}) },
+    where: { ...(activeOnly ? { status: "ACTIVE" } : {}) },
     include: {
-      style: true,
-      cutJobs: {
-        include: {
-          bundles: { select: { id: true, currentStage: true } },
-        },
-      },
+      lines: true,
+      cutJobs: true,
     },
-    orderBy: [{ isActive: "desc" }, { dueDate: "asc" }, { createdAt: "desc" }],
+    orderBy: [{ status: "asc" }, { deadlineAt: "asc" }, { createdAt: "desc" }],
   });
 
   const overdueCount = orders.filter(
-    (o) => o.isActive && o.dueDate && o.dueDate < today
+    (o) => o.status === "ACTIVE" && o.deadlineAt && o.deadlineAt < today
   ).length;
 
   const inCuttingCount = orders.filter((o) => o.cutJobs.length > 0).length;
-  const totalBundles = orders.reduce((s, o) =>
-    s + o.cutJobs.reduce((s2, cj) => s2 + cj.bundles.length, 0), 0
-  );
+  const totalLines = orders.reduce((s: number, o: typeof orders[0]) => s + o.lines.length, 0);
 
   return (
     <div className="space-y-6">
@@ -82,7 +64,7 @@ export default async function OrderStatusReportPage({
               {am.reports.ORDER_STATUS}
             </h1>
             <p className="text-slate-500 font-ethiopic text-sm mt-0.5">
-              የትዕዛዞች ማብቂያ ቀን፣ የምርት ደረጃ እና የባንድሎች ስርጭት ሁኔታ
+              የትዕዛዞች ማብቂያ ቀን እና ሁኔታ ክትትል
             </p>
           </div>
 
@@ -147,13 +129,13 @@ export default async function OrderStatusReportPage({
 
         <div className="erp-card p-5">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500 font-ethiopic">ጠቅላላ ባንድሎች</span>
+            <span className="text-xs font-semibold text-slate-500 font-ethiopic">ጠቅላላ ዝርዝሮች</span>
             <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
               <Layers size={16} />
             </div>
           </div>
           <p className="text-2xl font-bold text-slate-900 tabular-nums mt-2">
-            {totalBundles.toLocaleString()}
+            {totalLines.toLocaleString()}
           </p>
         </div>
       </div>
@@ -164,75 +146,55 @@ export default async function OrderStatusReportPage({
           <thead>
             <tr>
               <th>የትዕዛዝ ቁጥር</th>
-              <th>ስታይል</th>
-              <th>ደንበኛ</th>
-              <th className="text-right">መጠን (ፍሬ)</th>
+              <th className="text-right">ዝርዝሮች</th>
+              <th>ቆረጣ</th>
               <th>የማብቂያ ቀን</th>
-              <th>ያሉበት የምርት ደረጃዎች</th>
               <th className="text-center">{am.status}</th>
             </tr>
           </thead>
           <tbody>
             {orders.length === 0 && (
               <tr>
-                <td colSpan={7} className="text-center py-12 text-slate-400 font-ethiopic">
+                <td colSpan={5} className="text-center py-12 text-slate-400 font-ethiopic">
                   ምንም ትዕዛዝ አልተገኘም
                 </td>
               </tr>
             )}
             {orders.map((order) => {
-              const isOverdue = order.isActive && order.dueDate && order.dueDate < today;
-              // Collect all bundle stages
-              const stageCounts: Record<string, number> = {};
-              for (const cj of order.cutJobs) {
-                for (const b of cj.bundles) {
-                  stageCounts[b.currentStage] = (stageCounts[b.currentStage] ?? 0) + 1;
-                }
-              }
-              const stageEntries = Object.entries(stageCounts)
-                .sort((a, b) => b[1] - a[1])
-                .slice(0, 3);
+              const isOverdue = order.status === "ACTIVE" && order.deadlineAt && order.deadlineAt < today;
+              const totalQty = order.lines.reduce((s: number, l: typeof order.lines[0]) => s + l.qty, 0);
+              const cutPieces = order.cutJobs.reduce((s: number, cj: typeof order.cutJobs[0]) => s + cj.piecesCut, 0);
 
               return (
                 <tr key={order.id} className={isOverdue ? "bg-rose-50/30" : ""}>
                   <td>
                     <Link
-                      href={`/production/orders/${order.id}`}
+                      href={`/production`}
                       className="font-mono text-xs font-bold text-blue-600 hover:underline"
                     >
-                      {order.orderNumber}
+                      {order.orderNo}
                     </Link>
                   </td>
-                  <td className="font-semibold text-slate-800 font-ethiopic">{order.style.nameAm}</td>
-                  <td className="text-slate-600 font-ethiopic text-sm">{order.customer ?? "—"}</td>
                   <td className="tabular-nums font-semibold text-slate-900 text-right">
-                    {order.quantity.toLocaleString()}
+                    {totalQty > 0 ? `${totalQty.toLocaleString()} ፍሬ (${order.lines.length} ዝርዝር)` : `${order.lines.length} ዝርዝር`}
+                  </td>
+                  <td className="tabular-nums text-slate-600">
+                    {cutPieces > 0 ? `${cutPieces.toLocaleString()} ተቆርጧል` : "—"}
                   </td>
                   <td className={`font-ethiopic text-sm ${isOverdue ? "text-rose-600 font-bold" : "text-slate-600"}`}>
                     <div className="flex items-center gap-1.5">
-                      <span>{order.dueDate ? formatAsEthDate(order.dueDate) : "—"}</span>
+                      <span>{order.deadlineAt ? formatAsEthDate(order.deadlineAt) : "—"}</span>
                       {isOverdue && <span className="badge-danger text-[10px]">የዘገየ</span>}
                     </div>
                   </td>
-                  <td>
-                    <div className="flex flex-wrap gap-1.5">
-                      {stageEntries.length === 0 ? (
-                        <span className="text-xs text-slate-400 font-ethiopic">የቆረጣ ሥራ አልተጀመረም</span>
-                      ) : (
-                        stageEntries.map(([stage, count]) => (
-                          <span
-                            key={stage}
-                            className="text-[11px] bg-slate-100 text-slate-700 px-2 py-0.5 rounded-md font-ethiopic tabular-nums border border-slate-200"
-                          >
-                            {STAGE_AM[stage] ?? stage}: <strong className="text-slate-900">{count}</strong>
-                          </span>
-                        ))
-                      )}
-                    </div>
-                  </td>
                   <td className="text-center">
-                    <span className={order.isActive ? "badge-verified font-ethiopic" : "badge-draft font-ethiopic"}>
-                      {order.isActive ? "በሂደት ላይ" : "ተጠናቋል"}
+                    <span className={
+                      order.status === "ACTIVE" ? "badge-verified font-ethiopic" :
+                      order.status === "COMPLETED" ? "badge-draft font-ethiopic" :
+                      "badge-danger font-ethiopic"
+                    }>
+                      {order.status === "ACTIVE" ? "በሂደት ላይ" :
+                       order.status === "COMPLETED" ? "ተጠናቋል" : "ተሰርዟል"}
                     </span>
                   </td>
                 </tr>

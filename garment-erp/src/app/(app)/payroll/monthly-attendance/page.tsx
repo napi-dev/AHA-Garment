@@ -14,7 +14,7 @@ interface PageProps {
 export default async function MonthlyAttendancePage({ searchParams }: PageProps) {
   const session = await auth();
   if (!session?.user) redirect("/login");
-  requirePermission(session.user.role, "attendance:view");
+  requirePermission(session.user.role, "/payroll");
 
   const params = await searchParams;
   const eth = await getEffectiveEthDate();
@@ -38,7 +38,7 @@ export default async function MonthlyAttendancePage({ searchParams }: PageProps)
       },
     },
     orderBy: [
-      { employee: { department: { sortOrder: "asc" } } },
+      { employee: { department: { flowOrder: "asc" } } },
       { employee: { serialNumber: "asc" } },
       { date: "asc" }
     ],
@@ -101,11 +101,10 @@ export default async function MonthlyAttendancePage({ searchParams }: PageProps)
   for (const record of filteredRecords) {
     const existing = employeeMap.get(record.employeeId);
     
-    // Derive status from hoursWorked
-    const hours = parseFloat(record.hoursWorked.toString());
-    const isPresent = hours > 0 ? 1 : 0;
-    const isAbsent = hours === 0 ? 1 : 0;
-    const isLeave = hours === -1 ? 1 : 0;
+    // Derive counts from AttendanceStatus enum
+    const isPresent = record.status === "PRESENT" ? 1 : 0;
+    const isAbsent = (record.status === "ABSENT_UNAUTHORIZED" || record.status === "ABSENT_AUTHORIZED") ? 1 : 0;
+    const isLeave = record.status === "SICK_LEAVE" ? 1 : 0;
 
     if (existing) {
       existing.present += isPresent;
@@ -124,8 +123,8 @@ export default async function MonthlyAttendancePage({ searchParams }: PageProps)
   }
 
   const rows = Array.from(employeeMap.values()).sort((a, b) => {
-    if (a.employee.department.sortOrder !== b.employee.department.sortOrder) {
-      return a.employee.department.sortOrder - b.employee.department.sortOrder;
+    if ((a.employee.department.flowOrder ?? 999) !== (b.employee.department.flowOrder ?? 999)) {
+      return (a.employee.department.flowOrder ?? 999) - (b.employee.department.flowOrder ?? 999);
     }
     const aSerial = String(a.employee.serialNumber);
     const bSerial = String(b.employee.serialNumber);

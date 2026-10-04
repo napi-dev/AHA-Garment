@@ -15,7 +15,7 @@ interface PageProps {
 export default async function MonthlySalaryPage({ searchParams }: PageProps) {
   const session = await auth();
   if (!session?.user) redirect("/login");
-  requirePermission(session.user.role, "incentive:view");
+  requirePermission(session.user.role, "/payroll");
 
   const params = await searchParams;
   const eth = await getEffectiveEthDate();
@@ -75,7 +75,7 @@ export default async function MonthlySalaryPage({ searchParams }: PageProps) {
       },
     },
     orderBy: [
-      { department: { sortOrder: "asc" } },
+      { department: { flowOrder: "asc" } },
       { serialNumber: "asc" }
     ],
   });
@@ -122,7 +122,7 @@ export default async function MonthlySalaryPage({ searchParams }: PageProps) {
       const total = baseSalary.plus(incentive);
 
       const attendances = attendanceByEmployee.get(emp.id) ?? [];
-      const presentDays = attendances.filter(a => new Decimal(a.hoursWorked.toString()).greaterThan(0)).length;
+      const presentDays = attendances.filter((a: any) => a.status === "PRESENT").length;
 
       totalBaseSalary = totalBaseSalary.plus(baseSalary);
       totalIncentive = totalIncentive.plus(incentive);
@@ -247,7 +247,7 @@ export default async function MonthlySalaryPage({ searchParams }: PageProps) {
                     </td>
                     <td className="font-ethiopic text-slate-600 text-xs text-right">
                       <span className="bg-slate-100 text-slate-700 px-2 py-0.5 rounded">
-                        {row.employee.department.nameAm}
+                        {row.employee.department?.nameAm}
                       </span>
                     </td>
                     <td className="tabular-nums font-semibold text-right text-blue-700">

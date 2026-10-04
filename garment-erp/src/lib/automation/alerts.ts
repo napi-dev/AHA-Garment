@@ -63,30 +63,28 @@ export async function checkAndSendLowStockAlert(materialId: string) {
 export async function sendWastageAlert(cutJobId: string) {
   const job = await db.cutJob.findUnique({
     where: { id: cutJobId },
-    include: { order: { include: { style: true } } },
+    include: { order: true },
   });
   if (!job) return;
 
-  const pct = Number(job.wastagePct);
-  const limitSetting = await db.appSetting.findUnique({ where: { key: "wastage_alert_pct" } });
-  const limit = parseFloat(limitSetting?.value ?? "5.0");
+  const cons = Number(job.consumption);
+  const limitSetting = await db.appSetting.findUnique({ where: { key: "cutting_wastage_limit" } });
+  const limit = parseFloat(limitSetting?.value ?? "1.0");
 
-  if (pct <= limit) return;
+  if (cons <= limit) return;
 
   const msg = TEMPLATES.wastageAlert(
-    job.order.orderNumber,
-    job.order.style.nameAm,
-    Number(job.weightUsed).toFixed(3),
+    job.order.orderNo,
+    "—",
+    Number(job.kgReceived).toFixed(3),
     String(job.piecesCut),
-    pct.toFixed(1),
+    cons.toFixed(3),
     "—"
   );
 
   await db.alert.create({
-    data: { type: "WASTAGE", message: msg, reference: cutJobId },
+    data: { type: "CONSUMPTION", message: msg, reference: cutJobId },
   });
-
-  await db.cutJob.update({ where: { id: cutJobId }, data: { wastageAlertSent: true } });
 
   // Send to manager (automatically sends to admin too)
   await sendToManagerAndAdmin(msg);
@@ -101,10 +99,9 @@ export async function checkDelayedOrders() {
 
   const overdueOrders = await db.prodOrder.findMany({
     where: {
-      isActive: true,
-      dueDate: { lt: today },
+      status: "ACTIVE",
+      deadlineAt: { lt: today },
     },
-    include: { style: true },
   });
 
   for (const order of overdueOrders) {
@@ -118,8 +115,8 @@ export async function checkDelayedOrders() {
     });
     if (existing) continue;
 
-    const daysLate = Math.floor((today.getTime() - order.dueDate!.getTime()) / 86400000);
-    const msg = `⏰ ዘግይቶ ትዕዛዝ\nትዕዛዝ: ${order.orderNumber}  ስታይል: ${order.style.nameAm}\nመጠን: ${order.quantity} ፍሬ\nተጓዘ ቀናት: ${daysLate} ቀናት`;
+    const daysLate = Math.floor((today.getTime() - order.deadlineAt!.getTime()) / 86400000);
+    const msg = `⏰ ዘግይቶ ትዕዛዝ\nትዕዛዝ: ${order.orderNo}\nተጓዘ ቀናት: ${daysLate} ቀናት`;
 
     await db.alert.create({
       data: { type: "DELAYED_ORDER", message: msg, reference: order.id },
@@ -145,8 +142,9 @@ export async function checkMissingDayClose() {
   if (closed) return; // nothing to do
 
   // Check if there are any submitted count entries today
-  const countEntries = await db.hourlyCountLine.count({
-    where: { sheet: { date: today }, status: { not: "DRAFT" } },
+  // Check if there are any HourlyBox entries today
+  const countEntries = await db.hourlyBox.count({
+    where: { date: today },
   });
   if (countEntries === 0) return; // no entries, nothing to alert about
 

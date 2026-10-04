@@ -16,15 +16,15 @@ export async function GET(
   const date = new Date(dateStr + "T00:00:00Z");
 
   // Load all count lines for the day with operation mapping
-  const lines = await db.hourlyCountLine.findMany({
-    where: { sheet: { date }, status: { not: "DRAFT" } },
+  const lines = await db.hourlyBox.findMany({
+    where: { date },
     include: {
       employee: true,
       department: true,
-      sheet: { include: { operation: true } },
+      job: true,
     },
     orderBy: [
-      { department: { sortOrder: "asc" } },
+      { department: { flowOrder: "asc" } },
       { employee: { serialNumber: "asc" } },
     ],
   });
@@ -32,36 +32,35 @@ export async function GET(
   // Get incentive cards for target info
   const cardMap = new Map<string, number>();
   for (const line of lines) {
-    if (!cardMap.has(line.departmentId)) {
+    if (line.jobId && !cardMap.has(line.jobId)) {
       const card = await db.incentiveCard.findFirst({
         where: {
-          departmentId: line.departmentId,
+          jobId: line.jobId,
           effectiveFrom: { lte: date },
           OR: [{ effectiveTo: null }, { effectiveTo: { gte: date } }],
         },
         orderBy: { effectiveFrom: "desc" },
       });
-      cardMap.set(line.departmentId, card?.targetPerHour ?? 0);
+      cardMap.set(line.jobId, card?.targetPerHour ?? 0);
     }
   }
 
   let totalProduced = 0;
   let aboveTarget   = 0;
 
-  const rows = lines.map((line, idx) => {
-    const targetPerHour = cardMap.get(line.departmentId) ?? 0;
-    const targetPerDay  = targetPerHour * 8;
+  const rows = lines.map((line, idx: number) => {
+    const targetPerHour = (line.jobId ? cardMap.get(line.jobId) : null) ?? (line.targetForDay ? Math.round(line.targetForDay / 8) : 0);
+    const targetPerDay  = line.targetForDay > 0 ? line.targetForDay : targetPerHour * 8;
     const produced      = line.totalProduced;
     totalProduced      += produced;
     if (line.plusPieces > 0) aboveTarget++;
 
-    const diff = line.plusPieces - line.minusPieces;
     const pct  = targetPerDay > 0 ? Math.round((produced / targetPerDay) * 100 * 10) / 10 : 0;
 
     return {
       serial:          idx + 1,
       nameAm:          line.employee.nameAm,
-      operationAm:     line.sheet.operation.nameAm,
+      operationAm:     line.job?.nameAm ?? "",
       machineType:     line.department.nameEn ?? "",
       targetPerDay,
       produced,

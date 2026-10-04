@@ -37,10 +37,10 @@
       ]
     },
     {
-      "name": "Bundles",
-      "short_name": "Bundles",
-      "description": "Production line dashboard",
-      "url": "/production/bundles",
+      "name": "Production Orders",
+      "short_name": "Orders",
+      "description": "Production order board",
+      "url": "/production",
       "icons": [
         {
           "src": "/ahalogo.png",

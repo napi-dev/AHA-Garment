@@ -34,15 +34,12 @@ export async function GET(req: NextRequest) {
   const { dateToEth } = await import("@/lib/ethiopian-calendar");
   
   // Query all hourly count lines in a broad date range
-  const allLines = await db.hourlyCountLine.findMany({
+  const allLines = await db.hourlyBox.findMany({
     where: {
-      sheet: {
-        date: {
-          gte: new Date(new Date().getFullYear() - 1, 0, 1),
-          lte: new Date(new Date().getFullYear() + 1, 11, 31),
-        },
+      date: {
+        gte: new Date(new Date().getFullYear() - 1, 0, 1),
+        lte: new Date(new Date().getFullYear() + 1, 11, 31),
       },
-      status: { not: "DRAFT" },
     },
     include: {
       employee: {
@@ -54,18 +51,14 @@ export async function GET(req: NextRequest) {
           },
         },
       },
-      sheet: {
-        select: {
-          date: true,
-        },
-      },
       department: true,
+      job: true,
     },
   });
 
   // Filter by Ethiopian month/year
-  const filteredLines = allLines.filter((line) => {
-    const ethDate = dateToEth(line.sheet.date);
+  const filteredLines = allLines.filter((line: any) => {
+    const ethDate = dateToEth(line.date);
     return ethDate.year === year && ethDate.month === month;
   });
 
@@ -77,7 +70,7 @@ export async function GET(req: NextRequest) {
   }
 
   // Get date range from filtered lines
-  const dates = filteredLines.map((l) => l.sheet.date).sort((a, b) => a.getTime() - b.getTime());
+  const dates = filteredLines.map((l: any) => l.date).sort((a: any, b: any) => a.getTime() - b.getTime());
   const startDate = dates[0];
   const endDate = dates[dates.length - 1];
 
@@ -88,6 +81,7 @@ export async function GET(req: NextRequest) {
     plusPieces: number;
     minusPieces: number;
     days: number;
+    jobId: string;
     departmentId: string;
   }>();
 
@@ -108,16 +102,17 @@ export async function GET(req: NextRequest) {
         plusPieces: line.plusPieces,
         minusPieces: line.minusPieces,
         days: 1,
+        jobId: line.jobId,
         departmentId: line.departmentId,
       });
     }
   }
 
   // Get incentive rates
-  const deptIds = Array.from(new Set(Array.from(employeeDataMap.values()).map(e => e.departmentId)));
+  const jobIds = Array.from(new Set(Array.from(employeeDataMap.values()).map(e => e.jobId).filter(Boolean)));
   const incentiveCards = await db.incentiveCard.findMany({
     where: {
-      departmentId: { in: deptIds },
+      jobId: { in: jobIds },
       effectiveFrom: { lte: endDate },
       OR: [
         { effectiveTo: null },
@@ -127,17 +122,17 @@ export async function GET(req: NextRequest) {
     orderBy: { effectiveFrom: "desc" },
   });
 
-  const rateByDept = new Map<string, Decimal>();
+  const rateByJob = new Map<string, Decimal>();
   for (const card of incentiveCards) {
-    if (!rateByDept.has(card.departmentId)) {
-      rateByDept.set(card.departmentId, new Decimal(card.ratePerPiece.toString()));
+    if (!rateByJob.has(card.jobId)) {
+      rateByJob.set(card.jobId, new Decimal(card.ratePerPiece.toString()));
     }
   }
 
   // Calculate incentives by employee (only from plusPieces)
   const incentiveByEmployee = new Map<string, Decimal>();
   for (const [empId, data] of employeeDataMap.entries()) {
-    const rate = rateByDept.get(data.departmentId) ?? new Decimal(0);
+    const rate = (data.jobId ? rateByJob.get(data.jobId) : null) ?? new Decimal(0);
     const incentive = data.plusPieces > 0 ? new Decimal(data.plusPieces).times(rate) : new Decimal(0);
     incentiveByEmployee.set(empId, incentive);
   }
@@ -178,9 +173,9 @@ export async function GET(req: NextRequest) {
   let totalIncentive = new Decimal(0);
   let totalCompensation = new Decimal(0);
 
-  const employees = Array.from(employeeMap.values()).sort((a, b) => {
-    if (a.department.sortOrder !== b.department.sortOrder) {
-      return a.department.sortOrder - b.department.sortOrder;
+  const employees = Array.from(employeeMap.values()).sort((a: any, b: any) => {
+    if (a.department.flowOrder !== b.department.flowOrder) {
+      return a.department.flowOrder - b.department.flowOrder;
     }
     // Handle both string and number serialNumbers
     const aSerial = String(a.serialNumber);
@@ -188,7 +183,7 @@ export async function GET(req: NextRequest) {
     return aSerial.localeCompare(bSerial);
   });
 
-  const rows = employees.map((emp, idx) => {
+  const rows = employees.map((emp: any, idx: number) => {
     const incentive = incentiveByEmployee.get(emp.id) ?? new Decimal(0);
     const baseSalary =
       emp.salaryRecords[0]?.amount
@@ -196,10 +191,8 @@ export async function GET(req: NextRequest) {
         : new Decimal(0);
 
     const attendances = attendanceByEmployee.get(emp.id) ?? [];
-    // Present = hoursWorked > 0 (excluding leave which is -1)
-    const presentDays = attendances.filter((a) => Number(a.hoursWorked) > 0).length;
-    // Absent = hoursWorked = 0 (not counting leave = -1 or weekends)
-    const absentDays = attendances.filter((a) => Number(a.hoursWorked) === 0).length;
+    const presentDays = attendances.filter((a: any) => a.status === "PRESENT").length;
+    const absentDays = attendances.filter((a: any) => a.status === "ABSENT_UNAUTHORIZED" || a.status === "ABSENT_AUTHORIZED").length;
     const missedDays = workingDays - presentDays;
 
     const total = baseSalary.plus(incentive);

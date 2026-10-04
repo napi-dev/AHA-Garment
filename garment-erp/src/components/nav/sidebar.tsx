@@ -10,8 +10,8 @@ import { getPageAccess } from "@/lib/auth/permissions";
 import {
   LayoutDashboard, Users, Clock, ClipboardList, CheckSquare,
   Package, Scissors, Factory, Shield, TrendingUp, FileText,
-  Settings, LogOut, AlertTriangle, Truck, DollarSign, X,
-  Layers, Warehouse, Building2, ChevronRight
+  Settings, LogOut, AlertTriangle, DollarSign, X,
+  Layers, Warehouse, Building2, ArrowLeftRight, ShoppingBag, Store
 } from "lucide-react";
 
 interface NavItem {
@@ -62,9 +62,8 @@ export function Sidebar({
       items: [
         { label: am.nav.cutting, href: "/cutting", icon: <Scissors size={18} />, pagePath: "/cutting" },
         { label: "የምርት ትዕዛዞች", href: "/production", icon: <Factory size={18} />, pagePath: "/production" },
-        { label: "ባንድሎች (Bundles)", href: "/production/bundles", icon: <Layers size={18} />, pagePath: "/production/bundles" },
+        { label: am.nav.flow, href: "/flow", icon: <ArrowLeftRight size={18} />, pagePath: "/flow" },
         { label: am.nav.quality, href: "/quality", icon: <CheckSquare size={18} />, pagePath: "/quality" },
-        { label: am.nav.packing, href: "/packing", icon: <Package size={18} />, pagePath: "/packing" },
       ],
     },
     {
@@ -72,6 +71,10 @@ export function Sidebar({
       items: [
         { label: am.nav.materials, href: "/materials", icon: <Warehouse size={18} />, pagePath: "/materials" },
         { label: "አቅራቢ ድርጅቶች", href: "/suppliers", icon: <Building2 size={18} />, pagePath: "/suppliers" },
+        { label: am.nav.shop, href: "/shop", icon: <Store size={18} />, pagePath: "/shop" },
+        { label: "ሱቅ መቀበያ", href: "/shop/receive", icon: <Package size={18} />, pagePath: "/shop/receive" },
+        { label: "ሱቅ ሽያጭ", href: "/shop/sale", icon: <ShoppingBag size={18} />, pagePath: "/shop/sale" },
+        { label: "ወደ ፋብሪካ ተመላሽ", href: "/shop/return", icon: <ArrowLeftRight size={18} />, pagePath: "/shop/return" },
       ],
     },
     {
@@ -79,6 +82,7 @@ export function Sidebar({
       items: [
         { label: am.employees.title, href: "/employees", icon: <Users size={18} />, pagePath: "/employees" },
         { label: am.nav.incentive, href: "/incentive", icon: <TrendingUp size={18} />, pagePath: "/incentive" },
+        { label: "የኢንሴንቲቭ ማጠቃለያ", href: "/incentive/summary", icon: <FileText size={18} />, pagePath: "/incentive" },
         { label: am.nav.salary, href: "/salary", icon: <DollarSign size={18} />, pagePath: "/salary" },
         { label: "የወር ኢንሴንቲቭ ማጠቃለያ", href: "/payroll/monthly-incentive", icon: <TrendingUp size={18} />, pagePath: "/payroll" },
         { label: "የወር ደሞዝ ማጠቃለያ", href: "/payroll/monthly-salary", icon: <DollarSign size={18} />, pagePath: "/payroll" },
@@ -100,6 +104,7 @@ export function Sidebar({
         { label: am.nav.reports, href: "/reports", icon: <FileText size={18} />, pagePath: "/reports" },
         { label: am.nav.users, href: "/users", icon: <Shield size={18} />, pagePath: "/users" },
         { label: am.nav.settings, href: "/settings", icon: <Settings size={18} />, pagePath: "/settings" },
+        { label: "የተመን ካርድ", href: "/settings/incentive-card", icon: <TrendingUp size={18} />, pagePath: "/settings" },
         { label: am.nav.auditLog, href: "/audit", icon: <ClipboardList size={18} />, pagePath: "/audit" },
       ],
     },
@@ -238,7 +243,7 @@ export function Sidebar({
               <LogOut size={16} className="text-rose-500 group-hover:-translate-x-0.5 transition-transform" />
               <span>{am.nav.logout}</span>
             </div>
-            <span className="text-[10px] text-slate-400 font-normal">v1.0</span>
+            <span className="text-[10px] text-slate-400 font-normal">v2.0</span>
           </button>
         </div>
       </aside>

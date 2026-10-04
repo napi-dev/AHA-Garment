@@ -14,30 +14,32 @@ export default async function ProductivityReportPage({
 }) {
   const session = await auth();
   if (!session?.user) redirect("/login");
-  requirePermission(session.user.role, "reports:view");
+  requirePermission(session.user.role, "/reports");
 
   const params  = await searchParams;
   const dateStr = params.date ?? todayISOStringEAT();
   const date    = new Date(dateStr + "T00:00:00Z");
 
-  const lines = await db.hourlyCountLine.findMany({
-    where: { sheet: { date }, status: { not: "DRAFT" } },
+  const boxes = await db.hourlyBox.findMany({
+    where: { date },
     include: {
       employee: true,
-      department: true,
+      job: {
+        include: { department: true },
+      },
     },
     orderBy: [
-      { department: { sortOrder: "asc" } },
+      { job: { department: { flowOrder: "asc" } } },
       { employee: { serialNumber: "asc" } },
     ],
   });
 
   // Compute stats per row
-  const rows = lines.map((l) => {
-    const target  = l.targetForDay;
-    const produced = l.totalProduced;
+  const rows = boxes.map((b) => {
+    const target  = b.targetForDay;
+    const produced = b.totalProduced;
     const pct     = target > 0 ? Math.round((produced / target) * 100 * 10) / 10 : null;
-    return { ...l, target, produced, pct, isAbove: produced >= target };
+    return { ...b, department: b.job.department, target, produced, pct, isAbove: produced >= target };
   });
 
   const aboveTarget  = rows.filter((r) => r.isAbove).length;
@@ -102,7 +104,7 @@ export default async function ProductivityReportPage({
         </div>
       </div>
 
-      {lines.length === 0 ? (
+      {boxes.length === 0 ? (
         <div className="erp-card p-12 text-center space-y-2">
           <Calendar size={32} className="mx-auto text-slate-300" />
           <h3 className="font-bold text-slate-800 font-ethiopic">ምንም የተረጋገጠ ቁጥር አልተገኘም</h3>
