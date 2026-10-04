@@ -25,7 +25,7 @@ type ExistingBox = {
 export default async function CountEntryPage({
   searchParams,
 }: {
-  searchParams: Promise<{ job?: string; date?: string }>;
+  searchParams: Promise<{ job?: string; date?: string; page?: string }>;
 }) {
   const session = await auth();
   if (!session?.user) redirect("/login");
@@ -87,6 +87,20 @@ export default async function CountEntryPage({
   const selectedJobId = params.job ?? allJobs[0]?.id ?? "";
   const selectedJob = allJobs.find((j) => j.id === selectedJobId);
 
+  // ─── Pagination setup ───────────────────────────────────────────────────────
+  const page = parseInt(params.page ?? "1", 10);
+  const PAGE_SIZE = 50;
+
+  // Count total employees for selected job
+  const totalEmployees = selectedJobId
+    ? await db.employee.count({
+        where: { jobId: selectedJobId, isActive: true },
+      })
+    : 0;
+
+  const totalPages = Math.ceil(totalEmployees / PAGE_SIZE);
+  const needsPagination = totalEmployees > PAGE_SIZE;
+
   // ─── Load employees for selected job ────────────────────────────────────────
   const employees = selectedJobId
     ? await db.employee.findMany({
@@ -98,6 +112,10 @@ export default async function CountEntryPage({
           },
         },
         orderBy: { serialNumber: "asc" },
+        ...(needsPagination && {
+          skip: (page - 1) * PAGE_SIZE,
+          take: PAGE_SIZE,
+        }),
       })
     : [];
 
@@ -113,6 +131,7 @@ export default async function CountEntryPage({
       <div className="erp-card p-5">
         <form method="GET" className="space-y-4">
           <input type="hidden" name="date" value={selectedDateISO} />
+          <input type="hidden" name="page" value="1" />
           <div className="flex items-center gap-2 text-xs font-semibold text-slate-600 font-ethiopic mb-3">
             <Briefcase size={14} className="text-blue-500" />
             <span>ስራ ምረጥ (በክፍል የተደራጀ)፦</span>
@@ -155,7 +174,7 @@ export default async function CountEntryPage({
 
       {selectedJob && (
         <HourlyCountForm
-          key={`${selectedDateISO}-${selectedJobId}`}
+          key={`${selectedDateISO}-${selectedJobId}-${page}`}
           jobId={selectedJob.id}
           jobNameAm={selectedJob.nameAm}
           departmentId={selectedJob.department.id}
@@ -170,6 +189,10 @@ export default async function CountEntryPage({
           date={selectedDate.toISOString()}
           supervisorId={session.user.id}
           isReadOnly={isDayClosed}
+          currentPage={page}
+          totalPages={totalPages}
+          totalEmployees={totalEmployees}
+          needsPagination={needsPagination}
         />
       )}
     </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { am } from "@/lib/i18n/am";
 import { saveAttendance, submitAttendance } from "./actions";
 import { Check, Loader2, AlertCircle, CheckCircle2, XCircle, Save, ChevronLeft, ChevronRight } from "lucide-react";
@@ -45,16 +45,7 @@ const STATUS_OPTIONS: Array<{ label: string; value: AttendanceStatus; color: str
   { label: "የሃኪም ማስረጃ", value: "SICK_LEAVE", color: "purple" },
 ];
 
-export function AttendanceGrid({ 
-  employees, 
-  date, 
-  canEdit, 
-  userId, 
-  isLineSupervisor,
-  currentPage,
-  totalPages 
-}: AttendanceGridProps) {
-  // Build initial state
+function buildInitialState(employees: EmpRow[]): Record<string, RowState> {
   const init: Record<string, RowState> = {};
   for (const e of employees) {
     init[e.id] = {
@@ -64,9 +55,26 @@ export function AttendanceGrid({
       error: "",
     };
   }
-  const [rows, setRows] = useState<Record<string, RowState>>(init);
+  return init;
+}
+
+export function AttendanceGrid({ 
+  employees, 
+  date, 
+  canEdit, 
+  userId, 
+  isLineSupervisor,
+  currentPage,
+  totalPages 
+}: AttendanceGridProps) {
+  const [rows, setRows] = useState<Record<string, RowState>>(() => buildInitialState(employees));
   const [bulkSaving, setBulkSaving] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+
+  // Rebuild state when employees or page changes
+  useEffect(() => {
+    setRows(buildInitialState(employees));
+  }, [employees, currentPage]);
 
   function update(empId: string, status: AttendanceStatus) {
     setRows((p) => ({ ...p, [empId]: { ...p[empId], status, saved: false } }));

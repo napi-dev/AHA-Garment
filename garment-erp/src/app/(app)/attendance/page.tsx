@@ -46,6 +46,15 @@ export default async function AttendancePage({
     where: { isActive: true },
   });
 
+  // Get total present count across ALL employees for this date
+  const totalPresentCount = await db.attendance.count({
+    where: {
+      date,
+      status: "PRESENT",
+      employee: { isActive: true },
+    },
+  });
+
   const employees = await db.employee.findMany({
     where: { isActive: true },
     orderBy: { serialNumber: "asc" },
@@ -63,11 +72,6 @@ export default async function AttendancePage({
     session.user.role === "PRODUCTION_MANAGER" ||
     session.user.role === "LINE_SUPERVISOR"
   );
-
-  const totalPresent = employees.filter((e) => {
-    const att = e.attendances[0];
-    return att && att.status === "PRESENT";
-  }).length;
 
   const totalPages = Math.ceil(totalEmployees / PAGE_SIZE);
 
@@ -88,8 +92,10 @@ export default async function AttendancePage({
             <span>{formatAsEthDate(date)}</span>
             <span>·</span>
             <CheckCircle2 size={13} className="text-emerald-500" />
-            <span className="font-semibold text-emerald-600">{totalPresent}</span>
+            <span className="font-semibold text-emerald-600">{totalPresentCount}</span>
             <span>ከ {totalEmployees} ሠራተኞች ተገኝተዋል</span>
+            <span>·</span>
+            <span className="text-slate-400">ገጽ {page}/{totalPages}</span>
           </p>
         </div>
         <div className="flex items-center gap-3 flex-wrap">

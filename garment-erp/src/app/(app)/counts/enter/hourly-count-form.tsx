@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { am } from "@/lib/i18n/am";
 import { formatAsEthDate } from "@/lib/ethiopian-calendar";
 import { calculateDailyCount } from "@/lib/incentive/engine";
 import { saveHourlyBox } from "../actions";
-import { Check, Loader2, AlertCircle, Save, Target, Briefcase, Calendar, CheckCircle2, Lock } from "lucide-react";
+import { Check, Loader2, AlertCircle, Save, Target, Briefcase, Calendar, CheckCircle2, Lock, ChevronLeft, ChevronRight } from "lucide-react";
+import Link from "next/link";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -39,6 +40,10 @@ interface HourlyCountFormProps {
   date: string;
   supervisorId: string;
   isReadOnly?: boolean;
+  currentPage: number;
+  totalPages: number;
+  totalEmployees: number;
+  needsPagination: boolean;
 }
 
 type HourKey = "h1"|"h2"|"h3"|"h4"|"h5"|"h6"|"h7"|"h8";
@@ -89,24 +94,37 @@ export function HourlyCountForm({
   employees, 
   date, 
   supervisorId, 
-  isReadOnly = false 
+  isReadOnly = false,
+  currentPage,
+  totalPages,
+  totalEmployees,
+  needsPagination,
 }: HourlyCountFormProps) {
   // Build initial state: { [employeeId]: RowState }
-  const initialState: Record<string, RowState> = {};
-  for (const emp of employees) {
-    initialState[emp.id] = emp.existingBox
-      ? boxToRow(emp.existingBox)
-      : emptyRow();
-  }
+  const buildInitialState = useCallback(() => {
+    const initialState: Record<string, RowState> = {};
+    for (const emp of employees) {
+      initialState[emp.id] = emp.existingBox
+        ? boxToRow(emp.existingBox)
+        : emptyRow();
+    }
+    return initialState;
+  }, [employees]);
 
-  const [rows, setRows] = useState<Record<string, RowState>>(initialState);
+  const [rows, setRows] = useState<Record<string, RowState>>(buildInitialState);
   const [activeEmpId, setActiveEmpId] = useState<string | null>(null);
 
-  const totalRows    = Object.keys(initialState).length;
-  const alreadySaved = Object.values(initialState).filter((r) => r.saved).length;
+  // Rebuild state when employees change (page navigation)
+  useEffect(() => {
+    setRows(buildInitialState());
+  }, [employees, buildInitialState]);
+
+  const totalRows    = employees.length;
+  const alreadySaved = Object.values(rows).filter((r) => r.saved).length;
 
   const dateObj = new Date(date);
   const dateDisplay = formatAsEthDate(dateObj);
+  const dateStr = dateObj.toISOString().split("T")[0];
 
   const updateRow = useCallback(
     (empId: string, field: keyof RowState, value: string) => {
@@ -241,12 +259,41 @@ export function HourlyCountForm({
       <div className="erp-card overflow-hidden shadow-sm">
         {/* Header */}
         <div className="px-6 py-4 bg-slate-50/80 border-b border-slate-200/80">
-          <h3 className="font-bold text-slate-900 font-ethiopic text-sm">
-            {departmentNameAm} - {jobNameAm}
-          </h3>
-          <p className="text-xs text-slate-500 font-ethiopic mt-0.5">
-            {employees.length} ሠራተኞች በዚህ ስራ ተመድበዋል
-          </p>
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="font-bold text-slate-900 font-ethiopic text-sm">
+                {departmentNameAm} - {jobNameAm}
+              </h3>
+              <p className="text-xs text-slate-500 font-ethiopic mt-0.5">
+                {needsPagination 
+                  ? `${totalEmployees} ሠራተኞች ጠቅላላ · ገጽ ${currentPage}/${totalPages} · ${employees.length} በዚህ ገጽ`
+                  : `${employees.length} ሠራተኞች በዚህ ስራ ተመድበዋል`
+                }
+              </p>
+            </div>
+            {needsPagination && (
+              <div className="flex items-center gap-2">
+                {currentPage > 1 && (
+                  <Link
+                    href={`?job=${jobId}&date=${dateStr}&page=${currentPage - 1}`}
+                    className="inline-flex items-center gap-1.5 text-xs bg-white text-slate-700 border border-slate-300 px-3 py-2 rounded-xl hover:bg-slate-50 active:scale-95 transition-all font-ethiopic shadow-xs"
+                  >
+                    <ChevronLeft size={14} />
+                    <span>ቀዳሚ</span>
+                  </Link>
+                )}
+                {currentPage < totalPages && (
+                  <Link
+                    href={`?job=${jobId}&date=${dateStr}&page=${currentPage + 1}`}
+                    className="inline-flex items-center gap-1.5 text-xs bg-white text-slate-700 border border-slate-300 px-3 py-2 rounded-xl hover:bg-slate-50 active:scale-95 transition-all font-ethiopic shadow-xs"
+                  >
+                    <span>ቀጣይ</span>
+                    <ChevronRight size={14} />
+                  </Link>
+                )}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Table grid */}
@@ -290,6 +337,35 @@ export function HourlyCountForm({
             </tbody>
           </table>
         </div>
+
+        {/* Pagination Footer */}
+        {needsPagination && (
+          <div className="px-6 py-4 bg-slate-50/80 border-t border-slate-200/80 flex items-center justify-between gap-4">
+            <div className="text-xs text-slate-500 font-ethiopic">
+              ገጽ {currentPage} ከ {totalPages} · {alreadySaved}/{totalRows} ተቀምጧል
+            </div>
+            <div className="flex items-center gap-2">
+              {currentPage > 1 && (
+                <Link
+                  href={`?job=${jobId}&date=${dateStr}&page=${currentPage - 1}`}
+                  className="inline-flex items-center gap-1.5 text-xs bg-white text-slate-700 border border-slate-300 px-3 py-2 rounded-xl hover:bg-slate-50 active:scale-95 transition-all font-ethiopic shadow-xs"
+                >
+                  <ChevronLeft size={14} />
+                  <span>ቀዳሚ</span>
+                </Link>
+              )}
+              {currentPage < totalPages && (
+                <Link
+                  href={`?job=${jobId}&date=${dateStr}&page=${currentPage + 1}`}
+                  className="inline-flex items-center gap-1.5 text-xs bg-white text-slate-700 border border-slate-300 px-3 py-2 rounded-xl hover:bg-slate-50 active:scale-95 transition-all font-ethiopic shadow-xs"
+                >
+                  <span>ቀጣይ</span>
+                  <ChevronRight size={14} />
+                </Link>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
