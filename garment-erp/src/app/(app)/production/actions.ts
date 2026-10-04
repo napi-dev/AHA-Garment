@@ -5,97 +5,83 @@ import { db } from "@/lib/db";
 import { requirePermission } from "@/lib/auth/permissions";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import type { Size, OrderStatus } from "@prisma/client";
 
-// ── Garment style ────────────────────────────────────────────────────────────
-export async function createStyle(formData: FormData) {
-  const session = await auth();
-  if (!session?.user) throw new Error("ተፈቅዶ አልነበረም");
-  requirePermission(session.user.role, "bundles:edit");
-
-  const nameAm = String(formData.get("nameAm") ?? "").trim();
-  const nameEn = String(formData.get("nameEn") ?? "").trim() || null;
-  const count  = await db.garmentStyle.count();
-  const code   = `STY-${String(count + 1).padStart(3, "0")}`;
-
-  await db.garmentStyle.create({ data: { nameAm, nameEn, code } });
-  revalidatePath("/production/styles");
-}
-
-// ── BOM item ─────────────────────────────────────────────────────────────────
-export async function upsertBomItem(formData: FormData) {
-  const session = await auth();
-  if (!session?.user) throw new Error("ተፈቅዶ አልነበረም");
-  requirePermission(session.user.role, "bundles:edit");
-
-  const styleId    = String(formData.get("styleId") ?? "");
-  const materialId = String(formData.get("materialId") ?? "");
-  const qty        = String(formData.get("qtyPerPiece") ?? "0");
-  const unit       = String(formData.get("unit") ?? "");
-
-  await db.bomItem.upsert({
-    where: { styleId_materialId: { styleId, materialId } },
-    update: { qtyPerPiece: qty, unit },
-    create: { styleId, materialId, qtyPerPiece: qty, unit },
-  });
-  revalidatePath(`/production/styles/${styleId}`);
-}
-
-// ── Production order ─────────────────────────────────────────────────────────
 export async function createOrder(formData: FormData) {
   const session = await auth();
   if (!session?.user) throw new Error("ተፈቅዶ አልነበረም");
-  requirePermission(session.user.role, "bundles:edit");
+  requirePermission(session.user.role, "/production/orders");
 
-  const styleId    = String(formData.get("styleId") ?? "");
-  const quantity   = parseInt(String(formData.get("quantity") ?? "0"), 10);
-  const customer   = String(formData.get("customer") ?? "").trim() || null;
-  const dueDateStr = String(formData.get("dueDate") ?? "").trim();
-  const dueDate    = dueDateStr ? new Date(dueDateStr + "T00:00:00Z") : null;
+  const deadlineDate = String(formData.get("deadlineDate") ?? "");
+  const deadlineTime = String(formData.get("deadlineTime") ?? "17:00");
+  
+  if (!deadlineDate) throw new Error("የማጠናቀቂያ ቀን ያስፈልጋል");
+  const deadlineAt = new Date(`${deadlineDate}T${deadlineTime}:00Z`);
 
+  // Lines
+  const typeId = String(formData.get("typeId") ?? "ቲ-ሸርት").trim();
+  const color  = String(formData.get("color")  ?? "ነጭ").trim();
+  const size   = (String(formData.get("size")   ?? "L").toUpperCase()) as Size;
+  const qty    = parseInt(String(formData.get("qty") ?? "0"), 10);
+
+  if (qty <= 0) throw new Error("ብዛት ቢያንስ 1 መሆን አለበት");
+
+  // Generate ORD-00001 (5 digits)
   const count = await db.prodOrder.count();
-  const orderNumber = `ORD-${String(count + 1).padStart(4, "0")}`;
-
-  // Default stage route: all 9 stages in order
-  const STAGES = [
-    "RECEIVING","CUTTING","SEWING","TRIMMING",
-    "QUALITY_CONTROL","STYLING_HITPRESS","IRONING","PACKING","DELIVERY",
-  ] as const;
+  const orderNo = `ORD-${String(count + 1).padStart(5, "0")}`;
 
   const order = await db.prodOrder.create({
     data: {
-      orderNumber, styleId, quantity, customer, dueDate,
+      orderNo,
+      deadlineAt,
+      status: "ACTIVE",
+      createdById: session.user.id,
+      lines: {
+        create: {
+          typeId,
+          color,
+          size,
+          qty,
+        },
+      },
     },
   });
-
-  // Ensure the style has default stage routes defined
-  for (let i = 0; i < STAGES.length; i++) {
-    await db.styleStageRoute.upsert({
-      where: { styleId_stage: { styleId, stage: STAGES[i] } },
-      update: {},
-      create: { styleId, stage: STAGES[i], sortOrder: i + 1 },
-    });
-  }
 
   await db.auditLog.create({
     data: {
-      userId: session.user.id,
-      action: "CREATE_ORDER",
-      entity: "ProdOrder",
+      userId:   session.user.id,
+      action:   "CREATE_ORDER",
+      entity:   "ProdOrder",
       entityId: order.id,
-      after: { orderNumber, styleId, quantity, customer, dueDate: dueDateStr },
+      after:    { orderNo, deadlineAt: deadlineAt.toISOString(), lines: [{ typeId, color, size, qty }] },
     },
   });
 
   revalidatePath("/production");
-  redirect("/production");
+  revalidatePath("/dashboard");
+  redirect(`/production/orders/${order.id}`);
 }
 
-export async function closeOrder(orderId: string) {
+export async function updateOrderStatus(orderId: string, status: OrderStatus) {
   const session = await auth();
   if (!session?.user) throw new Error("ተፈቅዶ አልነበረም");
-  requirePermission(session.user.role, "bundles:edit");
+  requirePermission(session.user.role, "/production");
 
-  await db.prodOrder.update({ where: { id: orderId }, data: { isActive: false } });
+  await db.prodOrder.update({
+    where: { id: orderId },
+    data:  { status },
+  });
+
+  await db.auditLog.create({
+    data: {
+      userId:   session.user.id,
+      action:   "UPDATE_ORDER_STATUS",
+      entity:   "ProdOrder",
+      entityId: orderId,
+      after:    { status },
+    },
+  });
+
   revalidatePath("/production");
-  redirect("/production");
+  revalidatePath(`/production/orders/${orderId}`);
 }

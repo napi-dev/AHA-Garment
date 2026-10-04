@@ -1,0 +1,333 @@
+what i need is i wrote down then you prepare a beauty full md file 
+
+i need to simplyfy the system 
+
+the roles are must be fixed according to this 
+Code	Role	Does	Sees
+
+ADM-001	Owner  	Everything	
+
+ORD-001	Order Placer     	Takes orders, receives shop stock,  sells	Orders + shop stock
+
+PMG-001	Production Manager 	 follows and coordinates all things except some things 
+
+SUP-001 / SUP-002	Line Supervisor 1 / 2	Fills incentive box and  attendance 
+
+CUT-001	Cutting lead	Cutting incentive box + handover	Cutting only
+
+QCI-001	Quality inspector	Quality incentive box + Rework	Quality only
+
+STK-001	Store keeper	Fabric in/out	Store only
+
+የስራ ክፍል/ deparment is can be created by owner and production manager in /settings and needs to know who controls them 
+and for now the departments are ቆራጭ፣ ስፌት፣ ቅንጨባ ፣ ጥራት ተቆጣጣሪ፣ ካውያ ፣ ሂት ፕረስ ፣ ማሸግ፣ አስተዳደር (roles)
+
+in the system 
+save items by there order no or gave them other number not by 1 BND so the flow of department is 
+
+store,ቆራጭ፣ ስፌት፣ ቅንጨባ ፣ ጥራት ተቆጣጣሪ፣ ካውያ ፣ ሂት ፕረስ ፣ ማሸግ፣ shop  
+
+store control by store kepper , production manager and owner
+ቆራጭ control by cutting lead , production manager and owner
+ስፌት፣ ቅንጨባ control by line super visor, production manager and owner
+ጥራት ተቆጣጣሪ  control by Quality inspector, production manager and owner
+ካውያ ፣ ሂት ፕረስ ፣ ማሸግ control by production manager and owner
+shop control by Order Placer,owner 
+so the 
+
+ማንኛውምእቃበፋብሪካውስጥሲንቀሳቀስሁለትጊዜይቆጠራል:  ①  የሚልከውክፍል'ላክሁ'     ይላል የሚቀበለውክፍል
+② 'ተቀብያለሁ' 
+ይላል። ሁለቱቁጥሮችሲመጣጠኑስህተትየለም።ፍልልያካለ-       እቃውበዚያሁለትክፍሎችመካከልነውየጠፋው!
+ቆረጣ'400 ላክሁ'    አለ ስፌት
+→ '400 ተቀብያለሁ'    አለ ፍልልያ
+→
+ስፌት'380  ጨርስሼ ላክሁ'    አለች ኳሊቲ
+→
+= 0  ✓  ምንም ችግርየለም
+'365 ተቀብያለሁ'    አለ ፍልልያ
+→
+ቆረጣ ስፌት
+→ |  ስፌት ኳሊቲ
+→ |  → ኳሊቲ ቅንጫባ|  ቅንጫባ ሂትፕረስ
+→
+= -15  ⚠     እቃውበስፌትእናኳሊቲመካከልጠፍቷል!
+|  ሂትፕረስ ካውያ
+→ |  ካውያ ማሸግ
+→
+| ማሸግ መጋዘን
+→
+ፍልልያ ሲገኝ:  ①       በዚያ ቀን በዚያውክፍልእንደገና ይቆጠራል②Rework   መዝገብይፈተሻል(  ምናልባትእዛተቀምጧል)  ③  ካልተገኘወደ
+ማኔጀር ሪፖርት ይደረጋል
+ሰንጠረዡፍልልያ0      ካልሆነራሱቀይይቀየራልእና' ⚠ ውጥረትአለ'  ይላል-  ማስላትአያስፈልግም!
+
+this is the flow of the system 
+
+for report generation
+table1 ተ.ቁ ቀለም/ሳይዝ A. ቆረጣላከ B. ስፌት
+ተቀበለ
+C. ስፌት
+ጨረሰ
+D. ኳሊቲ
+አለፈ
+E. ፊኒሺንግ
+ተቀበለ
+F. ማሸግ
+ጨረሰ ድምርF-A
+ ሁኔታ 
+ማስታወ
+
+table2
+ቀን: ________ |    የቀን ጨርቅ ከመጋዘን ወጥቷል: ________ ኪ.ግ
+ዲፓርትመንት
+የተቀበለ (ገቢ) 
+ያውጣ(ውጪ) 
+ፍልልያ
+→
+መጋዘን ቆረጣ(ጨርቅ/ኪ.ግ
+የተገኘበት ምክንያት 
+ኃላፊፊርማ
+
+i need table like this for report and add this in count/close pdf generation 
+
+/dashboard
+
+የዛሬ ጠቅላላ ምርት, ዒላማ ያሳኩ ሠራተኞች, ንቁ የምርት ትዕዛዞች, ክፍት ማስጠንቀቂያዎች, የባለፉት 14 ቀናት የምርት ሂደት, one graph todays work, ⚡ፈጣን የስራ ተግባራት (Quick Actions) ,የ72/48/24 orders number 
+
+this dashboard must seen for Owner, and production manager only for others dashboard according to there works only if not nessery dont add graphs 
+
+in /attendance
+
+show 50 workes then put next button and show others no need of show them in የስራ ክፍል ምረጥ
+
+show them in ተ.ቁ	ሙሉ ስም  የስራ ክፍል	የተሠራበት የሰዓት ብዛት(change this dropdown and name the drop down must be(አለ፣ ቀሪ፣ ፈቃድ፣ የሃኪም ማስረጃ ))		ሁኔታ
+
+የጋራ መመዝገቢያ፦ this is good 
+
+and put save button for Line Supervisor in the last page and if save button touched then the attendance page isnt editable for them editable only for owner and production manager 
+
+and this page showable only for  owner , production manager and Line Supervisor
+
+
+in /cutting
+
+the form must be 
+/cutting/new
+
+የምርት ትዕዛዝ *
+
+ጨርቅ (from store)
+
+የተሰጠ ጨርቅ ሚዛን (ኪ.ግ)
+
+የተቆረጡ ፍሬዎች ብዛት *
+
+የተቆረጠበት ቀን
+
+then የብክነት ስሌት ቀመር (consumption) ፦ (የተቆረጡ ፍሬዎች ብዛት  ÷ የተሰጠ ጨርቅ ሚዛን (ኪ.ግ)
+if the answer is > 1 there is consumption በስርዓቱ ውስጥ ማስጠንቀቂያ ይፈጠራል።
+
+
+ጨርቅ (from store) see from the store then if
+ የተሰጠ ጨርቅ ሚዛን (ኪ.ግ) > ጨርቅ (from store) show messsage  በቂ ጨርቅ የለም
+ 
+ የተሰጠ ጨርቅ ሚዛን (ኪ.ግ) < ጨርቅ (from store) then calculate and save the remaning in store 
+
+show for cutting , owner and production manager roles 
+
+/production
+
+there is no need of /production/styles
+
+in /production/orders/new
+the form must
+
+ቀን:todays day 
+ምንጭ: ፋብሪካ / ትዕዛዝ ተመላሽ / ሌላ ስታይል:Dropdown 
+type: ቲ-ሸርት 
+ቀለም: ነጭ  
+Dropdown ሳይዝ: S / M / L / XL / XXL 
+ ብዛት: ________ ቁጥር ብ
+የማጠናቀቂያ ቀን (የማጠናቀቂያ ቀን)
+
+
+
+this page must show for owner, production manager , 	Order Placer
+
+
+
+የ72/48/24 ሰዓት ራስ-ሰራሽ ማስጠንቀቂያ
+
+72 ሰዓት ሲቀር:🟢
+48 ሰዓት ሲቀር:🟡
+24 ሰዓት ሲቀር:🔴
+
+"ትዕዛዝ ORD-XXX በ3 ቀን ይቀራል። የቆረጣ ዝግጅት ጀምር" → ወደ PMG-001 + ORD-001 + ADM-001
+"ትዕዛዝ ORD-XXX በ2 ቀን ይቀራል። የስፌት መስመር ሂደት አረጋግጥ" → ማስጠንቀቂያ ቀጥሏል
+"ትዕዛዝ ORD-XXX በ1 ቀን ይቀራል! የፊኒሺንግ ፍጥነት ጨምር!" → ማስጠንቀቂያ + ድምጽ for admin and production manager only 
+
+and new page for owner and Order Placer 
+ውጪ ስክሪን (ሽያጭ - እዚህ ብቻ ዋጋ ይገባል)
+ቀን: 03/10/2026 auto
+ስታይል + ቀለም + ሳይዝ: ነጭ ቲ-ሸርት / ነጭ / L 
+የሚወጣ ብዛት: ________ ቁጥር ብቻ
+የአንድ ፍሬ ዋጋ (ብር): ________ ቁጥር - 
+ጠቅላላ ገቢ: auto
+የተገዛው ሰው: ________
+
+and new page for owner and Order Placer 
+የሱቅ እቃ መረከቢያ
+ቀን: 03/10/2026 ራስ-ሰራሽ
+ምንጭ: ፋብሪካ / ትዕዛዝ ተመላሽ / ሌላ Dropdown
+ስታይል: ነጭ ቲ-ሸርት 
+ቀለም: ነጭ 
+ሳይዝ: S / M / L / XL / XXL Dropdown
+
+ብዛት: ________ ቁጥር ብቻ
+
+ ወደ ፋብሪካ ተመላሽ እቃ
+ከሱቅ ወደ ፋብሪካ የሚመለስ እቃ (ጥራት ችግር ወይም ያልተሸጠ) በተመሳሳይ ቀላል ስክሪን "ፋብሪካ ተመላሽ" በሚል ምንጭ ይመዘገባል። ዋጋ አይገባም። so this are need new page for owner and Order Placer  
+
+3. የሱቅ ቀሪ (ራስ-ሰራሽ)
+ስታይል
+ነጭ ቲ-ሸርት
+ትራክ ሱሪ
+ቀለም
+ነጭ
+ጥቁር
+ሳይዝ
+L
+XL
+ሽጥ ✓
+የገባ
+400
+200
+የወጣ
+120
+45
+ቀሪ
+280
+155
+ቀሪ = የገባ - የወጣ - ራሱ ይሰላል። ቀሪ 0 ሲሆን "አልቋል" ማስጠንቀቂያ ይሰጣል
+
+for owner, production manager ,Order Placer
+
+/production/bundles
+this page is uncessary so change in to bundle in to order so  how many works are in the dpts 
+ 
+ቆረጣ
+ORD-00012
+ነጭ ቲ-ሸርት
+40 ፍሬ
+
+for owner, production manager
+
+/quality
+
+in /quality/inspect
+
+return the defects in to ጉድለቱ የተፈጠረበት የስራ ክፍል to control the flow 
+
+in /materials
+
+/materials/new
+and /materials/recive 
+
+so no need of 2 page i need 1 page only 
+to recive 
+
+/suppliers and /materials  pages controled by 
+	Store keeper, production manager, owner
+
+/employees
+this page controled by 
+	 production manager, owner
+
+/incentive
+
+control this page 
+
+ወቅታዊ ወር፦ መስከረም 2019 ዓ.ም
+
+ወርሃዊ የኢንሴንቲቭ ማጠቃለያ by this button show the month payment 
+
+የ1ኛ ወቅት ክፍያ (ከቀን 1-15) ዝጋ
+የ2ኛ ወቅት ክፍያ (ከቀን 16-30) ዝጋ
+
+when report this  ወቅት ክፍያ make sure 
+table 1
+የ15     ቀንኢንሴንቲቭማስሊያሰንጠረዥ(Bi-Weekly Incentive Calculation)
+ የቆጠራዙር:   ከቀን______   እስከቀን______ (15 ቀናት)  |   የክፍያቀን: ______  |  ማረጋገጫ: ____________
+ የዕለት+/-  ፍሬ(   ከዒላማጋርማወዳደር-  በየቀኑይሞላል)
+ተ.ቁ ቀን1 ቀን2 ቀን3 ቀን4 ቀን5 ቀን6 ቀን7 ቀን8 ቀን9 ቀን10 ቀን11 ቀን12 ቀን13 ቀን14 የ15    የ15ድምር
+(+/-) ኢንሴንቲቭ(ብር)
+
+table 2
+
+የ15    ቀንኢንሴንቲቭማጠቃለያበዲፓርትመንት
+ተ.ቁ የ15   ቀንድምርፍሬ  ጠቅላላኢንሴንቲቭ(ብር)
+
+and also when we touch ወርሃዊ የኢንሴንቲቭ ማጠቃለያ monthly like this this are generated 
+
+this is good and the date is in ethiopian calander 
+
+and make sure all buttons work good and also make sure the 13 ethiopian month is conciderd in the system 
+
+/salary,/payroll/monthly-incentive,/payroll/monthly-salary,/payroll/monthly-attendance,/payroll/monthly-report this pages is only for admin and production manager and make sure dont load all in one load 50 then put next button to see others and also make sure they load real data from the current
+
+/alerts make sure all alerts cant go to all 
+
+ የጨርቅ ብክነት for cutting , production manager and owner 
+
+like this do for the rest and if production manager and owner  ✓ ፍታ delete from the data base 
+ 
+/reports
+
+show real data for owner and production manager only and if reports make 45 days delete them from the database if they are teh data show only in this page other wise leave them 
+
+
+/users
+this page only see the owner 
+
+in /settings
+this page show only for owner and production manager 
+
+/settings/incentive-card
+leave as it is 
+make sure ሥራ ላይ የሚውልበት ቀን didnt have an error in report generation and also in the system 
+
+
+/settings/periods
+i thing we didnt need this the incentive is from day 1 up to day 15 and also day 16 up to day 30 and for puagume 1 up to 5 or 6 according to the Ethiopian calander so make sure the system follw this so we didnt need this seeting 
+
+የተፈቀደ ከፍተኛ የብክነት ወሰን (%)
+this is consumption not by persont so deafualt is 1 do as it is and ccan be editable so in the cutting can be  editable 
+
+የወርሃዊ ደሞዝ መክፈያ ቀን
+
+leave as it is 
+
+የቴሌግራም ማሳወቂያ ቦት ቅንብር
+ዕለታዊ የምርት ሪፖርቶች፣ የብክነትና የዕለት መዝጊያ ማስጠንቀቂያዎች በቀጥታ ወደ ቴሌግራምዎ እንዲደርሱ ቦቱን ያገናኙ።
+
+we didnt need this be cause we connect this by .env file 
+
+የመላኪያ ሁኔታ (የቅርብ ጊዜ ሪፖርት መላኪያዎች)
+this is in the report i ting so we didnt need this 
+
+/audit
+this page show only for owner
+
+and from conter/close 
+
+delete the 30 days audit need to be in this and can be done by only the admin 
+make sure this work nicely 
+
+and /login
+the install app thing i like it it is the best so make sure in android i download it but it as again and again so make sure if installed dont ask again and also add never ask button 
+
+
+make sure the all system work after this v2.0 update 
+ 
+
+
+

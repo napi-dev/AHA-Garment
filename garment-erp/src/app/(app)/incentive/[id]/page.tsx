@@ -25,7 +25,7 @@ export default async function IncentiveStatementPage({ params }: { params: Promi
           employee: { include: { department: true } },
           card: true,
         },
-        orderBy: [{ employee: { department: { sortOrder: "asc" } } }, { employee: { serialNumber: "asc" } }],
+        orderBy: [{ employee: { department: { flowOrder: "asc" } } }, { employee: { serialNumber: "asc" } }],
       },
     },
   });

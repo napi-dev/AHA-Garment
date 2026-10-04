@@ -10,7 +10,7 @@ import { UserPlus, ArrowLeft, Shield, KeyRound, User, Briefcase } from "lucide-r
 export default async function NewUserPage() {
   const session = await auth();
   if (!session?.user) redirect("/login");
-  requirePermission(session.user.role, "users:manage");
+  if (session.user.role !== "ADMIN") redirect("/dashboard");
 
   const employees = await db.employee.findMany({
     where: { isActive: true, user: null },

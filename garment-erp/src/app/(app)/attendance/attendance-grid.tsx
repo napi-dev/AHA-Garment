@@ -80,7 +80,6 @@ export function AttendanceGrid({
         date,
         employeeId: empId,
         status: row.status,
-        enteredById: userId,
       });
       setRows((p) => ({ ...p, [empId]: { ...p[empId], saving: false, saved: true } }));
     } catch (e) {
@@ -100,7 +99,6 @@ export function AttendanceGrid({
           date,
           employeeId: empId,
           status,
-          enteredById: userId,
         });
         setRows((p) => ({ ...p, [empId]: { ...p[empId], status, saved: true } }));
       }

@@ -10,7 +10,7 @@ import { KeyRound, ArrowLeft, AlertTriangle, ShieldCheck } from "lucide-react";
 export default async function ResetPinPage({ params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
   if (!session?.user) redirect("/login");
-  requirePermission(session.user.role, "users:manage");
+  if (session.user.role !== "ADMIN") redirect("/dashboard");
 
   const { id } = await params;
   const user = await db.appUser.findUnique({

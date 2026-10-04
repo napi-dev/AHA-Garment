@@ -277,11 +277,32 @@ const PAGE_ACCESS: Record<string, PagePermission> = {
   },
 };
 
+const LEGACY_ACTION_TO_PATH: Record<string, string> = {
+  "users:manage": "/users",
+  "users:view": "/users",
+  "settings:manage": "/settings",
+  "settings:edit": "/settings",
+  "reports:view": "/reports",
+  "reports:manage": "/reports",
+  "production:manage": "/production",
+  "production:view": "/production",
+  "attendance:manage": "/attendance",
+  "counts:manage": "/counts/enter",
+  "quality:manage": "/quality",
+  "materials:manage": "/materials",
+  "suppliers:manage": "/suppliers",
+  "salary:manage": "/salary",
+  "salary:view": "/salary",
+  "audit:view": "/audit",
+};
+
 /**
  * Check if a role can access a page
  */
 export function getPageAccess(role: Role, path: string): PageAccess | null {
-  const normalizedPath = path.split("?")[0].replace(/\/$/, "");
+  if (role === "ADMIN") return "full";
+  const mappedPath = LEGACY_ACTION_TO_PATH[path] || path;
+  const normalizedPath = mappedPath.split("?")[0].replace(/\/$/, "");
   
   // Check exact match first
   if (PAGE_ACCESS[normalizedPath]) {
@@ -411,6 +432,10 @@ export function canCloseIncentive(role: Role): boolean {
 
 export function canEditSalary(role: Role): boolean {
   return role === "ADMIN";
+}
+
+export function canViewSalary(role: Role): boolean {
+  return role === "ADMIN" || role === "PRODUCTION_MANAGER";
 }
 
 export function canEditBonus(role: Role): boolean {

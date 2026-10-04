@@ -1,145 +1,157 @@
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { redirect } from "next/navigation";
-import { requirePermission } from "@/lib/auth/permissions";
-import { am } from "@/lib/i18n/am";
-import { LayoutGrid, Filter } from "lucide-react";
-import { BundleCard } from "./bundle-card";
-
-const STAGES = [
-  "RECEIVING","CUTTING","SEWING","TRIMMING",
-  "QUALITY_CONTROL","STYLING_HITPRESS","IRONING","PACKING","DELIVERY",
-] as const;
-
-const STAGE_AM: Record<string, string> = {
-  RECEIVING:"ጥሬ እቃ", CUTTING:"ቆረጣ", SEWING:"ስፌት",
-  TRIMMING:"ለቀማ", QUALITY_CONTROL:"ጥራት ፍተሻ", STYLING_HITPRESS:"ሂትፕረስ",
-  IRONING:"ካውያ", PACKING:"ማሸግ", DELIVERY:"ማድረስ",
-};
-
-const STAGE_COLORS: Record<string, { header: string; card: string; badge: string }> = {
-  RECEIVING:        { header:"bg-slate-100 text-slate-700",        card:"border-slate-200",  badge:"bg-slate-100 text-slate-600" },
-  CUTTING:          { header:"bg-orange-100 text-orange-700",       card:"border-orange-200", badge:"bg-orange-100 text-orange-600" },
-  SEWING:           { header:"bg-blue-100 text-blue-700",           card:"border-blue-200",   badge:"bg-blue-100 text-blue-600" },
-  TRIMMING:         { header:"bg-yellow-100 text-yellow-700",       card:"border-yellow-200", badge:"bg-yellow-100 text-yellow-600" },
-  QUALITY_CONTROL:  { header:"bg-purple-100 text-purple-700",       card:"border-purple-200", badge:"bg-purple-100 text-purple-600" },
-  STYLING_HITPRESS: { header:"bg-pink-100 text-pink-700",           card:"border-pink-200",   badge:"bg-pink-100 text-pink-600" },
-  IRONING:          { header:"bg-red-100 text-red-700",             card:"border-red-200",    badge:"bg-red-100 text-red-600" },
-  PACKING:          { header:"bg-teal-100 text-teal-700",           card:"border-teal-200",   badge:"bg-teal-100 text-teal-600" },
-  DELIVERY:         { header:"bg-green-100 text-green-700",         card:"border-green-200",  badge:"bg-green-100 text-green-600" },
-};
+import { getPageAccess } from "@/lib/auth/permissions";
+import { Factory, Package } from "lucide-react";
 
 export default async function BundleBoardPage({
   searchParams,
 }: {
-  searchParams: Promise<{ order?: string; stage?: string }>;
+  searchParams: Promise<{ order?: string }>;
 }) {
   const session = await auth();
   if (!session?.user) redirect("/login");
-  requirePermission(session.user.role, "bundles:view");
+  
+  const access = getPageAccess(session.user.role, "/production/bundles");
+  if (access === "none") redirect("/dashboard");
 
   const params = await searchParams;
 
-  const bundles = await db.bundle.findMany({
+  // Get all active jobs grouped by department
+  const jobs = await db.job.findMany({
     where: {
-      ...(params.order ? { cutJob: { order: { orderNumber: { contains: params.order.toUpperCase() } } } } : {}),
-      ...(params.stage ? { currentStage: params.stage as typeof STAGES[number] } : {}),
+      isActive: true,
     },
     include: {
-      cutJob: { include: { order: { include: { style: true } } } },
-      stageLogs: { orderBy: { enteredAt: "desc" }, take: 1 },
+      department: {
+        select: { nameAm: true, flowOrder: true },
+      },
+      hourlyBoxes: {
+        select: {
+          date: true,
+          totalProduced: true,
+        },
+      },
     },
-    orderBy: { createdAt: "desc" },
-    take: 200,
+    orderBy: [
+      { department: { flowOrder: "asc" } },
+      { sortOrder: "asc" },
+    ],
   });
 
-  // Group by stage
-  const byStage: Record<string, typeof bundles> = {};
-  for (const stage of STAGES) byStage[stage] = [];
-  for (const b of bundles) byStage[b.currentStage]?.push(b);
+  // Group jobs by department
+  const departmentGroups = new Map<string, Array<{
+    jobName: string;
+    produced: number;
+    flowOrder: number | null;
+  }>>();
 
-  const canAdvance = ["ADMIN","PRODUCTION_MANAGER","PRODUCTION_MANAGER","QC_INSPECTOR","FINISHED_GOODS_MANAGER"].includes(session.user.role);
+  for (const job of jobs) {
+    const deptName = job.department.nameAm;
+    const produced = job.hourlyBoxes.reduce((sum, box) => sum + (box.totalProduced || 0), 0);
+    
+    if (!departmentGroups.has(deptName)) {
+      departmentGroups.set(deptName, []);
+    }
+    
+    departmentGroups.get(deptName)!.push({
+      jobName: job.nameAm,
+      produced,
+      flowOrder: job.department.flowOrder,
+    });
+  }
+
+  // Sort departments by flow order
+  const sortedDepts = Array.from(departmentGroups.entries()).sort((a, b) => {
+    const flowA = a[1][0]?.flowOrder ?? 999;
+    const flowB = b[1][0]?.flowOrder ?? 999;
+    return flowA - flowB;
+  });
 
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="erp-card p-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2 text-xs font-semibold text-indigo-600 uppercase tracking-wider font-ethiopic">
-            <LayoutGrid size={14} />
-            <span>ምርት ክፍል — ቀጥታ ሰሌዳ</span>
+      <div className="erp-card p-6">
+        <div className="flex items-center justify-between gap-4 flex-wrap">
+          <div>
+            <div className="flex items-center gap-2 text-xs font-semibold text-blue-600 uppercase tracking-wider font-ethiopic">
+              <Factory size={14} />
+              <span>የምርት ሂደት</span>
+            </div>
+            <h1 className="text-2xl font-bold text-slate-900 font-ethiopic mt-1">
+              በክፍል ያሉ ትዕዛዞች
+            </h1>
+            <p className="text-slate-500 text-sm mt-0.5 font-ethiopic">
+              Orders by Department
+            </p>
           </div>
-          <h1 className="text-2xl font-bold text-slate-900 font-ethiopic mt-1">
-            የቀጥታ ምርት ሰሌዳ
-          </h1>
-          <p className="text-slate-500 text-sm mt-0.5 font-ethiopic">
-            ሁሉም ባንድሎች በሂደት ደረጃ — {bundles.length} ባንድሎች
+          
+          <form method="GET" className="flex gap-2">
+            <button 
+              type="button"
+              onClick={() => window.location.href = '/production/bundles'}
+              className="px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-ethiopic hover:bg-blue-700 transition-colors font-semibold"
+            >
+              ዝግጁ
+            </button>
+          </form>
+        </div>
+      </div>
+
+      {/* Department Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {sortedDepts.map(([deptName, jobs]) => (
+          <div key={deptName} className="erp-card overflow-hidden">
+            <div className="px-4 py-3 bg-blue-50 border-b border-blue-100">
+              <h3 className="font-bold text-slate-900 font-ethiopic text-sm flex items-center gap-2">
+                <Package size={16} className="text-blue-600" />
+                {deptName}
+              </h3>
+              <p className="text-xs text-slate-500 mt-0.5 font-ethiopic">
+                {jobs.length} ስራዎች
+              </p>
+            </div>
+            
+            <div className="p-4 space-y-2">
+              {jobs.map((job, idx) => (
+                <div 
+                  key={idx}
+                  className="p-3 rounded-lg bg-slate-50 border border-slate-200 hover:bg-slate-100 transition-colors"
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1 min-w-0">
+                      <p className="font-ethiopic text-sm text-slate-700 font-semibold">
+                        {job.jobName}
+                      </p>
+                    </div>
+                    <div className="text-right ml-2">
+                      <p className="text-lg font-bold text-slate-900 tabular-nums">
+                        {job.produced}
+                      </p>
+                      <p className="text-xs text-slate-500 font-ethiopic">ፍሬ</p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+              
+              {jobs.length === 0 && (
+                <p className="text-center text-slate-400 text-sm font-ethiopic py-4">
+                  ምንም ስራ የለም
+                </p>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {sortedDepts.length === 0 && (
+        <div className="erp-card p-12 text-center">
+          <Factory size={48} className="mx-auto text-slate-300 mb-4" />
+          <p className="text-slate-500 font-ethiopic text-lg">
+            ምንም ንቁ ስራዎች የሉም
           </p>
         </div>
-
-        {/* Filters */}
-        <form method="GET" className="flex gap-2 items-center">
-          <Filter size={14} className="text-slate-400" />
-          <input name="order" defaultValue={params.order ?? ""} placeholder="ORD-0001"
-            className="px-3 py-2 rounded-lg border border-slate-200 text-sm w-28 uppercase focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono bg-white" />
-          <select name="stage" defaultValue={params.stage ?? ""}
-            className="px-3 py-2 rounded-lg border border-slate-200 text-sm font-ethiopic focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white">
-            <option value="">ሁሉም ደረጃዎች</option>
-            {STAGES.map((s) => <option key={s} value={s}>{STAGE_AM[s]}</option>)}
-          </select>
-          <button type="submit"
-            className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-ethiopic hover:bg-indigo-700 transition-colors font-semibold">
-            {am.filter}
-          </button>
-        </form>
-      </div>
-
-      {/* Stage columns */}
-      <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-4 gap-4">
-        {STAGES.map((stage) => {
-          const stageBundles = params.stage ? (byStage[params.stage] ?? []) : (byStage[stage] ?? []);
-          if (params.stage && params.stage !== stage) return null;
-          const colors = STAGE_COLORS[stage];
-          return (
-            <div key={stage} className="erp-card overflow-hidden">
-              <div className={`px-4 py-3 border-b flex items-center justify-between ${colors.header}`}>
-                <span className="font-semibold text-sm font-ethiopic">{STAGE_AM[stage]}</span>
-                <span className="text-xs font-bold bg-white/60 px-2 py-0.5 rounded-full tabular-nums">
-                  {stageBundles.length}
-                </span>
-              </div>
-              <div className="p-3 space-y-2 max-h-[420px] overflow-y-auto">
-                {stageBundles.length === 0 && (
-                  <p className="text-xs text-slate-400 text-center py-5 font-ethiopic">ባንድል የለም</p>
-                )}
-                {stageBundles.map((b) => (
-                  <BundleCard
-                    key={b.id}
-                    bundle={{
-                      id:       b.id,
-                      bundleCode: b.bundleCode,
-                      quantity: b.quantity,
-                      cutJob: {
-                        order: {
-                          orderNumber: b.cutJob.order.orderNumber,
-                          style: { nameAm: b.cutJob.order.style.nameAm },
-                        },
-                      },
-                    }}
-                    canAdvance={canAdvance}
-                    currentStage={stage}
-                    userId={session.user.id}
-                    STAGE_AM={STAGE_AM}
-                    STAGES={STAGES}
-                    colors={colors}
-                  />
-                ))}
-              </div>
-            </div>
-          );
-        })}
-      </div>
+      )}
     </div>
   );
 }
-

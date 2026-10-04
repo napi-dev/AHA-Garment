@@ -18,8 +18,7 @@ export default async function IssueMaterialPage({ params }: { params: Promise<{ 
   if (!material) notFound();
 
   const orders = await db.prodOrder.findMany({
-    where: { isActive: true },
-    include: { style: true },
+    where: { status: "ACTIVE" },
     orderBy: { createdAt: "desc" },
     take: 30,
   });
@@ -96,8 +95,8 @@ export default async function IssueMaterialPage({ params }: { params: Promise<{ 
           <select name="reference" className="input-field font-ethiopic text-slate-800">
             <option value="">ትዕዛዝ ይምረጡ (አማራጭ)</option>
             {orders.map((o) => (
-              <option key={o.id} value={o.orderNumber}>
-                {o.orderNumber} — {o.style.nameAm}
+              <option key={o.id} value={o.orderNo}>
+                {o.orderNo}
               </option>
             ))}
           </select>

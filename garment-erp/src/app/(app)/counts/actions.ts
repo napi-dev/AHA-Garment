@@ -3,7 +3,7 @@
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
-import { requirePageAccess } from "@/lib/auth/permissions-v2";
+import { requirePageAccess } from "@/lib/auth/permissions";
 
 // ─── Save hourly box for a single worker ─────────────────────────────────────
 
@@ -64,6 +64,7 @@ export async function saveHourlyBox(input: SaveHourlyBoxInput): Promise<{ ok: bo
     },
     update: {
       jobId: input.jobId,
+      departmentId: job.departmentId,
       h1, h2, h3, h4, h5, h6, h7, h8,
       totalProduced: input.totalProduced,
       targetForDay: input.targetForDay,
@@ -78,6 +79,7 @@ export async function saveHourlyBox(input: SaveHourlyBoxInput): Promise<{ ok: bo
       date,
       employeeId: input.employeeId,
       jobId: input.jobId,
+      departmentId: job.departmentId,
       h1, h2, h3, h4, h5, h6, h7, h8,
       totalProduced: input.totalProduced,
       targetForDay: input.targetForDay,
@@ -276,7 +278,7 @@ export async function generateAndSendDailyReport(dateStr: string): Promise<{ ok:
           },
         },
         orderBy: [
-          { job: { department: { sortOrder: "asc" } } },
+          { job: { department: { flowOrder: "asc" } } },
           { employee: { serialNumber: "asc" } },
         ],
       }),

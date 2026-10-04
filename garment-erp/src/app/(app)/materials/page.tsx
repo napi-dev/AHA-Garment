@@ -111,16 +111,6 @@ export default async function MaterialsPage({
         </div>
 
         <div className="flex items-center gap-2.5 flex-wrap">
-          {canEdit && (
-            <Link
-              href="/materials/new"
-              className="btn-secondary flex items-center gap-2 font-ethiopic"
-            >
-              <Plus size={16} />
-              <span>{am.materials.newMaterial}</span>
-            </Link>
-          )}
-
           <Link
             href="/materials/receive"
             className="btn-primary flex items-center gap-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 font-ethiopic"

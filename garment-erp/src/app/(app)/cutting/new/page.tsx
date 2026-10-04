@@ -6,7 +6,7 @@ import { am } from "@/lib/i18n/am";
 import { todayISOStringEAT } from "@/lib/ethiopian-calendar";
 import { createCutJob } from "../actions";
 import Link from "next/link";
-import { Scissors, ArrowRight, Info } from "lucide-react";
+import { Scissors, ArrowRight, Info, AlertTriangle } from "lucide-react";
 import { CutJobSubmitButton } from "./submit-button";
 
 export default async function NewCutJobPage({
@@ -16,19 +16,49 @@ export default async function NewCutJobPage({
 }) {
   const session = await auth();
   if (!session?.user) redirect("/login");
-  requirePermission(session.user.role, "cuts:edit");
+  requirePermission(session.user.role, "/cutting");
 
   const params = await searchParams;
 
+  // Active orders with lines
   const orders = await db.prodOrder.findMany({
-    where: { isActive: true },
-    include: { style: { include: { bomItems: { include: { material: true } } } } },
+    where: { status: "ACTIVE" },
+    include: { lines: true },
     orderBy: { createdAt: "desc" },
   });
 
-  const selectedOrder = params.orderId
-    ? orders.find((o) => o.id === params.orderId)
-    : null;
+  // Fabric materials from store with current stock
+  const fabricMaterials = await db.material.findMany({
+    where: { isActive: true },
+    include: {
+      stockMovements: {
+        select: { type: true, quantity: true },
+      },
+    },
+    orderBy: { nameAm: "asc" },
+  });
+
+  const fabricsWithStock = fabricMaterials.map((f) => {
+    let stock = 0;
+    for (const m of f.stockMovements) {
+      const q = Number(m.quantity);
+      if (m.type === "RECEIVE" || m.type === "RETURN") stock += q;
+      else stock -= q;
+    }
+    return {
+      id: f.id,
+      nameAm: f.nameAm,
+      sku: f.sku,
+      unit: f.unit,
+      stock: Math.max(0, stock),
+    };
+  });
+
+  // Limit setting
+  const limitSetting = await db.appSetting.findUnique({
+    where: { key: "cutting_wastage_limit" },
+  });
+  const limit = limitSetting ? parseFloat(limitSetting.value) : 1.0;
 
   const today = todayISOStringEAT();
 
@@ -55,7 +85,7 @@ export default async function NewCutJobPage({
           {am.cutting.newCutJob}
         </h1>
         <p className="text-slate-500 text-sm mt-0.5 font-ethiopic">
-          ለተመረጠው ትዕዛዝ የወጣውን ጨርቅ ሚዛንና የተቆረጡትን ፍሬዎች ይመዝግቡ
+          የተሰጠ ጨርቅ ሚዛን (ኪ.ግ) እና የተቆረጡ ፍሬዎች ምዝገባ (የተፈቀደ የፍጆታ ወሰን፦ {limit.toFixed(2)} ኪ.ግ/ፍሬ)
         </p>
       </div>
 
@@ -73,113 +103,111 @@ export default async function NewCutJobPage({
             className="input-field font-ethiopic text-slate-800"
           >
             <option value="">የትዕዛዝ ቁጥር ይምረጡ</option>
-            {orders.map((o) => (
-              <option key={o.id} value={o.id}>
-                {o.orderNumber} — {o.style.nameAm} ({o.quantity.toLocaleString()} ፍሬ)
-              </option>
-            ))}
+            {orders.map((o) => {
+              const totalQty = o.lines.reduce((s, l) => s + l.qty, 0);
+              return (
+                <option key={o.id} value={o.id}>
+                  {o.orderNo} ({totalQty} ፍሬ)
+                </option>
+              );
+            })}
           </select>
         </div>
 
-        {/* Weights & Pieces */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5 font-ethiopic">
-              {am.cutting.weightIssued} <span className="text-rose-500">*</span>
-            </label>
-            <input
-              name="weightIssued"
-              type="number"
-              step="0.001"
-              min="0.001"
-              required
-              className="input-field tabular-nums"
-              placeholder="ምሳሌ፦ 100.000"
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5 font-ethiopic">
-              {am.cutting.weightUsed} <span className="text-rose-500">*</span>
-            </label>
-            <input
-              name="weightUsed"
-              type="number"
-              step="0.001"
-              min="0.001"
-              required
-              className="input-field tabular-nums"
-              placeholder="ምሳሌ፦ 98.000"
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5 font-ethiopic">
-              {am.cutting.piecesCut} <span className="text-rose-500">*</span>
-            </label>
-            <input
-              name="piecesCut"
-              type="number"
-              min="1"
-              required
-              className="input-field tabular-nums"
-              placeholder="ምሳሌ፦ 380"
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5 font-ethiopic">
-              የሚፈጠሩ ባንድሎች ብዛት
-            </label>
-            <input
-              name="bundleCount"
-              type="number"
-              min="1"
-              defaultValue="1"
-              className="input-field tabular-nums"
-            />
-          </div>
-        </div>
-
-        {/* Date */}
+        {/* Fabric from store */}
         <div>
           <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5 font-ethiopic">
-            {am.cutting.cuttingDate}
+            ጨርቅ (ከመጋዘን) <span className="text-rose-500">*</span>
+          </label>
+          <select
+            name="fabricId"
+            required
+            className="input-field font-ethiopic text-slate-800"
+          >
+            <option value="">የጨርቅ አይነት ይምረጡ</option>
+            {fabricsWithStock.map((f) => (
+              <option key={f.id} value={f.id}>
+                {f.nameAm} ({f.sku}) — በመጋዘን ያለው፦ {f.stock.toFixed(1)} {f.unit}
+              </option>
+            ))}
+          </select>
+          <p className="text-[11px] text-slate-400 font-ethiopic mt-1">
+            የተሰጠው ጨርቅ ሚዛን ከመጋዘን ካለው ክምችት በላይ ከሆነ ስርዓቱ አይፈቅድም።
+          </p>
+        </div>
+
+        {/* Weight Issued / Received (kg) */}
+        <div>
+          <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5 font-ethiopic">
+            የተሰጠ ጨርቅ ሚዛን (ኪ.ግ) <span className="text-rose-500">*</span>
+          </label>
+          <input
+            name="kgReceived"
+            type="number"
+            step="0.001"
+            min="0.001"
+            required
+            placeholder="ምሳሌ፦ 45.5"
+            className="input-field tabular-nums text-slate-800 font-bold"
+          />
+        </div>
+
+        {/* Pieces Cut */}
+        <div>
+          <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5 font-ethiopic">
+            የተቆረጡ ፍሬዎች ብዛት <span className="text-rose-500">*</span>
+          </label>
+          <input
+            name="piecesCut"
+            type="number"
+            min="1"
+            required
+            placeholder="ምሳሌ፦ 200"
+            className="input-field tabular-nums text-slate-800 font-bold"
+          />
+        </div>
+
+        {/* Cut Date */}
+        <div>
+          <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5 font-ethiopic">
+            የተቆረጠበት ቀን <span className="text-rose-500">*</span>
           </label>
           <input
             name="date"
             type="date"
             defaultValue={today}
-            className="input-field"
+            required
+            className="input-field text-slate-800"
           />
         </div>
 
-        {/* Standard Weight Hint from BOM */}
-        {selectedOrder?.style.bomItems[0] && (
-          <div className="alert-info text-xs font-ethiopic flex items-start gap-2.5">
-            <Info size={16} className="text-blue-600 flex-shrink-0 mt-0.5" />
-            <div>
-              <p className="font-semibold text-blue-900">የስታይሉ መደበኛ የጨርቅ ፍጆታ (BOM)፦</p>
-              <p className="text-blue-700 mt-0.5">
-                በአንድ ፍሬ {Number(selectedOrder.style.bomItems[0].qtyPerPiece).toFixed(4)} {selectedOrder.style.bomItems[0].unit}
-              </p>
-            </div>
-          </div>
-        )}
-
-        <div className="pt-2 flex items-center gap-3">
-          <CutJobSubmitButton />
-          <Link
-            href="/cutting"
-            className="btn-secondary px-6 font-ethiopic text-center"
-          >
-            {am.cancel}
-          </Link>
+        {/* Notes */}
+        <div>
+          <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5 font-ethiopic">
+            {am.notes} (ማስታወሻ)
+          </label>
+          <textarea
+            name="notes"
+            rows={2}
+            className="input-field font-ethiopic text-slate-800 resize-none"
+            placeholder="ተጨማሪ ማብራሪያ ካለ እዚህ ይጻፉ..."
+          />
         </div>
 
-        <div className="text-[11px] text-slate-400 font-ethiopic text-center pt-1 border-t border-slate-100">
-          የብክነት ስሌት ቀመር፦ ((የወጣ ጨርቅ − (ፍሬዎች × BOM)) ÷ የወጣ ጨርቅ) × 100
-          <br />ብክነቱ ከ 5% በላይ ከሆነ በስርዓቱ ውስጥ ማስጠንቀቂያ ይፈጠራል።
+        {/* Calculation Info Box */}
+        <div className="rounded-xl bg-orange-50/70 border border-orange-200/80 p-3.5 space-y-1.5 text-xs text-orange-950 font-ethiopic">
+          <div className="flex items-center gap-1.5 font-bold text-orange-800">
+            <Info size={14} />
+            <span>የብክነት ስሌት ቀመር (Consumption Formula)፦</span>
+          </div>
+          <p className="leading-relaxed">
+            ፍጆታ = የተሰጠ ጨርቅ ሚዛን (ኪ.ግ) ÷ የተቆረጡ ፍሬዎች ብዛት። መልሱ ከተፈቀደው ወሰን ({limit.toFixed(2)} ኪ.ግ/ፍሬ) በላይ ከሆነ በስርዓቱ ውስጥ የብክነት ማስጠንቀቂያ በራስ-ሰር ይፈጠራል።
+          </p>
+        </div>
+
+        {/* Submit */}
+        <div className="pt-2">
+          <CutJobSubmitButton />
         </div>
       </form>
     </div>

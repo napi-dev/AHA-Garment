@@ -47,24 +47,11 @@ export async function closePeriod(
 ): Promise<ClosePeriodResult> {
   return await db.$transaction(async (tx) => {
     // ── 1. Period boundaries ─────────────────────────────────────────────────
-    // Check for a configured override first, else use defaults
-    const config = await tx.periodConfig.findUnique({
-      where: { ethYear_ethMonth: { ethYear, ethMonth } },
-    });
-
-    let startDate: Date;
-    let endDate: Date;
-    let paymentDay: number;
-
-    if (config) {
-      startDate = periodNumber === 1 ? config.period1Start : config.period2Start;
-      endDate   = periodNumber === 1 ? config.period1End   : config.period2End;
-    } else {
-      const bounds = defaultPeriodBoundaries(ethYear, ethMonth);
-      startDate = periodNumber === 1 ? bounds.p1Start : bounds.p2Start;
-      endDate   = periodNumber === 1 ? bounds.p1End   : bounds.p2End;
-    }
-    paymentDay = periodNumber === 1 ? 4 : 19;
+    // v2: Period 1 = 1-15, Period 2 = 16-30 (or Pagume 1-5/6)
+    const bounds = defaultPeriodBoundaries(ethYear, ethMonth);
+    const startDate = periodNumber === 1 ? bounds.p1Start : bounds.p2Start;
+    const endDate   = periodNumber === 1 ? bounds.p1End   : bounds.p2End;
+    const paymentDay = periodNumber === 1 ? 4 : 19;
 
     // ── 2. Find or create the period record ──────────────────────────────────
     let period = await tx.incentivePeriod.findUnique({

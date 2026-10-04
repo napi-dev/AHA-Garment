@@ -19,8 +19,21 @@ export async function recordOffence(employeeId: string, formData: FormData) {
 
   if (!reason) throw new Error("ምክንያት ያስፈልጋል");
 
+  const emp = await db.employee.findUnique({
+    where: { id: employeeId },
+    select: { departmentId: true },
+  });
+  if (!emp) throw new Error("ሠራተኛው አልተገኘም");
+
   const offence = await db.offence.create({
-    data: { employeeId, level, date, reason, recordedById: session.user.id },
+    data: {
+      employeeId,
+      departmentId: emp.departmentId,
+      level,
+      date,
+      reason,
+      recordedById: session.user.id,
+    },
   });
 
   // Apply automatic penalty based on level

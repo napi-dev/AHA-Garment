@@ -3,8 +3,6 @@
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { requirePermission } from "@/lib/auth/permissions";
-import { calculateWastage } from "@/lib/incentive/engine";
-import { sendWastageAlert } from "@/lib/automation/alerts";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import Decimal from "decimal.js";
@@ -12,94 +10,112 @@ import Decimal from "decimal.js";
 export async function createCutJob(formData: FormData) {
   const session = await auth();
   if (!session?.user) throw new Error("ተፈቅዶ አልነበረም");
-  requirePermission(session.user.role, "cuts:edit");
+  requirePermission(session.user.role, "/cutting");
 
-  const orderId      = String(formData.get("orderId") ?? "");
-  const weightIssued = parseFloat(String(formData.get("weightIssued") ?? "0"));
-  const weightUsed   = parseFloat(String(formData.get("weightUsed")   ?? "0"));
-  const piecesCut    = parseInt(String(formData.get("piecesCut")      ?? "0"), 10);
-  const bundleCount  = parseInt(String(formData.get("bundleCount")    ?? "1"), 10);
-  const dateStr      = String(formData.get("date") ?? new Date().toISOString().split("T")[0]);
-  const date         = new Date(dateStr + "T00:00:00Z");
+  const orderId    = String(formData.get("orderId") ?? "");
+  const fabricId   = String(formData.get("fabricId") ?? "");
+  const kgReceived = parseFloat(String(formData.get("kgReceived") ?? "0"));
+  const piecesCut  = parseInt(String(formData.get("piecesCut") ?? "0"), 10);
+  const dateStr    = String(formData.get("date") ?? new Date().toISOString().split("T")[0]);
+  const date       = new Date(dateStr + "T00:00:00Z");
+  const notes      = String(formData.get("notes") ?? "").trim() || null;
 
-  if (!orderId || piecesCut < 1 || weightUsed <= 0) throw new Error("ሁሉም ግዴታ መስኮች ያስፈልጋሉ");
+  if (!orderId || !fabricId || piecesCut < 1 || kgReceived <= 0) {
+    throw new Error("ሁሉም አስፈላጊ መስኮች በትክክል መሞላት አለባቸው");
+  }
 
-  // Get BOM standard weight per piece
+  // 1. Verify order exists
   const order = await db.prodOrder.findUnique({
     where: { id: orderId },
-    include: { style: { include: { bomItems: { take: 1 } } } },
   });
   if (!order) throw new Error("ትዕዛዙ አልተገኘም");
 
-  const stdWeightPerPiece = order.style.bomItems[0]
-    ? Number(order.style.bomItems[0].qtyPerPiece)
-    : weightUsed / piecesCut; // fallback: no waste
+  // 2. Check fabric stock in store
+  const movements = await db.stockMovement.findMany({
+    where: { materialId: fabricId },
+    select: { type: true, quantity: true },
+  });
 
-  const { wastagePct } = calculateWastage(weightUsed, piecesCut, stdWeightPerPiece);
+  let fabricStock = 0;
+  for (const m of movements) {
+    const q = Number(m.quantity);
+    if (m.type === "RECEIVE" || m.type === "RETURN") {
+      fabricStock += q;
+    } else {
+      fabricStock -= q;
+    }
+  }
 
+  if (kgReceived > fabricStock) {
+    throw new Error(`በቂ ጨርቅ በመጋዘን ውስጥ የለም! በመጋዘን ያለው ክምችት: ${fabricStock.toFixed(2)} ኪ.ግ ሲሆን የተጠየቀው: ${kgReceived.toFixed(2)} ኪ.ግ ነው`);
+  }
+
+  // 3. Read consumption limit from settings (default 1.00)
+  const limitSetting = await db.appSetting.findUnique({
+    where: { key: "cutting_wastage_limit" },
+  });
+  const limitUsed = limitSetting ? parseFloat(limitSetting.value) : 1.0;
+
+  // 4. Calculate consumption = kgReceived ÷ piecesCut
+  const consumptionVal = kgReceived / piecesCut;
+  const consumptionDec = new Decimal(consumptionVal).toDecimalPlaces(4);
+  const limitDec       = new Decimal(limitUsed).toDecimalPlaces(2);
+
+  // 5. Create CutJob
   const job = await db.cutJob.create({
     data: {
       orderId,
-      weightIssued: new Decimal(weightIssued).toDecimalPlaces(3),
-      weightUsed:   new Decimal(weightUsed).toDecimalPlaces(3),
+      fabricId,
+      kgReceived:  new Decimal(kgReceived).toDecimalPlaces(3),
       piecesCut,
-      wastagePct:   new Decimal(wastagePct).toDecimalPlaces(2),
-      cuttingManagerId: session.user.id,
+      consumption: consumptionDec,
+      limitUsed:   limitDec,
       date,
+      cuttingLeadId: session.user.id,
+      notes,
     },
   });
 
-  // Create bundles
-  const piecesPerBundle = Math.floor(piecesCut / bundleCount);
-  const remainder       = piecesCut % bundleCount;
-  const bundleSeq       = await db.bundle.count();
+  // 6. Deduct fabric from store via StockMovement (ISSUE)
+  await db.stockMovement.create({
+    data: {
+      materialId:  fabricId,
+      type:        "ISSUE",
+      quantity:    new Decimal(kgReceived).toDecimalPlaces(3),
+      reference:   order.orderNo,
+      destination: "ቆራጭ",
+      date,
+      enteredById: session.user.id,
+      notes:       `የቆረጣ ሥራ ORD: ${order.orderNo} (${piecesCut} ፍሬ)`,
+    },
+  });
 
-  for (let i = 0; i < bundleCount; i++) {
-    const qty  = piecesPerBundle + (i === 0 ? remainder : 0);
-    const code = `BND-${String(bundleSeq + i + 1).padStart(5, "0")}`;
-    await db.bundle.create({
+  // 7. Check if consumption exceeds limit -> create Alert
+  if (consumptionVal > limitUsed) {
+    await db.alert.create({
       data: {
-        bundleCode: code,
-        cutJobId: job.id,
-        quantity: qty,
-        currentStage: "CUTTING",
-        stageLogs: {
-          create: { stage: "CUTTING", enteredById: session.user.id },
-        },
+        type:      "CONSUMPTION",
+        title:     `የጨርቅ ብክነት ማስጠንቀቂያ — ${order.orderNo}`,
+        message:   `ለትዕዛዝ ${order.orderNo} የተመዘገበው የጨርቅ ፍጆታ (${consumptionDec.toFixed(3)} ኪ.ግ/ፍሬ) ከተፈቀደው ወሰን (${limitDec.toFixed(2)}) በልጧል!`,
+        entityId:  job.id,
+        roles:     ["ADMIN", "PRODUCTION_MANAGER", "CUTTING_MANAGER"],
       },
     });
   }
 
-  // Stock movement — issue fabric
-  const fabMaterial = order.style.bomItems[0]?.materialId ?? null;
-  if (fabMaterial) {
-    await db.stockMovement.create({
-      data: {
-        materialId: fabMaterial,
-        type: "ISSUE",
-        quantity: new Decimal(weightUsed).toDecimalPlaces(3),
-        reference: order.orderNumber,
-        date,
-        enteredById: session.user.id,
-        notes: `ቆርጦ — ${job.id.slice(-6)}`,
-      },
-    });
-  }
-
+  // 8. Audit log
   await db.auditLog.create({
     data: {
       userId:   session.user.id,
       action:   "CREATE_CUT_JOB",
       entity:   "CutJob",
       entityId: job.id,
-      after:    { orderId, weightUsed, piecesCut, wastagePct, bundleCount },
+      after:    { orderNo: order.orderNo, kgReceived, piecesCut, consumption: consumptionDec.toString(), limitUsed },
     },
   });
 
-  // Fire wastage alert if above limit
-  if (wastagePct > 5) await sendWastageAlert(job.id);
-
   revalidatePath("/cutting");
-  revalidatePath("/production");
+  revalidatePath("/materials");
+  revalidatePath("/dashboard");
   redirect("/cutting");
 }

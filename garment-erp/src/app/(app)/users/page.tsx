@@ -17,7 +17,7 @@ export default async function UsersPage({
 }) {
   const session = await auth();
   if (!session?.user) redirect("/login");
-  requirePermission(session.user.role, "users:manage");
+  if (session.user.role !== "ADMIN") redirect("/dashboard");
 
   const params = await searchParams;
   const page = Math.max(1, parseInt(params.page ?? "1", 10));

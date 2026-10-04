@@ -63,7 +63,7 @@ export default async function MonthlySummaryPage({
       if (!deptMap.has(dept.id)) {
         deptMap.set(dept.id, {
           nameAm: dept.nameAm,
-          sortOrder: dept.sortOrder,
+          flowOrder: dept.flowOrder ?? 999,
           workers: new Set(),
           p1Calc: new Decimal(0), p1Pay: new Decimal(0),
           p2Calc: new Decimal(0), p2Pay: new Decimal(0),
@@ -85,7 +85,7 @@ export default async function MonthlySummaryPage({
   }
 
   const rows = [...deptMap.entries()]
-    .sort((a, b) => a[1].sortOrder - b[1].sortOrder)
+    .sort((a, b) => a[1].flowOrder - b[1].flowOrder)
     .map(([deptId, d]) => ({
       deptId,
       nameAm:          d.nameAm,

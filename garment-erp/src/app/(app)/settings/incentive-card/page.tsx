@@ -7,8 +7,7 @@ import { formatAsEthDate, todayISOStringEAT } from "@/lib/ethiopian-calendar";
 import { updateIncentiveCard } from "./actions";
 import { IncentiveCardSaveButton } from "./save-button";
 import Link from "next/link";
-import Decimal from "decimal.js";
-import { Award, ArrowLeft, Calendar, History, Info, CheckCircle2 } from "lucide-react";
+import { Award, ArrowLeft, Calendar, History, Info, CheckCircle2, Briefcase } from "lucide-react";
 
 export default async function IncentiveCardPage({
   searchParams,
@@ -17,24 +16,41 @@ export default async function IncentiveCardPage({
 }) {
   const session = await auth();
   if (!session?.user) redirect("/login");
-  requirePermission(session.user.role, "incentive_card:edit");
+  requirePermission(session.user.role, "/settings");
 
   const params = await searchParams;
   const justSaved = params.saved === "1";
 
   const today = todayISOStringEAT();
 
-  // All departments with their current active card
+  // All departments with jobs and their current active card
   const departments = await db.department.findMany({
     where: { isActive: true },
     include: {
-      incentiveCards: {
-        where: { effectiveTo: null },
-        orderBy: { effectiveFrom: "desc" },
-        take: 1,
+      jobs: {
+        where: { isActive: true },
+        include: {
+          incentiveCards: {
+            where: { effectiveTo: null },
+            orderBy: { effectiveFrom: "desc" },
+            take: 1,
+          },
+        },
+        orderBy: { sortOrder: "asc" },
       },
     },
-    orderBy: { sortOrder: "asc" },
+    orderBy: { flowOrder: "asc" },
+  });
+
+  // Recent history of card changes
+  const cardHistory = await db.incentiveCard.findMany({
+    take: 30,
+    orderBy: { effectiveFrom: "desc" },
+    include: {
+      job: {
+        include: { department: true },
+      },
+    },
   });
 
   return (
@@ -60,7 +76,7 @@ export default async function IncentiveCardPage({
           {am.settings.incentiveCard}
         </h1>
         <p className="text-slate-500 font-ethiopic text-sm mt-0.5">
-          ለእያንዳንዱ የስራ ክፍል የሰዓት ዒላማ (Target) እና ከተጨማሪ ፍሬ የሚከፈለውን የብር ተመን እዚህ ያዋቅሩ
+          ለእያንዳንዱ የስራ ዓይነት (Job) የሰዓት ዒላማ (Target) እና ከተጨማሪ ፍሬ የሚከፈለውን የብር ተመን እዚህ ያዋቅሩ
         </p>
       </div>
 
@@ -72,7 +88,7 @@ export default async function IncentiveCardPage({
         </p>
       </div>
 
-      {/* Success banner — shown after save */}
+      {/* Success banner */}
       {justSaved && (
         <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800">
           <CheckCircle2 size={18} className="text-emerald-600 flex-shrink-0" />
@@ -85,134 +101,161 @@ export default async function IncentiveCardPage({
         </div>
       )}
 
-      {/* Department Cards Grid or Table */}
-      <div className="space-y-4">
+      {/* Department Cards with Jobs */}
+      <div className="space-y-6">
         {departments.map((dept) => {
-          const card = dept.incentiveCards[0];
-          const action = updateIncentiveCard.bind(null, dept.id, session.user.id);
-
+          if (!dept.jobs.length) return null;
           return (
-            <form
-              key={dept.id}
-              action={action}
-              className="erp-card p-5 flex flex-col md:flex-row md:items-center justify-between gap-4"
-            >
-              <div className="min-w-[180px]">
+            <div key={dept.id} className="erp-card p-5 space-y-4">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                 <div className="flex items-center gap-2">
                   <h3 className="font-bold text-slate-900 font-ethiopic text-base">
                     {dept.nameAm}
                   </h3>
-                  <span className="badge-draft text-[11px] font-ethiopic">
-                    {am.stages[dept.stage as keyof typeof am.stages] ?? dept.stage}
+                  <span className="text-xs text-slate-400 font-ethiopic">
+                    ({dept.jobs.length} የስራ ዓይነቶች)
                   </span>
                 </div>
-                <p className="text-xs text-slate-400 font-ethiopic mt-1">
-                  ወቅታዊ ተመን፦ {card ? `${formatAsEthDate(card.effectiveFrom)} ጀምሮ` : "ተመን አልተመደበም"}
-                </p>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 flex-1 max-w-2xl">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-600 mb-1 font-ethiopic">
-                    {am.incentive.targetPerHour} (ፍሬ/ሰዓት)
-                  </label>
-                  <input
-                    name="targetPerHour"
-                    type="number"
-                    min="0"
-                    max="9999"
-                    defaultValue={card?.targetPerHour ?? 0}
-                    required
-                    className="input-field text-xs py-2 px-3 tabular-nums font-bold text-slate-800"
-                  />
-                </div>
+              <div className="space-y-3">
+                {dept.jobs.map((job) => {
+                  const card = job.incentiveCards[0];
+                  const action = updateIncentiveCard.bind(null, job.id, session.user.id);
 
-                <div>
-                  <label className="block text-xs font-semibold text-slate-600 mb-1 font-ethiopic">
-                    {am.incentive.ratePerPiece} (ብር/ፍሬ)
-                  </label>
-                  <input
-                    name="ratePerPiece"
-                    type="number"
-                    min="0"
-                    step="0.0001"
-                    max="99"
-                    defaultValue={card ? new Decimal(card.ratePerPiece.toString()).toFixed(4) : "0.0000"}
-                    required
-                    className="input-field text-xs py-2 px-3 tabular-nums font-bold text-emerald-700"
-                  />
-                </div>
+                  return (
+                    <form
+                      key={job.id}
+                      action={action}
+                      className="p-4 rounded-xl bg-slate-50/70 border border-slate-200/80 flex flex-col lg:flex-row lg:items-center justify-between gap-4"
+                    >
+                      <div className="min-w-[200px]">
+                        <div className="flex items-center gap-2">
+                          <Briefcase size={15} className="text-blue-600 flex-shrink-0" />
+                          <h4 className="font-semibold text-slate-800 font-ethiopic text-sm">
+                            {job.nameAm}
+                          </h4>
+                        </div>
+                        <p className="text-xs text-slate-400 font-ethiopic mt-1">
+                          ወቅታዊ ተመን፦ {card ? `${formatAsEthDate(card.effectiveFrom)} ጀምሮ` : "ተመን አልተመደበም"}
+                        </p>
+                      </div>
 
-                <div>
-                  <label className="block text-xs font-semibold text-slate-600 mb-1 font-ethiopic">
-                    {am.settings.effectiveDate}
-                  </label>
-                  <input
-                    name="effectiveFrom"
-                    type="date"
-                    defaultValue={today}
-                    required
-                    className="input-field text-xs py-2 px-3"
-                  />
-                </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 flex-1 max-w-xl">
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-600 mb-1 font-ethiopic">
+                            {am.incentive.targetPerHour} (ፍሬ/ሰዓት)
+                          </label>
+                          <input
+                            name="targetPerHour"
+                            type="number"
+                            min="0"
+                            required
+                            defaultValue={card?.targetPerHour ?? 0}
+                            className="input-field text-right font-mono font-bold"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-600 mb-1 font-ethiopic">
+                            {am.incentive.ratePerPiece} (ብር/ፍሬ)
+                          </label>
+                          <input
+                            name="ratePerPiece"
+                            type="number"
+                            step="0.0001"
+                            min="0"
+                            required
+                            defaultValue={card ? Number(card.ratePerPiece).toFixed(4) : "0.0000"}
+                            className="input-field text-right font-mono font-bold"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-600 mb-1 font-ethiopic">
+                            ሥራ ላይ የሚውልበት ቀን
+                          </label>
+                          <input
+                            name="effectiveFrom"
+                            type="date"
+                            defaultValue={today}
+                            required
+                            className="input-field text-sm font-mono"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-end self-end lg:self-center">
+                        <IncentiveCardSaveButton />
+                      </div>
+                    </form>
+                  );
+                })}
               </div>
-
-              <div className="flex items-end">
-                <IncentiveCardSaveButton />
-              </div>
-            </form>
+            </div>
           );
         })}
       </div>
 
-      {/* Card History */}
-      <CardHistory />
-    </div>
-  );
-}
+      {/* History Table */}
+      <div id="history" className="erp-card p-6 space-y-4">
+        <div className="flex items-center gap-2">
+          <History size={16} className="text-slate-500" />
+          <h2 className="text-base font-bold text-slate-900 font-ethiopic">
+            የተመን ለውጦች ታሪክ (የቅርብ 30 ምዝገባዎች)
+          </h2>
+        </div>
 
-async function CardHistory() {
-  const history = await db.incentiveCard.findMany({
-    where: { effectiveTo: { not: null } },
-    include: { department: { select: { nameAm: true } } },
-    orderBy: { effectiveFrom: "desc" },
-    take: 15,
-  });
-
-  if (history.length === 0) return null;
-
-  return (
-    <div id="history" className="erp-card overflow-hidden">
-      <div className="px-6 py-4 border-b border-slate-200/80 flex items-center gap-2">
-        <History size={16} className="text-slate-400" />
-        <h2 className="font-bold text-slate-800 font-ethiopic text-sm">
-          የቀደምት ካርዶች ታሪክ (Incentive Card History)
-        </h2>
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs font-ethiopic">
+            <thead>
+              <tr className="border-b border-slate-200 text-slate-400 font-medium text-right">
+                <th className="py-2.5 px-3 text-left">የስራ ክፍል</th>
+                <th className="py-2.5 px-3 text-left">የስራ ዓይነት</th>
+                <th className="py-2.5 px-3">የሰዓት ዒላማ</th>
+                <th className="py-2.5 px-3">የፍሬ ተመን</th>
+                <th className="py-2.5 px-3">የጀመረበት ቀን</th>
+                <th className="py-2.5 px-3">የተጠናቀቀበት ቀን</th>
+                <th className="py-2.5 px-3 text-center">ሁኔታ</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {cardHistory.map((c) => {
+                const isActive = !c.effectiveTo;
+                return (
+                  <tr key={c.id} className="hover:bg-slate-50/50 transition-colors">
+                    <td className="py-2.5 px-3 font-semibold text-slate-800 text-left">
+                      {c.job.department.nameAm}
+                    </td>
+                    <td className="py-2.5 px-3 text-slate-700 text-left">
+                      {c.job.nameAm}
+                    </td>
+                    <td className="py-2.5 px-3 text-right font-mono font-bold text-slate-800">
+                      {c.targetPerHour} ፍሬ/ሰዓት
+                    </td>
+                    <td className="py-2.5 px-3 text-right font-mono font-bold text-blue-700">
+                      {Number(c.ratePerPiece).toFixed(4)} ብር
+                    </td>
+                    <td className="py-2.5 px-3 text-right font-mono text-slate-500">
+                      {formatAsEthDate(c.effectiveFrom)}
+                    </td>
+                    <td className="py-2.5 px-3 text-right font-mono text-slate-500">
+                      {c.effectiveTo ? formatAsEthDate(c.effectiveTo) : "—"}
+                    </td>
+                    <td className="py-2.5 px-3 text-center">
+                      {isActive ? (
+                        <span className="badge-confirmed text-[10px]">በሥራ ላይ</span>
+                      ) : (
+                        <span className="badge-draft text-[10px]">ያለፈ</span>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       </div>
-      <table className="w-full text-left data-table">
-        <thead>
-          <tr>
-            <th>የስራ ክፍል</th>
-            <th className="text-center">{am.incentive.targetPerHour}</th>
-            <th className="text-center">{am.incentive.ratePerPiece}</th>
-            <th>የጀመረበት ቀን</th>
-            <th>የተጠናቀቀበት ቀን</th>
-          </tr>
-        </thead>
-        <tbody>
-          {history.map((c) => (
-            <tr key={c.id}>
-              <td className="font-semibold text-slate-700 font-ethiopic">{c.department.nameAm}</td>
-              <td className="tabular-nums font-semibold text-center text-slate-800">{c.targetPerHour}</td>
-              <td className="tabular-nums font-semibold text-center text-emerald-700">
-                {new Decimal(c.ratePerPiece.toString()).toFixed(4)} ብር
-              </td>
-              <td className="font-ethiopic text-xs text-slate-500">{formatAsEthDate(c.effectiveFrom)}</td>
-              <td className="font-ethiopic text-xs text-slate-500">{c.effectiveTo ? formatAsEthDate(c.effectiveTo) : "—"}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
     </div>
   );
 }

@@ -15,15 +15,14 @@ const db = new PrismaClient({
 });
 
 const SYSTEM_USERS = [
-  { code: "ADM-001", pin: "1234", role: "ADMIN"                  as const, nameAm: "አስተዳዳሪ" },
-  { code: "MGR-001", pin: "1234", role: "PRODUCTION_MANAGER"    as const, nameAm: "ዋና ምርት አስኪያጅ" },
-  { code: "STK-001", pin: "1234", role: "STORE_KEEPER"           as const, nameAm: "የመጋዘን ኃላፊ" },
-  { code: "CUT-001", pin: "1234", role: "CUTTING_MANAGER"        as const, nameAm: "የቆረጣ ኃላፊ" },
-  { code: "PRD-001", pin: "1234", role: "PRODUCTION_MANAGER"     as const, nameAm: "የምርት ኃላፊ" },
-  { code: "QCI-001", pin: "1234", role: "QC_INSPECTOR"           as const, nameAm: "የጥራት ተቆጣጣሪ" },
-  { code: "FGM-001", pin: "1234", role: "FINISHED_GOODS_MANAGER" as const, nameAm: "የተጠናቀቀ እቃ ኃላፊ" },
-  { code: "HRC-001", pin: "1234", role: "HR_CLERK"               as const, nameAm: "የሰው ሀብት" },
-  { code: "OPR-001", pin: "1234", role: "OPERATOR"               as const, nameAm: "ኦፕሬተር" },
+  { code: "ADM-001", pin: "1234", role: "ADMIN" as const, nameAm: "ባለቤት (Owner)" },
+  { code: "PMG-001", pin: "1234", role: "PRODUCTION_MANAGER" as const, nameAm: "የምርት ኃላፊ" },
+  { code: "ORD-001", pin: "1234", role: "ORDER_PLACER" as const, nameAm: "የትዕዛዝ ተቀባይ" },
+  { code: "SUP-001", pin: "1234", role: "LINE_SUPERVISOR" as const, nameAm: "መስመር 1 ሱፐርቫይዘር" },
+  { code: "SUP-002", pin: "1234", role: "LINE_SUPERVISOR" as const, nameAm: "መስመር 2 ሱፐርቫይዘር" },
+  { code: "CUT-001", pin: "1234", role: "CUTTING_MANAGER" as const, nameAm: "የቆረጣ ኃላፊ" },
+  { code: "QCI-001", pin: "1234", role: "QC_INSPECTOR" as const, nameAm: "የጥራት ተቆጣጣሪ" },
+  { code: "STK-001", pin: "1234", role: "STORE_KEEPER" as const, nameAm: "የመጋዘን ኃላፊ" },
 ];
 
 async function main() {
@@ -43,7 +42,7 @@ async function main() {
   }
 
   // Get first department to attach employees to
-  const firstDept = await db.department.findFirst({ orderBy: { sortOrder: "asc" } });
+  const firstDept = await db.department.findFirst({ orderBy: { flowOrder: "asc" } });
   if (!firstDept) {
     console.log("\n❌ No departments found — run db:push and db:seed first.");
     return;
