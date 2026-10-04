@@ -8,10 +8,10 @@ import { useRouter } from "next/navigation";
 interface DateNavigatorProps {
   currentDate: string; // YYYY-MM-DD
   isToday: boolean;
-  deptId?: string;
+  jobId?: string;
 }
 
-export function DateNavigator({ currentDate, isToday, deptId }: DateNavigatorProps) {
+export function DateNavigator({ currentDate, isToday, jobId }: DateNavigatorProps) {
   const router = useRouter();
   const dateObj = new Date(currentDate + "T12:00:00Z");
   const ethDisplay = formatAsEthDate(dateObj);
@@ -26,11 +26,11 @@ export function DateNavigator({ currentDate, isToday, deptId }: DateNavigatorPro
   const nextDateISO = nextDate.toISOString().split("T")[0];
   const maxDateISO = todayISOStringEAT().split("T")[0];
 
-  // Build URLs preserving dept
+  // Build URLs preserving job
   const buildUrl = (date: string) => {
     const params = new URLSearchParams();
     params.set("date", date);
-    if (deptId) params.set("dept", deptId);
+    if (jobId) params.set("job", jobId);
     return `/counts/enter?${params.toString()}`;
   };
 

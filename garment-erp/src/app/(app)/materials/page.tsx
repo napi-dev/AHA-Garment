@@ -83,7 +83,7 @@ export default async function MaterialsPage({
   const filtered = showLowOnly ? withStock.filter((m) => m.isLow) : withStock;
   const lowCount = withStock.filter((m) => m.isLow).length;
   const totalPages = Math.ceil(totalCount / PAGE_SIZE);
-  const canEdit = ["ADMIN", "SUPER_MANAGER", "STORE_KEEPER"].includes(session.user.role);
+  const canEdit = ["ADMIN", "PRODUCTION_MANAGER", "STORE_KEEPER"].includes(session.user.role);
 
   function buildHref(p: number) {
     const sp = new URLSearchParams();

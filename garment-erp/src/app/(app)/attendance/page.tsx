@@ -13,7 +13,7 @@ import type { AttendanceStatus } from "@prisma/client";
 export default async function AttendancePage({
   searchParams,
 }: {
-  searchParams: Promise<{ date?: string; dept?: string }>;
+  searchParams: Promise<{ date?: string; page?: string }>;
 }) {
   const session = await auth();
   if (!session?.user) redirect("/login");
@@ -30,6 +30,8 @@ export default async function AttendancePage({
   effectiveToday.setUTCHours(0, 0, 0, 0);
   const dateStr = params.date ?? effectiveToday.toISOString().split("T")[0];
   const date = new Date(dateStr + "T00:00:00Z");
+  const page = parseInt(params.page ?? "1", 10);
+  const PAGE_SIZE = 50;
 
   // Check if attendance is locked for this date
   const isLocked = await db.attendanceSubmission.findFirst({
@@ -39,32 +41,22 @@ export default async function AttendancePage({
     },
   });
 
-  // Load all dept names for the selector
-  const allDepts = await db.department.findMany({
-    where: { isActive: true, flowOrder: { not: null } }, // Only flow departments
-    orderBy: { flowOrder: "asc" },
-    select: { id: true, nameAm: true },
+  // Load ALL employees with pagination
+  const totalEmployees = await db.employee.count({
+    where: { isActive: true },
   });
 
-  // Determine which dept to show
-  const selectedDeptId = params.dept ?? allDepts[0]?.id ?? "";
-
-  // Load selected department's employees + their attendance for this date
-  const departments = selectedDeptId
-    ? await db.department.findMany({
-        where: { id: selectedDeptId, isActive: true },
-        include: {
-          employees: {
-            where: { isActive: true },
-            orderBy: { serialNumber: "asc" },
-            include: {
-              attendances: { where: { date } },
-              job: { select: { nameAm: true } },
-            },
-          },
-        },
-      })
-    : [];
+  const employees = await db.employee.findMany({
+    where: { isActive: true },
+    orderBy: { serialNumber: "asc" },
+    skip: (page - 1) * PAGE_SIZE,
+    take: PAGE_SIZE,
+    include: {
+      attendances: { where: { date } },
+      job: { select: { nameAm: true } },
+      department: { select: { nameAm: true } },
+    },
+  });
 
   const canEdit = !isLocked && (
     session.user.role === "ADMIN" ||
@@ -72,16 +64,12 @@ export default async function AttendancePage({
     session.user.role === "LINE_SUPERVISOR"
   );
 
-  const totalEmployees = departments.reduce((acc, d) => acc + d.employees.length, 0);
-  const totalPresent = departments.reduce(
-    (acc, d) =>
-      acc +
-      d.employees.filter((e) => {
-        const att = e.attendances[0];
-        return att && att.status === "PRESENT";
-      }).length,
-    0
-  );
+  const totalPresent = employees.filter((e) => {
+    const att = e.attendances[0];
+    return att && att.status === "PRESENT";
+  }).length;
+
+  const totalPages = Math.ceil(totalEmployees / PAGE_SIZE);
 
   return (
     <div className="space-y-6">
@@ -131,55 +119,26 @@ export default async function AttendancePage({
         </div>
       )}
 
-      {/* Department selector */}
-      <div className="erp-card p-4">
-        <form method="GET" className="flex flex-wrap items-center gap-3">
-          {/* preserve date when switching dept */}
-          <input type="hidden" name="date" value={dateStr} />
-          <div className="flex items-center gap-2 text-xs font-semibold text-slate-600 font-ethiopic">
-            <Building2 size={14} className="text-blue-500" />
-            <span>የስራ ክፍል ምረጥ፦</span>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {allDepts.map((d) => (
-              <button
-                key={d.id}
-                type="submit"
-                name="dept"
-                value={d.id}
-                className={`px-3 py-1.5 rounded-xl text-xs font-semibold font-ethiopic transition-colors ${
-                  d.id === selectedDeptId
-                    ? "bg-blue-600 text-white shadow-sm"
-                    : "bg-slate-100 text-slate-700 hover:bg-slate-200"
-                }`}
-              >
-                {d.nameAm}
-              </button>
-            ))}
-          </div>
-        </form>
-      </div>
-
       <AttendanceGrid
-        departments={departments.map((d) => ({
-          id: d.id,
-          nameAm: d.nameAm,
-          employees: d.employees.map((e) => ({
-            id: e.id,
-            serialNumber: e.serialNumber,
-            nameAm: e.nameAm,
-            jobName: e.job?.nameAm ?? "—",
-            attendance: e.attendances[0]
-              ? {
-                  id: e.attendances[0].id,
-                  status: e.attendances[0].status,
-                }
-              : null,
-          })),
+        employees={employees.map((e) => ({
+          id: e.id,
+          serialNumber: e.serialNumber,
+          nameAm: e.nameAm,
+          jobName: e.job?.nameAm ?? "—",
+          departmentName: e.department.nameAm,
+          attendance: e.attendances[0]
+            ? {
+                id: e.attendances[0].id,
+                status: e.attendances[0].status,
+              }
+            : null,
         }))}
         date={dateStr}
         canEdit={canEdit}
         userId={session.user.id}
+        isLineSupervisor={session.user.role === "LINE_SUPERVISOR"}
+        currentPage={page}
+        totalPages={totalPages}
       />
     </div>
   );

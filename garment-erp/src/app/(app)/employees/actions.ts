@@ -2,20 +2,29 @@
 
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { requirePermission } from "@/lib/auth/permissions";
+import { getPageAccess } from "@/lib/auth/permissions";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 export async function createEmployee(formData: FormData) {
   const session = await auth();
   if (!session?.user) throw new Error("ተፈቅዶ አልነበረም");
-  requirePermission(session.user.role, "employees:edit");
+  
+  const access = getPageAccess(session.user.role, "/employees");
+  if (access !== "full") throw new Error("ፈቃድ የለም");
 
   const nameAm = String(formData.get("nameAm") ?? "").trim();
   const nameEn = String(formData.get("nameEn") ?? "").trim() || null;
   const departmentId = String(formData.get("departmentId") ?? "");
+  const jobId = String(formData.get("jobId") ?? "") || null;
+  const lineNoStr = String(formData.get("lineNo") ?? "");
+  const lineNo = lineNoStr ? parseInt(lineNoStr, 10) : null;
+  const hiredAtStr = String(formData.get("hiredAt") ?? "");
+  const hiredAt = hiredAtStr ? new Date(hiredAtStr + "T00:00:00Z") : null;
+  const notes = String(formData.get("notes") ?? "").trim() || null;
 
   if (!nameAm || !departmentId) throw new Error("ስም እና ክፍል ያስፈልጋሉ");
+  if (!jobId) throw new Error("ስራ መምረጥ ያስፈልጋል");
 
   // Auto-assign next serial number
   const maxSerial = await db.employee.aggregate({ _max: { serialNumber: true } });
@@ -25,7 +34,17 @@ export async function createEmployee(formData: FormData) {
   const employeeCode = `EMP-${String(nextSerial).padStart(3, "0")}`;
 
   const emp = await db.employee.create({
-    data: { nameAm, nameEn, departmentId, serialNumber: nextSerial, employeeCode },
+    data: { 
+      nameAm, 
+      nameEn, 
+      departmentId, 
+      jobId,
+      lineNo,
+      serialNumber: nextSerial, 
+      employeeCode,
+      hiredAt,
+      notes,
+    },
   });
 
   await db.auditLog.create({
@@ -34,7 +53,7 @@ export async function createEmployee(formData: FormData) {
       action: "CREATE_EMPLOYEE",
       entity: "Employee",
       entityId: emp.id,
-      after: { nameAm, departmentId, employeeCode },
+      after: { nameAm, departmentId, jobId, lineNo, employeeCode },
     },
   });
 
@@ -45,17 +64,25 @@ export async function createEmployee(formData: FormData) {
 export async function updateEmployee(empId: string, formData: FormData) {
   const session = await auth();
   if (!session?.user) throw new Error("ተፈቅዶ አልነበረም");
-  requirePermission(session.user.role, "employees:edit");
+  
+  const access = getPageAccess(session.user.role, "/employees");
+  if (access !== "full") throw new Error("ፈቃድ የለም");
 
   const nameAm = String(formData.get("nameAm") ?? "").trim();
   const nameEn = String(formData.get("nameEn") ?? "").trim() || null;
   const departmentId = String(formData.get("departmentId") ?? "");
+  const jobId = String(formData.get("jobId") ?? "") || null;
+  const lineNoStr = String(formData.get("lineNo") ?? "");
+  const lineNo = lineNoStr ? parseInt(lineNoStr, 10) : null;
+  const hiredAtStr = String(formData.get("hiredAt") ?? "");
+  const hiredAt = hiredAtStr ? new Date(hiredAtStr + "T00:00:00Z") : null;
+  const notes = String(formData.get("notes") ?? "").trim() || null;
   const isActive = formData.get("isActive") !== "false";
 
   const before = await db.employee.findUnique({ where: { id: empId } });
   await db.employee.update({
     where: { id: empId },
-    data: { nameAm, nameEn, departmentId, isActive },
+    data: { nameAm, nameEn, departmentId, jobId, lineNo, hiredAt, notes, isActive },
   });
 
   await db.auditLog.create({
@@ -64,8 +91,14 @@ export async function updateEmployee(empId: string, formData: FormData) {
       action: "UPDATE_EMPLOYEE",
       entity: "Employee",
       entityId: empId,
-      before: before ? { nameAm: before.nameAm, departmentId: before.departmentId, isActive: before.isActive } : undefined,
-      after: { nameAm, departmentId, isActive },
+      before: before ? { 
+        nameAm: before.nameAm, 
+        departmentId: before.departmentId,
+        jobId: before.jobId,
+        lineNo: before.lineNo,
+        isActive: before.isActive 
+      } : undefined,
+      after: { nameAm, departmentId, jobId, lineNo, isActive },
     },
   });
 
@@ -76,8 +109,9 @@ export async function updateEmployee(empId: string, formData: FormData) {
 export async function deleteEmployee(empId: string) {
   const session = await auth();
   if (!session?.user) throw new Error("ተፈቅዶ አልነበረም");
-  // Only Admin and Super Manager can delete
-  if (session.user.role !== "ADMIN" && session.user.role !== "SUPER_MANAGER") {
+  
+  // Only Admin can delete
+  if (session.user.role !== "ADMIN") {
     throw new Error("ፈቃድ የለም");
   }
 

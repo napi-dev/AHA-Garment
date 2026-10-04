@@ -58,7 +58,7 @@ export default async function BundleBoardPage({
   for (const stage of STAGES) byStage[stage] = [];
   for (const b of bundles) byStage[b.currentStage]?.push(b);
 
-  const canAdvance = ["ADMIN","SUPER_MANAGER","PRODUCTION_MANAGER","QC_INSPECTOR","FINISHED_GOODS_MANAGER"].includes(session.user.role);
+  const canAdvance = ["ADMIN","PRODUCTION_MANAGER","PRODUCTION_MANAGER","QC_INSPECTOR","FINISHED_GOODS_MANAGER"].includes(session.user.role);
 
   return (
     <div className="space-y-6">

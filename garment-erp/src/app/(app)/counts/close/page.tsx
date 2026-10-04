@@ -1,7 +1,7 @@
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { redirect } from "next/navigation";
-import { requirePermission } from "@/lib/auth/permissions";
+import { getPageAccess } from "@/lib/auth/permissions";
 import { am } from "@/lib/i18n/am";
 import { formatAsEthDate } from "@/lib/ethiopian-calendar";
 import { getEffectiveDate } from "@/lib/date-override/effective-date";
@@ -16,7 +16,9 @@ import {
 export default async function DayClosePage() {
   const session = await auth();
   if (!session?.user) redirect("/login");
-  requirePermission(session.user.role, "counts:verify");
+
+  const access = getPageAccess(session.user.role, "/counts/close");
+  if (access === "none") redirect("/dashboard");
 
   // Effective today (respects admin date override)
   const today = await getEffectiveDate();
@@ -25,8 +27,6 @@ export default async function DayClosePage() {
   const todayClose = await db.dayClose.findUnique({ where: { date: today } });
 
   // ── Find the active working date ──────────────────────────────────────────
-  // If today is already closed, check if yesterday was not closed but had entries
-  // (the manager forgot to close it). Show that day instead so they can still close it.
   let workingDate = today;
   let isYesterday = false;
 
@@ -34,10 +34,10 @@ export default async function DayClosePage() {
     const yesterday = new Date(today);
     yesterday.setUTCDate(yesterday.getUTCDate() - 1);
 
-    const yesterdayClose  = await db.dayClose.findUnique({ where: { date: yesterday } });
-    const yesterdaySheets = await db.hourlyCountSheet.count({ where: { date: yesterday } });
+    const yesterdayClose = await db.dayClose.findUnique({ where: { date: yesterday } });
+    const yesterdayBoxes = await db.hourlyBox.count({ where: { date: yesterday } });
 
-    if (!yesterdayClose && yesterdaySheets > 0) {
+    if (!yesterdayClose && yesterdayBoxes > 0) {
       workingDate = yesterday;
       isYesterday = true;
     }
@@ -45,19 +45,16 @@ export default async function DayClosePage() {
 
   const dayClose = workingDate === today ? todayClose : null;
 
-  // Summary for working date — all in parallel
-  const [sheetCount, lineStats, pendingLines, verifiedLines] = await Promise.all([
-    db.hourlyCountSheet.count({ where: { date: workingDate } }),
-    db.hourlyCountLine.aggregate({
-      where: { sheet: { date: workingDate } },
+  // Summary for working date
+  const [boxCount, boxStats, aboveTarget] = await Promise.all([
+    db.hourlyBox.count({ where: { date: workingDate } }),
+    db.hourlyBox.aggregate({
+      where: { date: workingDate },
       _count: { _all: true },
       _sum: { totalProduced: true, plusPieces: true, minusPieces: true },
     }),
-    db.hourlyCountLine.count({
-      where: { sheet: { date: workingDate }, status: "SUBMITTED" },
-    }),
-    db.hourlyCountLine.count({
-      where: { sheet: { date: workingDate }, status: "VERIFIED" },
+    db.hourlyBox.count({
+      where: { date: workingDate, plusPieces: { gt: 0 } },
     }),
   ]);
 
@@ -73,7 +70,6 @@ export default async function DayClosePage() {
             <p className="mt-0.5 text-amber-700">
               የዛሬ ({formatAsEthDate(today)}) ቀን ቀድሞ ተዘግቷል።
               ትናንት ({formatAsEthDate(workingDate)}) ግን ቁጥሮች ተስቀምጠዋል ነገር ግን ቀኑ አልተዘጋም።
-              ከዚህ ታች ያለው ማጠቃለያ ለትናንት ነው።
             </p>
           </div>
         </div>
@@ -103,63 +99,48 @@ export default async function DayClosePage() {
       <div className="erp-card p-6 space-y-5">
         <h2 className="font-bold text-slate-800 font-ethiopic text-base flex items-center gap-2">
           <span>📊</span>
-          <span>
-            {isYesterday ? "ትናንት" : "የዛሬ"} የፋብሪካው ጠቅላላ የምርት ማጠቃለያ
-          </span>
+          <span>{isYesterday ? "ትናንት" : "የዛሬ"} የፋብሪካው ጠቅላላ የምርት ማጠቃለያ</span>
         </h2>
 
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
           <StatBox
-            label="የምርት ሰሌዳዎች"
-            value={sheetCount}
-            icon={<FileText size={16} className="text-blue-600" />}
-          />
-          <StatBox
             label="የተመዘገቡ ሠራተኞች"
-            value={lineStats._count._all}
+            value={boxStats._count._all}
             icon={<Users size={16} className="text-indigo-600" />}
           />
           <StatBox
             label="ጠቅላላ የተመረተ"
-            value={lineStats._sum.totalProduced ?? 0}
+            value={boxStats._sum.totalProduced ?? 0}
             color="text-blue-700"
             icon={<Factory size={16} className="text-blue-600" />}
           />
           <StatBox
             label="+የትርፍ ምርት ፍሬ"
-            value={lineStats._sum.plusPieces ?? 0}
+            value={boxStats._sum.plusPieces ?? 0}
             color="text-emerald-700"
             icon={<TrendingUp size={16} className="text-emerald-600" />}
           />
           <StatBox
             label="−ያልተሟላ ፍሬ"
-            value={lineStats._sum.minusPieces ?? 0}
+            value={boxStats._sum.minusPieces ?? 0}
             color="text-rose-600"
           />
           <StatBox
-            label="ማረጋገጫ የሚጠብቁ"
-            value={pendingLines}
-            color={pendingLines > 0 ? "text-amber-600" : "text-slate-400"}
-            icon={pendingLines > 0 ? <AlertTriangle size={16} className="text-amber-600" /> : undefined}
+            label="ከዒላማ በላይ"
+            value={aboveTarget}
+            color="text-emerald-600"
+          />
+          <StatBox
+            label="ጠቅላላ ሰሌዳዎች"
+            value={boxCount}
+            icon={<FileText size={16} className="text-slate-500" />}
           />
         </div>
 
-        {pendingLines > 0 && (
-          <div className="alert-warning font-ethiopic text-xs flex items-center gap-2">
-            <AlertTriangle size={16} className="text-amber-700 flex-shrink-0" />
-            <span>
-              {pendingLines} ሠራተኞች ያስመዘገቧቸው ቁጥሮች ገና አልተረጋገጡም።
-              ቀን ከመዝጋቱ በፊት ማረጋገጥ ይመከራል።
-            </span>
-          </div>
-        )}
-
-        {verifiedLines === 0 && lineStats._count._all > 0 && (
+        {boxStats._count._all === 0 && (
           <div className="alert-info font-ethiopic text-xs flex items-center gap-2">
-            <span>ℹ️</span>
-            <span>
-              እስካሁን የተረጋገጠ ቁጥር የለም። የቁጥጥር ሂደቱ ከተጠናቀቀ በኋላ ቀኑን መዝጋት ይችላሉ።
-            </span>
+            <AlertTriangle size={16} className="text-blue-600 flex-shrink-0" />
+            <span>ለዚህ ቀን ምንም የተመዘገበ ቁጥር የለም።</span>
           </div>
         )}
 
@@ -175,7 +156,7 @@ export default async function DayClosePage() {
         )}
       </div>
 
-      {/* Close action — uses workingDate */}
+      {/* Close action */}
       <DayCloseButton
         date={workingDate.toISOString()}
         alreadyClosed={!!dayClose}
@@ -185,10 +166,8 @@ export default async function DayClosePage() {
       {/* Generate & send PDF report */}
       <GenerateReportButton date={workingDate.toISOString()} />
 
-      {/* Monthly audit log purge — Admin / Super Manager only */}
-      {(session.user.role === "ADMIN" || session.user.role === "SUPER_MANAGER") && (
-        <PurgeAuditButton />
-      )}
+      {/* Monthly audit log purge — Admin only */}
+      {session.user.role === "ADMIN" && <PurgeAuditButton />}
     </div>
   );
 }

@@ -1,7 +1,7 @@
 "use server";
 
 import { auth } from "@/lib/auth";
-import { requirePermission, canApproveIncentive } from "@/lib/auth/permissions";
+import { canApproveIncentive, canCloseIncentive } from "@/lib/auth/permissions";
 import { closePeriod, approvePeriod } from "@/lib/incentive/periods";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -9,7 +9,7 @@ import { redirect } from "next/navigation";
 export async function closePeriodAction(formData: FormData) {
   const session = await auth();
   if (!session?.user) throw new Error("ተፈቅዶ አልነበረም");
-  requirePermission(session.user.role, "incentive:view");
+  if (!canCloseIncentive(session.user.role)) throw new Error("ፈቃድ የለዎትም");
 
   const ethYear      = parseInt(String(formData.get("ethYear")      ?? "0"), 10);
   const ethMonth     = parseInt(String(formData.get("ethMonth")     ?? "0"), 10);
@@ -23,7 +23,7 @@ export async function closePeriodAction(formData: FormData) {
 export async function approvePeriodAction(periodId: string) {
   const session = await auth();
   if (!session?.user) throw new Error("ተፈቅዶ አልነበረም");
-  if (!canApproveIncentive(session.user.role)) throw new Error("ሱፐር ማኔጀር ብቻ ሊያፀድቅ ይችላል");
+  if (!canApproveIncentive(session.user.role)) throw new Error("ባለቤት (ADMIN) ብቻ ሊያፀድቅ ይችላል");
 
   await approvePeriod(periodId, session.user.id);
   revalidatePath("/incentive");

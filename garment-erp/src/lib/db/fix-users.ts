@@ -16,7 +16,7 @@ const db = new PrismaClient({
 
 const SYSTEM_USERS = [
   { code: "ADM-001", pin: "1234", role: "ADMIN"                  as const, nameAm: "አስተዳዳሪ" },
-  { code: "MGR-001", pin: "1234", role: "SUPER_MANAGER"          as const, nameAm: "ሱፐር ማኔጀር" },
+  { code: "MGR-001", pin: "1234", role: "PRODUCTION_MANAGER"    as const, nameAm: "ዋና ምርት አስኪያጅ" },
   { code: "STK-001", pin: "1234", role: "STORE_KEEPER"           as const, nameAm: "የመጋዘን ኃላፊ" },
   { code: "CUT-001", pin: "1234", role: "CUTTING_MANAGER"        as const, nameAm: "የቆረጣ ኃላፊ" },
   { code: "PRD-001", pin: "1234", role: "PRODUCTION_MANAGER"     as const, nameAm: "የምርት ኃላፊ" },

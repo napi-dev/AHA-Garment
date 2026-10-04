@@ -1,7 +1,7 @@
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { redirect } from "next/navigation";
-import { requirePermission } from "@/lib/auth/permissions";
+import { getPageAccess, canResolveAlert, canSeeAlert } from "@/lib/auth/permissions";
 import { am } from "@/lib/i18n/am";
 import { formatAsEthDate } from "@/lib/ethiopian-calendar";
 import { resolveAlertAction } from "./actions";
@@ -32,7 +32,9 @@ export default async function AlertsPage({
 }) {
   const session = await auth();
   if (!session?.user) redirect("/login");
-  requirePermission(session.user.role, "reports:view");
+  
+  const access = getPageAccess(session.user.role, "/alerts");
+  if (access === "none") redirect("/dashboard");
 
   const params = await searchParams;
   const showResolved = params.resolved === "1";
@@ -40,6 +42,7 @@ export default async function AlertsPage({
   // Count open alerts first — if none and not showing resolved, skip the full query
   const openCount = await db.alert.count({ where: { resolvedAt: null } });
 
+  // Only fetch alert types this role can see
   const alerts = openCount > 0 || showResolved
     ? await db.alert.findMany({
         where: { ...(showResolved ? {} : { resolvedAt: null }) },
@@ -48,7 +51,9 @@ export default async function AlertsPage({
       })
     : [];
 
-  const canResolve = ["ADMIN", "SUPER_MANAGER"].includes(session.user.role);
+  // Filter alerts by role visibility
+  const visibleAlerts = alerts.filter((a) => canSeeAlert(session.user.role, a.type));
+  const canResolve = canResolveAlert(session.user.role);
 
   return (
     <div className="space-y-6">
@@ -80,7 +85,7 @@ export default async function AlertsPage({
 
       {/* Alert list */}
       <div className="space-y-3">
-        {alerts.length === 0 && (
+        {visibleAlerts.length === 0 && (
           <div className="erp-card p-12 text-center">
             <CheckCircle2 size={44} className="mx-auto text-green-400 mb-3" />
             <p className="font-ethiopic text-green-700 text-lg font-semibold">
@@ -89,7 +94,7 @@ export default async function AlertsPage({
           </div>
         )}
 
-        {alerts.map((alert) => {
+        {visibleAlerts.map((alert) => {
           const action = canResolve ? resolveAlertAction.bind(null, alert.id) : null;
           return (
             <div key={alert.id}

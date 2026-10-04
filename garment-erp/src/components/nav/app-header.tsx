@@ -63,7 +63,7 @@ export function AppHeader({
 
         {/* Center/Right: Ethiopian Date, Alerts, and User Profile */}
         <div className="flex items-center gap-3">
-          {/* Ethiopian Date Badge — editable for ADMIN/SUPER_MANAGER */}
+          {/* Ethiopian Date Badge — editable for ADMIN/PRODUCTION_MANAGER */}
           <DateOverrideBadge
             ethDateDisplay={ethDateDisplay}
             isOverridden={isOverridden}

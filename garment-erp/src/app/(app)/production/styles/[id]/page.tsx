@@ -24,7 +24,7 @@ export default async function StyleDetailPage({ params }: { params: Promise<{ id
   if (!style) notFound();
 
   const materials = await db.material.findMany({ where: { isActive: true }, orderBy: { sku: "asc" } });
-  const canEdit = ["ADMIN", "SUPER_MANAGER", "CUTTING_MANAGER"].includes(session.user.role);
+  const canEdit = ["ADMIN", "PRODUCTION_MANAGER", "CUTTING_MANAGER"].includes(session.user.role);
   const action = upsertBomItem;
 
   const STAGES_AM: Record<string, string> = {

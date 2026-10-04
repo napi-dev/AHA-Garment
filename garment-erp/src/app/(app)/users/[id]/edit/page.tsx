@@ -74,8 +74,8 @@ export default async function EditUserPage({ params }: { params: Promise<{ id: s
           </select>
         </div>
 
-        {/* Protect the sole Super Manager and Admin */}
-        {(user.role === "SUPER_MANAGER" || user.role === "ADMIN") && (
+        {/* Protect the sole Production Manager and Admin */}
+        {(user.role === "PRODUCTION_MANAGER" || user.role === "ADMIN") && (
           <div className="alert-warning flex items-start gap-2.5">
             <AlertTriangle size={18} className="text-amber-600 flex-shrink-0 mt-0.5" />
             <p className="text-xs text-amber-800 font-ethiopic leading-relaxed">

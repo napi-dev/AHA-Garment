@@ -23,7 +23,7 @@ export default async function AppLayout({
   ]);
 
   const ethDateDisplay = `${eth.day} ${ethMonthName(eth.month)} ${eth.year} ዓ.ም (${formatEthDate(eth)})`;
-  const canEditDate = role === "ADMIN" || role === "SUPER_MANAGER";
+  const canEditDate = role === "ADMIN" || role === "PRODUCTION_MANAGER";
 
   return (
     <AppShell

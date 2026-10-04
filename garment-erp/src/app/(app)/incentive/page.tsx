@@ -1,6 +1,6 @@
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
-import { requirePermission } from "@/lib/auth/permissions";
+import { getPageAccess, canCloseIncentive, canApproveIncentive } from "@/lib/auth/permissions";
 import { am } from "@/lib/i18n/am";
 import { ethMonthName, formatAsEthDate } from "@/lib/ethiopian-calendar";
 import { getEffectiveEthDate } from "@/lib/date-override/effective-date";
@@ -12,11 +12,14 @@ import { Award, Calendar, CheckCircle2, Clock, ChevronRight, FileText, BarChart2
 export default async function IncentivePage() {
   const session = await auth();
   if (!session?.user) redirect("/login");
-  requirePermission(session.user.role, "incentive:view");
+  
+  const access = getPageAccess(session.user.role, "/incentive");
+  if (access === "none") redirect("/dashboard");
 
   const periods = await listPeriods();
   const eth = await getEffectiveEthDate();
-  const canClose = session.user.role === "ADMIN" || session.user.role === "SUPER_MANAGER" || session.user.role === "PRODUCTION_MANAGER";
+  const canClose = canCloseIncentive(session.user.role);
+  const canApprove = canApproveIncentive(session.user.role);
 
   const approvedCount = periods.filter((p) => p.status === "APPROVED").length;
   const pendingCount = periods.filter((p) => p.status === "PENDING_APPROVAL").length;

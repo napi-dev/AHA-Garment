@@ -7,7 +7,7 @@
  * the real employee list and incentive card arrive.
  */
 
-import { PrismaClient, BundleStage, Role } from "@prisma/client";
+import { PrismaClient, Role } from "@prisma/client";
 import bcrypt from "bcryptjs";
 import Decimal from "decimal.js";
 
@@ -20,67 +20,42 @@ const db = new PrismaClient({
 const DEPARTMENTS: Array<{
   nameAm: string;
   nameEn: string;
-  stage: BundleStage;
-  sortOrder: number;
-  targetPerHour: number;
-  ratePerPiece: string; // string to keep exact Decimal
+  flowOrder: number | null;
+  controllers: Role[];
 }> = [
-  // Sewing (stage 3)
-  { nameAm: "ትከሻ (ፍሬንት)", nameEn: "Shoulder, back and front", stage: "SEWING", sortOrder: 1, targetPerHour: 70, ratePerPiece: "1.00" },
-  { nameAm: "ወገብ መቀምቀም", nameEn: "Waist tacking", stage: "SEWING", sortOrder: 2, targetPerHour: 70, ratePerPiece: "1.00" },
-  { nameAm: "እጅ / ሳይድ", nameEn: "Sleeve and side", stage: "SEWING", sortOrder: 3, targetPerHour: 75, ratePerPiece: "1.00" },
-  { nameAm: "ኪስ መለጠፍ", nameEn: "Pocket attaching", stage: "SEWING", sortOrder: 4, targetPerHour: 80, ratePerPiece: "0.90" },
-  { nameAm: "ሳይድ", nameEn: "Side", stage: "SEWING", sortOrder: 5, targetPerHour: 78, ratePerPiece: "1.00" },
-  { nameAm: "እጃት", nameEn: "Sleeve", stage: "SEWING", sortOrder: 6, targetPerHour: 76, ratePerPiece: "1.00" },
-  { nameAm: "እጅት ደርዝ እና ባጅ", nameEn: "Sleeve topstitch and badge", stage: "SEWING", sortOrder: 7, targetPerHour: 82, ratePerPiece: "0.90" },
-  { nameAm: "Interlock ማጠፍ", nameEn: "Interlock hem", stage: "SEWING", sortOrder: 8, targetPerHour: 72, ratePerPiece: "1.20" },
-  { nameAm: "ወገብ መቀጠም", nameEn: "Waistband joining", stage: "SEWING", sortOrder: 9, targetPerHour: 75, ratePerPiece: "0.90" },
-  { nameAm: "የካንሻይ ወገብ ዝግጅት", nameEn: "Kanshay waist prep", stage: "SEWING", sortOrder: 10, targetPerHour: 82, ratePerPiece: "0.80" },
-  // Styling / hit press (stage 6)
-  { nameAm: "ሂትፕረስ መለጠፍ", nameEn: "Heat-press applying", stage: "STYLING_HITPRESS", sortOrder: 11, targetPerHour: 90, ratePerPiece: "0.80" },
-  // Ironing (stage 7)
-  { nameAm: "ካውያ", nameEn: "Ironing", stage: "IRONING", sortOrder: 12, targetPerHour: 45, ratePerPiece: "0.80" },
-  // Trimming (stage 4)
-  { nameAm: "ቅንጫባ (ክር ለቃሚ)", nameEn: "Thread trimming", stage: "TRIMMING", sortOrder: 13, targetPerHour: 30, ratePerPiece: "0.70" },
-  // Packing (stage 8)
-  { nameAm: "ማሸግ", nameEn: "Packing", stage: "PACKING", sortOrder: 14, targetPerHour: 55, ratePerPiece: "0.60" },
-  // Cutting (stage 2)
-  { nameAm: "ስቲከር / ላስቲክ መቀጥ", nameEn: "Sticker and elastic cutting", stage: "CUTTING", sortOrder: 15, targetPerHour: 60, ratePerPiece: "0.80" },
-  // QC (stage 5)
-  { nameAm: "ዳሜጅ / ሱሪ መስረት", nameEn: "Damage and repair", stage: "QUALITY_CONTROL", sortOrder: 16, targetPerHour: 60, ratePerPiece: "0.80" },
+  // Production departments in flow order
+  { nameAm: "ትከሻ (ፍሬንት)", nameEn: "Shoulder, back and front", flowOrder: 1, controllers: ["PRODUCTION_MANAGER", "LINE_SUPERVISOR"] },
+  { nameAm: "ወገብ መቀምቀም", nameEn: "Waist tacking", flowOrder: 2, controllers: ["PRODUCTION_MANAGER", "LINE_SUPERVISOR"] },
+  { nameAm: "እጅ / ሳይድ", nameEn: "Sleeve and side", flowOrder: 3, controllers: ["PRODUCTION_MANAGER", "LINE_SUPERVISOR"] },
+  { nameAm: "ኪስ መለጠፍ", nameEn: "Pocket attaching", flowOrder: 4, controllers: ["PRODUCTION_MANAGER", "LINE_SUPERVISOR"] },
+  { nameAm: "ሳይድ", nameEn: "Side", flowOrder: 5, controllers: ["PRODUCTION_MANAGER", "LINE_SUPERVISOR"] },
+  { nameAm: "እጃት", nameEn: "Sleeve", flowOrder: 6, controllers: ["PRODUCTION_MANAGER", "LINE_SUPERVISOR"] },
+  { nameAm: "እጅት ደርዝ እና ባጅ", nameEn: "Sleeve topstitch and badge", flowOrder: 7, controllers: ["PRODUCTION_MANAGER", "LINE_SUPERVISOR"] },
+  { nameAm: "Interlock ማጠፍ", nameEn: "Interlock hem", flowOrder: 8, controllers: ["PRODUCTION_MANAGER", "LINE_SUPERVISOR"] },
+  { nameAm: "ወገብ መቀጠም", nameEn: "Waistband joining", flowOrder: 9, controllers: ["PRODUCTION_MANAGER", "LINE_SUPERVISOR"] },
+  { nameAm: "የካንሻይ ወገብ ዝግጅት", nameEn: "Kanshay waist prep", flowOrder: 10, controllers: ["PRODUCTION_MANAGER", "LINE_SUPERVISOR"] },
+  { nameAm: "ሂትፕረስ መለጠፍ", nameEn: "Heat-press applying", flowOrder: 11, controllers: ["PRODUCTION_MANAGER"] },
+  { nameAm: "ካውያ", nameEn: "Ironing", flowOrder: 12, controllers: ["PRODUCTION_MANAGER"] },
+  { nameAm: "ቅንጫባ (ክር ለቃሚ)", nameEn: "Thread trimming", flowOrder: 13, controllers: ["PRODUCTION_MANAGER", "QC_INSPECTOR"] },
+  { nameAm: "ማሸግ", nameEn: "Packing", flowOrder: 14, controllers: ["PRODUCTION_MANAGER"] },
+  { nameAm: "ስቲከር / ላስቲክ መቀጥ", nameEn: "Sticker and elastic cutting", flowOrder: 15, controllers: ["CUTTING_MANAGER"] },
+  { nameAm: "ዳሜጅ / ሱሪ መስረት", nameEn: "Damage and repair", flowOrder: 16, controllers: ["QC_INSPECTOR"] },
   // Cutting support
-  { nameAm: "ረዳት / ሱሪ መቁረጥ", nameEn: "Helper, trouser cutting", stage: "CUTTING", sortOrder: 17, targetPerHour: 50, ratePerPiece: "0.80" },
-  { nameAm: "ቆራጭ", nameEn: "Cutter", stage: "CUTTING", sortOrder: 18, targetPerHour: 65, ratePerPiece: "0.90" },
-  { nameAm: "ረዳት ቆራጭ", nameEn: "Assistant cutter", stage: "CUTTING", sortOrder: 19, targetPerHour: 55, ratePerPiece: "0.90" },
-  // QC inspector (target 0 → always 0 incentive)
-  { nameAm: "የጥራት ተቆጣጣሪ", nameEn: "Quality inspector", stage: "QUALITY_CONTROL", sortOrder: 20, targetPerHour: 0, ratePerPiece: "0.60" },
-  // Support (target 0)
-  { nameAm: "ረዳት", nameEn: "Helper", stage: "SEWING", sortOrder: 21, targetPerHour: 0, ratePerPiece: "0.60" },
-  // Extra support rows (always 0, not in incentive card)
-  { nameAm: "የመስመር ረዳት", nameEn: "Line helpers", stage: "SEWING", sortOrder: 22, targetPerHour: 0, ratePerPiece: "0.00" },
-  { nameAm: "መስመር ማሰራት", nameEn: "Line running", stage: "SEWING", sortOrder: 23, targetPerHour: 0, ratePerPiece: "0.00" },
-  { nameAm: "ቁጥጥር", nameEn: "Line control", stage: "SEWING", sortOrder: 24, targetPerHour: 0, ratePerPiece: "0.00" },
+  { nameAm: "ረዳት / ሱሪ መቁረጥ", nameEn: "Helper, trouser cutting", flowOrder: null, controllers: ["CUTTING_MANAGER"] },
+  { nameAm: "ቆራጭ", nameEn: "Cutter", flowOrder: null, controllers: ["CUTTING_MANAGER"] },
+  { nameAm: "ረዳት ቆራጭ", nameEn: "Assistant cutter", flowOrder: null, controllers: ["CUTTING_MANAGER"] },
+  // QC inspector
+  { nameAm: "የጥራት ተቆጣጣሪ", nameEn: "Quality inspector", flowOrder: null, controllers: ["QC_INSPECTOR"] },
+  // Support
+  { nameAm: "ረዳት", nameEn: "Helper", flowOrder: null, controllers: ["PRODUCTION_MANAGER", "LINE_SUPERVISOR"] },
+  // Extra support rows (not in production flow)
+  { nameAm: "የመስመር ረዳት", nameEn: "Line helpers", flowOrder: null, controllers: ["PRODUCTION_MANAGER"] },
+  { nameAm: "መስመር ማሰራት", nameEn: "Line running", flowOrder: null, controllers: ["PRODUCTION_MANAGER"] },
+  { nameAm: "ቁጥጥር", nameEn: "Line control", flowOrder: null, controllers: ["PRODUCTION_MANAGER"] },
+  { nameAm: "አስተዳደር", nameEn: "Administration", flowOrder: null, controllers: [] },
 ];
 
-// ─── 2. Operations (13 from salary_schedule.pdf) ─────────────────────────────
-
-const OPERATIONS = [
-  { nameEn: "Cutting and preparation, helpers", nameAm: "ቆረጣ እና ዝግጅት", sortOrder: 1 },
-  { nameEn: "DTF sticker heat-pressing", nameAm: "ሂትፕረስ", sortOrder: 2 },
-  { nameEn: "Pocket sewing and topstitch", nameAm: "ኪስ መስፋት + ደርዝ", sortOrder: 3 },
-  { nameEn: "Neck rib and back tape", nameAm: "አንገት ሪብ እና ጀርባ ቴፕ", sortOrder: 4 },
-  { nameEn: "Waistband and elastic joining", nameAm: "ወገብ እና ላስቲክ መቀጠም", sortOrder: 5 },
-  { nameEn: "Waist, Kanshay", nameAm: "ወገብ በካንሻይ", sortOrder: 6 },
-  { nameEn: "Trouser panel seam, front and back", nameAm: "የሱሪ ፓነል ስፌት", sortOrder: 7 },
-  { nameEn: "Shoulder and sleeve joining", nameAm: "ትከሻ እና እጃት መቀጠም", sortOrder: 8 },
-  { nameEn: "T-shirt and trouser side seam", nameAm: "ሳይድ ስፌት", sortOrder: 9 },
-  { nameEn: "T-shirt and trouser hem or sleeve fold", nameAm: "ሄም ወይም እጃት ማጠፍ", sortOrder: 10 },
-  { nameEn: "Line material feeder or helper", nameAm: "ረዳት", sortOrder: 11 },
-  { nameEn: "Thread trimming", nameAm: "ቅንጫባ (ክር ለቃሚ)", sortOrder: 12 },
-  { nameEn: "Ironing and packing", nameAm: "ካውያ እና ማሸግ", sortOrder: 13 },
-];
-
-// ─── 3. Sample employees (one per department, for testing) ───────────────────
+// ─── 2. Sample employees (one per department, for testing) ───────────────────
 
 // Workers from incentive_v4.pdf period 1 statement (67 workers)
 // Using representative sample: at least one per department
@@ -187,14 +162,12 @@ const SAMPLE_EMPLOYEES: Array<{
 
 const SYSTEM_USERS: Array<{ code: string; pin: string; role: Role; nameAm: string }> = [
   { code: "ADM-001",  pin: "1234", role: "ADMIN",                  nameAm: "አስተዳዳሪ" },
-  { code: "MGR-001",  pin: "1234", role: "SUPER_MANAGER",          nameAm: "ሱፐር ማኔጀር" },
+  { code: "MGR-001",  pin: "1234", role: "PRODUCTION_MANAGER",    nameAm: "ዋና ምርት አስኪያጅ" },
   { code: "STK-001",  pin: "1234", role: "STORE_KEEPER",           nameAm: "የመጋዘን ኃላፊ" },
   { code: "CUT-001",  pin: "1234", role: "CUTTING_MANAGER",        nameAm: "የቆረጣ ኃላፊ" },
-  { code: "PRD-001",  pin: "1234", role: "PRODUCTION_MANAGER",     nameAm: "የምርት ኃላፊ" },
   { code: "QCI-001",  pin: "1234", role: "QC_INSPECTOR",           nameAm: "የጥራት ተቆጣጣሪ" },
-  { code: "FGM-001",  pin: "1234", role: "FINISHED_GOODS_MANAGER", nameAm: "የተጠናቀቀ እቃ ኃላፊ" },
-  { code: "HRC-001",  pin: "1234", role: "HR_CLERK",               nameAm: "የሰው ሀብት" },
-  { code: "OPR-001",  pin: "1234", role: "OPERATOR",               nameAm: "ኦፕሬተር" },
+  { code: "SUP-001",  pin: "1234", role: "LINE_SUPERVISOR",        nameAm: "የመስመር ሱፐርቫይዘር" },
+  { code: "ORD-001",  pin: "1234", role: "ORDER_PLACER",           nameAm: "የትዕዛዝ ተቀባይ" },
 ];
 
 // ─── Seed logic ───────────────────────────────────────────────────────────────
@@ -208,66 +181,22 @@ async function main() {
 
   for (const dept of DEPARTMENTS) {
     const created = await db.department.upsert({
-      where: { nameEn: dept.nameEn },
-      update: { nameAm: dept.nameAm, stage: dept.stage, sortOrder: dept.sortOrder },
+      where: { nameAm: dept.nameAm },
+      update: { 
+        nameEn: dept.nameEn, 
+        flowOrder: dept.flowOrder,
+        controllers: { set: dept.controllers },
+      },
       create: {
         nameAm: dept.nameAm,
         nameEn: dept.nameEn,
-        stage: dept.stage,
-        sortOrder: dept.sortOrder,
+        flowOrder: dept.flowOrder,
+        controllers: dept.controllers,
       },
     });
     deptIds.push(created.id);
   }
   console.log(`    ✓ ${deptIds.length} departments`);
-
-  // ── Incentive cards (effective from 2018-01-01 EC / ~2025-09-11 Greg) ──
-  console.log("  Creating incentive cards...");
-  const effectiveFrom = new Date("2025-09-11T00:00:00Z"); // ~ Meskerem 1, 2018 EC
-  const setByUserId = "seed";
-
-  for (let i = 0; i < DEPARTMENTS.length; i++) {
-    const dept = DEPARTMENTS[i];
-    const deptId = deptIds[i];
-    if (dept.ratePerPiece === "0.00" && dept.targetPerHour === 0) continue;
-
-    // Close any existing open card
-    await db.incentiveCard.updateMany({
-      where: { departmentId: deptId, effectiveTo: null },
-      data: { effectiveTo: effectiveFrom },
-    });
-
-    // Use createOrUpdate pattern — compound unique now exists in schema
-    const existing = await db.incentiveCard.findUnique({
-      where: { departmentId_effectiveFrom: { departmentId: deptId, effectiveFrom } },
-    });
-    if (!existing) {
-      await db.incentiveCard.create({
-        data: {
-          departmentId: deptId,
-          targetPerHour: dept.targetPerHour,
-          ratePerPiece: new Decimal(dept.ratePerPiece),
-          effectiveFrom,
-          effectiveTo: null,
-          setByUserId,
-        },
-      });
-    }
-  }
-  console.log("    ✓ incentive cards");
-
-  // ── Operations ───────────────────────────────────────────────────────────
-  console.log("  Creating operations...");
-  const opIds: string[] = [];
-  for (const op of OPERATIONS) {
-    const created = await db.operation.upsert({
-      where: { nameEn: op.nameEn },
-      update: { nameAm: op.nameAm, sortOrder: op.sortOrder },
-      create: { nameEn: op.nameEn, nameAm: op.nameAm, sortOrder: op.sortOrder },
-    });
-    opIds.push(created.id);
-  }
-  console.log(`    ✓ ${opIds.length} operations`);
 
   // ── Employees ────────────────────────────────────────────────────────────
   console.log("  Creating sample employees...");
@@ -283,18 +212,22 @@ async function main() {
     let id: string;
     if (existing) {
       id = existing.id;
+      // Track the highest serial number if employee already exists
+      if (existing.serialNumber >= serial) {
+        serial = existing.serialNumber + 1;
+      }
     } else {
       const created = await db.employee.create({
         data: {
-          serialNumber: serial++,
+          serialNumber: serial,
           nameAm: emp.nameAm,
           departmentId: deptId,
         },
       });
       id = created.id;
+      serial++;
     }
     empIds.push(id);
-    serial++;
   }
   console.log(`    ✓ ${SAMPLE_EMPLOYEES.length} employees`);
 
@@ -302,24 +235,37 @@ async function main() {
   console.log("  Creating system users...");
   for (const u of SYSTEM_USERS) {
     const pinHash = await bcrypt.hash(u.pin, 10);
-    await db.appUser.upsert({
+    
+    // Check if AppUser already exists
+    const existingUser = await db.appUser.findUnique({
       where: { employeeCode: u.code },
-      update: { pinHash, role: u.role },
-      create: {
-        employeeCode: u.code,
-        pinHash,
-        role: u.role,
-        employee: {
-          create: {
-            serialNumber: serial++,
-            nameAm: u.nameAm,
-            department: {
-              connect: { id: deptIds[0] }, // temporary dept assignment for system users
+    });
+    
+    if (existingUser) {
+      // Update existing user
+      await db.appUser.update({
+        where: { employeeCode: u.code },
+        data: { pinHash, role: u.role },
+      });
+    } else {
+      // Create new user with employee
+      await db.appUser.create({
+        data: {
+          employeeCode: u.code,
+          pinHash,
+          role: u.role,
+          employee: {
+            create: {
+              serialNumber: serial++,
+              nameAm: u.nameAm,
+              department: {
+                connect: { id: deptIds[0] },
+              },
             },
           },
         },
-      },
-    });
+      });
+    }
   }
   console.log(`    ✓ ${SYSTEM_USERS.length} system users`);
 

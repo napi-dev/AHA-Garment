@@ -90,23 +90,23 @@ export async function closePeriod(
     // ── 3. Get ALL active employees (not just those with counts) ─────────────
     const allEmployees = await tx.employee.findMany({
       where: { isActive: true },
-      select: { id: true, departmentId: true },
+      select: { id: true, departmentId: true, jobId: true },
     });
 
-    // ── 4. Aggregate HourlyCountLine rows for each employee in range ─────────
+    // ── 4. Aggregate HourlyBox rows for each employee in range ───────────────
     type CountAgg = {
       employeeId: string;
-      departmentId: string;
+      jobId: string;
       totalPlus: number;
       totalMinus: number;
       totalMistakes: number;
     };
 
-    const rawAgg = await tx.hourlyCountLine.groupBy({
-      by: ["employeeId", "departmentId"],
+    const rawAgg = await tx.hourlyBox.groupBy({
+      by: ["employeeId", "jobId"],
       where: {
-        sheet: { date: { gte: startDate, lte: endDate }, status: "LOCKED" },
-        status: "LOCKED",
+        date: { gte: startDate, lte: endDate },
+        isLocked: true,
       },
       _sum: { plusPieces: true, minusPieces: true, mistakes: true },
     });
@@ -115,7 +115,7 @@ export async function closePeriod(
     rawAgg.forEach((r) => {
       aggregated.set(r.employeeId, {
         employeeId: r.employeeId,
-        departmentId: r.departmentId,
+        jobId: r.jobId,
         totalPlus: r._sum.plusPieces ?? 0,
         totalMinus: r._sum.minusPieces ?? 0,
         totalMistakes: r._sum.mistakes ?? 0,
@@ -133,18 +133,22 @@ export async function closePeriod(
 
     // Process ALL active employees (create zero lines if no counts)
     for (const emp of allEmployees) {
+      // Use job from aggregated data (actual job worked) or fallback to employee's assigned job
+      const empJobId = aggregated.get(emp.id)?.jobId ?? emp.jobId;
+      if (!empJobId) continue; // no job assigned → skip
+
       const agg = aggregated.get(emp.id) || {
         employeeId: emp.id,
-        departmentId: emp.departmentId,
+        jobId: empJobId,
         totalPlus: 0,
         totalMinus: 0,
         totalMistakes: 0,
       };
 
-      // Active card for this department at period end
+      // Active card for this job at period end
       const card = await tx.incentiveCard.findFirst({
         where: {
-          departmentId: agg.departmentId,
+          jobId: empJobId,
           effectiveFrom: { lte: endDate },
           OR: [{ effectiveTo: null }, { effectiveTo: { gte: endDate } }],
         },
@@ -165,7 +169,7 @@ export async function closePeriod(
 
       const result = calculateWorkerIncentive({
         employeeId: agg.employeeId,
-        departmentId: agg.departmentId,
+        departmentId: emp.departmentId,
         plusPieces: agg.totalPlus,
         minusPieces: agg.totalMinus,
         mistakes: agg.totalMistakes,
@@ -173,7 +177,6 @@ export async function closePeriod(
         isSuspended: !!suspension,
       });
 
-      // Use Decimal for money calculations
       const calculated = new Decimal(result.calculated);
       const payable = new Decimal(result.payable);
 
@@ -181,7 +184,7 @@ export async function closePeriod(
         data: {
           periodId: period.id,
           employeeId: agg.employeeId,
-          departmentId: agg.departmentId,
+          jobId: empJobId,
           cardId: card.id,
           ratePerPiece: card.ratePerPiece,
           plusPieces: agg.totalPlus,

@@ -4,7 +4,7 @@ import { am } from "@/lib/i18n/am";
 import { formatAsEthDate, ethMonthName } from "@/lib/ethiopian-calendar";
 import { getEffectiveDate, getEffectiveEthDate } from "@/lib/date-override/effective-date";
 import { redirect } from "next/navigation";
-import { hasPermission } from "@/lib/auth/permissions";
+import { getPageAccess, canCloseIncentive, canApproveIncentive } from "@/lib/auth/permissions";
 import { DashboardCharts } from "./dashboard-charts";
 import Decimal from "decimal.js";
 import Link from "next/link";
@@ -27,16 +27,16 @@ export default async function DashboardPage() {
   const [dayClose, countStats, aboveTarget, openAlerts, pendingPeriods] =
     await Promise.all([
       db.dayClose.findUnique({ where: { date: today } }),
-      db.hourlyCountLine.aggregate({
-        where: { sheet: { date: today }, status: { not: "DRAFT" } },
+      db.hourlyBox.aggregate({
+        where: { date: today },
         _count: { _all: true },
         _sum:   { totalProduced: true, plusPieces: true },
       }),
-      db.hourlyCountLine.count({
-        where: { sheet: { date: today }, plusPieces: { gt: 0 } },
+      db.hourlyBox.count({
+        where: { date: today, plusPieces: { gt: 0 } },
       }),
       db.alert.count({ where: { resolvedAt: null } }),
-      hasPermission(role, "incentive:approve")
+      canApproveIncentive(role)
         ? db.incentivePeriod.count({ where: { status: "PENDING_APPROVAL" } })
         : Promise.resolve(0),
     ]);
@@ -53,18 +53,15 @@ export default async function DashboardPage() {
   });
   const closedDaySet = new Set(closedDays.map(d => d.date.toISOString().split("T")[0]));
 
-  const trendRaw = await db.hourlyCountLine.findMany({
-    where: { 
-      sheet: { date: { gte: trendStart, lte: today } }, 
-      status: { not: "DRAFT" } // Show all non-draft data, not just LOCKED
-    },
-    select: { sheet: { select: { date: true } }, totalProduced: true, plusPieces: true },
+  const trendRaw = await db.hourlyBox.findMany({
+    where: { date: { gte: trendStart, lte: today } },
+    select: { date: true, totalProduced: true, plusPieces: true },
   });
 
   const trendMap = new Map<string, { produced: number; plus: number }>();
   let grandTotalProduced = 0;
   for (const row of trendRaw) {
-    const key = row.sheet.date.toISOString().split("T")[0];
+    const key = row.date.toISOString().split("T")[0];
     const prev = trendMap.get(key) ?? { produced: 0, plus: 0 };
     prev.produced += row.totalProduced ?? 0;
     prev.plus     += row.plusPieces    ?? 0;
@@ -90,20 +87,20 @@ export default async function DashboardPage() {
   // ── Remaining queries — all parallel ──────────────────────────────────────
   const [currentPeriod, deptStatsRaw, [openOrders, overdueOrders]] =
     await Promise.all([
-      hasPermission(role, "incentive:view")
+      canCloseIncentive(role) || canApproveIncentive(role)
         ? db.incentivePeriod.findFirst({
             where: { ethYear: eth.year, ethMonth: eth.month },
             orderBy: { periodNumber: "desc" },
           })
         : Promise.resolve(null),
-      db.hourlyCountLine.groupBy({
+      db.hourlyBox.groupBy({
         by:   ["departmentId"],
-        where: { sheet: { date: today }, status: { not: "DRAFT" } },
+        where: { date: today },
         _sum:  { totalProduced: true, plusPieces: true, targetForDay: true },
       }),
       Promise.all([
-        db.prodOrder.count({ where: { isActive: true } }),
-        db.prodOrder.count({ where: { isActive: true, dueDate: { lt: today } } }),
+        db.prodOrder.count({ where: { status: "ACTIVE" } }),
+        db.prodOrder.count({ where: { status: "ACTIVE", deadlineAt: { lt: today } } }),
       ]),
     ]);
 
@@ -123,7 +120,7 @@ export default async function DashboardPage() {
         : "—";
   }
 
-  // ── Dept chart — resolve names in one extra query ─────────────────────────
+  // ── Dept chart — resolve names ────────────────────────────────────────────
   const deptIds = deptStatsRaw.map((d) => d.departmentId);
   const deptRows = deptIds.length
     ? await db.department.findMany({
@@ -144,6 +141,7 @@ export default async function DashboardPage() {
     .slice(0, 10);
 
   const totalWorkersAttended = countStats._count._all;
+  const canCloseDay = !dayClose && getPageAccess(role, "/counts/close") !== "none";
 
   return (
     <div className="space-y-8">
@@ -166,7 +164,7 @@ export default async function DashboardPage() {
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-3">
-            {!dayClose && hasPermission(role, "counts:verify") && (
+            {!dayClose && canCloseDay && (
               <Link href="/counts/close"
                 className="px-5 py-3 rounded-2xl bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-ethiopic font-semibold text-sm hover:from-purple-500 hover:to-indigo-500 transition-all shadow-lg flex items-center gap-2 animate-pulse">
                 <CheckSquare size={16} />
@@ -267,9 +265,9 @@ export default async function DashboardPage() {
       </div>
 
       {/* Incentive / pending KPIs */}
-      {(hasPermission(role, "incentive:view") || pendingPeriods > 0) && (
+      {(canCloseIncentive(role) || canApproveIncentive(role) || pendingPeriods > 0) && (
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
-          {hasPermission(role, "incentive:view") && (
+          {(canCloseIncentive(role) || canApproveIncentive(role)) && (
             <>
               <div className="erp-card p-5 border-l-4 border-emerald-500">
                 <p className="text-xs text-slate-500 font-ethiopic">ወቅታዊ የኢንሴንቲቭ ክፍያ</p>
@@ -313,19 +311,18 @@ export default async function DashboardPage() {
 }
 
 function QuickActions({ role }: { role: string }) {
+  const r = role as import("@prisma/client").Role;
+  const { getPageAccess } = require("@/lib/auth/permissions");
+  
   const actions = [
-    { label: "የሰዓት ቁጥር መዝግብ",   desc: "የእያንዳንዱን ሠራተኛ የሰዓት ውጤት አስገባ",        href: "/counts/enter",       permission: "counts:enter"   as const, icon: <Clock size={20} className="text-blue-600" />,    badge: "ዕለታዊ" as string | undefined },
-    { label: "የዕለት ሥራ አጠቃልል",  desc: "የዕለቱን የምርት ሰሌዳ ፈትሽና ዝጋ",            href: "/counts/close",       permission: "counts:verify"  as const, icon: <CheckSquare size={20} className="text-purple-600" />, badge: "ቀን ማጠቃለያ" as string | undefined },
-    { label: "አዲስ ቆረጣ ጀምር",    desc: "ለጨርቅ ቆረጣ ክፍል ትዕዛዝ መዝግብ",           href: "/cutting/new",        permission: "cuts:edit"      as const, icon: <Scissors size={20} className="text-orange-600" />, badge: undefined },
-    { label: "ጥሬ ዕቃ ገቢ አድርግ",  desc: "የመጡ አዳዲስ ጥሬ ዕቃዎችን አስመዝግብ",         href: "/materials/receive",  permission: "stock:edit"     as const, icon: <Package size={20} className="text-teal-600" />,   badge: undefined },
-    { label: "የጥራት ፍተሻ (QC)",   desc: "ባንድሎችን መርምርና አፅድቅ",                  href: "/quality",            permission: "qc:edit"        as const, icon: <CheckCircle2 size={20} className="text-pink-600" />, badge: undefined },
-    { label: "የስራ ባንድሎች",        desc: "የተቆረጡ የስራ ጥቅሎች ክትትል",                href: "/production/bundles", permission: "bundles:view"   as const, icon: <Layers size={20} className="text-indigo-600" />,  badge: undefined },
-    { label: "ኢንሴንቲቭ አፅድቅ",    desc: "የተሰላ የሠራተኞች ኢንሴንቲቭ ክፍያ ማረጋገጫ",     href: "/incentive",          permission: "incentive:approve" as const, icon: <TrendingUp size={20} className="text-emerald-600" />, badge: "ማኔጅመንት" as string | undefined },
+    { label: "የሰዓት ቁጥር መዝግብ",   desc: "የእያንዳንዱን ሠራተኛ የሰዓት ውጤት አስገባ",        href: "/counts/enter",       page: "/counts/enter",       icon: <Clock size={20} className="text-blue-600" />,    badge: "ዕለታዊ" as string | undefined },
+    { label: "የዕለት ሥራ አጠቃልል",  desc: "የዕለቱን የምርት ሰሌዳ ፈትሽና ዝጋ",            href: "/counts/close",       page: "/counts/close",       icon: <CheckSquare size={20} className="text-purple-600" />, badge: "ቀን ማጠቃለያ" as string | undefined },
+    { label: "አዲስ ቆረጣ ጀምር",    desc: "ለጨርቅ ቆረጣ ክፍል ትዕዛዝ መዝግብ",           href: "/cutting/new",        page: "/cutting",            icon: <Scissors size={20} className="text-orange-600" />, badge: undefined },
+    { label: "ጥሬ ዕቃ ገቢ አድርግ",  desc: "የመጡ አዳዲስ ጥሬ ዕቃዎችን አስመዝግብ",         href: "/materials",          page: "/materials",          icon: <Package size={20} className="text-teal-600" />,   badge: undefined },
+    { label: "ኢንሴንቲቭ አፅድቅ",    desc: "የተሰላ የሠራተኞች ኢንሴንቲቭ ክፍያ ማረጋገጫ",     href: "/incentive",          page: "/incentive",          icon: <TrendingUp size={20} className="text-emerald-600" />, badge: "ማኔጅመንት" as string | undefined },
   ];
 
-  const visible = actions.filter((a) =>
-    hasPermission(role as Parameters<typeof hasPermission>[0], a.permission)
-  );
+  const visible = actions.filter((a) => getPageAccess(r, a.page) !== "none");
   if (!visible.length) return null;
 
   return (

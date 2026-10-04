@@ -35,7 +35,7 @@ export default async function PackingPage() {
     take: 20,
   });
 
-  const canEdit = ["ADMIN","SUPER_MANAGER","FINISHED_GOODS_MANAGER"].includes(session.user.role);
+  const canEdit = ["ADMIN","PRODUCTION_MANAGER","FINISHED_GOODS_MANAGER"].includes(session.user.role);
 
   return (
     <div className="space-y-6">

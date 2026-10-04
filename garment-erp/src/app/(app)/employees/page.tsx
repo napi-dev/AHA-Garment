@@ -1,7 +1,7 @@
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { redirect } from "next/navigation";
-import { requirePermission, canViewSalary } from "@/lib/auth/permissions";
+import { getPageAccess, canEditSalary } from "@/lib/auth/permissions";
 import { am } from "@/lib/i18n/am";
 import Link from "next/link";
 import { Users, UserPlus, Search, Filter, ShieldAlert, Banknote, Edit3, CheckCircle2, XCircle, Building2 } from "lucide-react";
@@ -17,7 +17,9 @@ export default async function EmployeesPage({
 }) {
   const session = await auth();
   if (!session?.user) redirect("/login");
-  requirePermission(session.user.role, "employees:view");
+  
+  const access = getPageAccess(session.user.role, "/employees");
+  if (access === "none") redirect("/dashboard");
 
   const params = await searchParams;
   const activeFilter = params.active !== "false";
@@ -35,15 +37,19 @@ export default async function EmployeesPage({
   const [employees, total, departments, totalActive, totalInactive] = await Promise.all([
     db.employee.findMany({
       where,
-      include: { department: true, _count: { select: { offences: true } } },
-      orderBy: [{ department: { sortOrder: "asc" } }, { serialNumber: "asc" }],
+      include: { 
+        department: true, 
+        job: { select: { nameAm: true } },
+        _count: { select: { offences: true } } 
+      },
+      orderBy: [{ department: { flowOrder: "asc" } }, { serialNumber: "asc" }],
       skip,
       take: PAGE_SIZE,
     }),
     db.employee.count({ where }),
     db.department.findMany({
-      // All departments including አስተዳደር (isActive:false) so managers appear in filter
-      orderBy: [{ isActive: "desc" }, { sortOrder: "asc" }],
+      where: { isActive: true },
+      orderBy: { flowOrder: "asc" },
     }),
     db.employee.count({ where: { isActive: true } }),
     db.employee.count({ where: { isActive: false } }),
@@ -51,9 +57,9 @@ export default async function EmployeesPage({
 
   const totalPages = Math.ceil(total / PAGE_SIZE);
 
-  const canEdit = session.user.role === "ADMIN" || session.user.role === "SUPER_MANAGER" || session.user.role === "HR_CLERK";
-  const canDelete = session.user.role === "ADMIN" || session.user.role === "SUPER_MANAGER";
-  const userCanViewSalary = canViewSalary(session.user.role);
+  const canEdit = access === "full";
+  const canDelete = session.user.role === "ADMIN";
+  const userCanViewSalary = canEditSalary(session.user.role) || session.user.role === "PRODUCTION_MANAGER";
 
   function buildHref(p: number) {
     const sp = new URLSearchParams();
@@ -144,16 +150,9 @@ export default async function EmployeesPage({
               className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 font-ethiopic text-slate-700"
             >
               <option value="">ሁሉም የስራ ክፍሎች</option>
-              <optgroup label="── የምርት ክፍሎች ──">
-                {departments.filter((d) => d.isActive).map((d) => (
-                  <option key={d.id} value={d.id}>{d.nameAm}</option>
-                ))}
-              </optgroup>
-              <optgroup label="── ቁጥጥርና አስተዳደር ──">
-                {departments.filter((d) => !d.isActive).map((d) => (
-                  <option key={d.id} value={d.id}>{d.nameAm}</option>
-                ))}
-              </optgroup>
+              {departments.map((d) => (
+                <option key={d.id} value={d.id}>{d.nameAm}</option>
+              ))}
             </select>
           </div>
 
@@ -196,6 +195,7 @@ export default async function EmployeesPage({
                 <th className="w-16 text-center">መለያ</th>
                 <th className="text-right">{am.employees.name}</th>
                 <th className="text-right">{am.employees.department}</th>
+                <th className="text-right">ስራ</th>
                 <th className="w-24 text-center">{am.status}</th>
                 <th className="w-28 text-center">ጥፋቶች</th>
                 {canEdit && <th className="w-48 text-center">{am.actions}</th>}
@@ -204,7 +204,7 @@ export default async function EmployeesPage({
             <tbody>
               {employees.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="text-center text-slate-400 py-16 font-ethiopic">
+                  <td colSpan={7} className="text-center text-slate-400 py-16 font-ethiopic">
                     <Users size={36} className="mx-auto mb-2 text-slate-300" />
                     <p>{am.employees.noEmployees}</p>
                   </td>
@@ -213,18 +213,26 @@ export default async function EmployeesPage({
               {employees.map((emp) => (
                 <tr key={emp.id} className="hover:bg-slate-50/80 transition-colors">
                   <td className="text-center font-mono text-xs font-semibold text-slate-600 bg-slate-50/50 py-3">
-                    {emp.employeeCode ?? emp.serialNumber}
+                    {emp.employeeCode ?? `#${emp.serialNumber}`}
                   </td>
                   <td className="font-ethiopic text-slate-900 font-medium text-right py-3">
                     <div>{emp.nameAm}</div>
                     {emp.nameEn && (
                       <div className="text-xs text-slate-400 font-sans">{emp.nameEn}</div>
                     )}
+                    {emp.lineNo && (
+                      <div className="text-xs text-blue-600 font-ethiopic mt-0.5">
+                        መስመር {emp.lineNo}
+                      </div>
+                    )}
                   </td>
                   <td className="font-ethiopic text-slate-600 text-right py-3">
-                    <span className="inline-block bg-slate-100 text-slate-700 text-xs px-2.5 py-1 rounded-lg">
-                      {emp.department.nameAm}
-                    </span>
+                    {emp.department.nameAm}
+                  </td>
+                  <td className="font-ethiopic text-slate-600 text-right py-3 text-xs">
+                    {emp.job?.nameAm ?? (
+                      <span className="text-slate-400">ስራ አልተመደበም</span>
+                    )}
                   </td>
                   <td className="text-center py-3">
                     {emp.isActive ? (

@@ -18,7 +18,7 @@ interface Props {
   ethYear: number;
   ethMonth: number;
   ethDay: number;
-  /** Whether this user can edit the date (ADMIN or SUPER_MANAGER) */
+  /** Whether this user can edit the date (ADMIN or PRODUCTION_MANAGER) */
   canEdit: boolean;
 }
 

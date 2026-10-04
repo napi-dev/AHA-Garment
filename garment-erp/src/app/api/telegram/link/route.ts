@@ -64,7 +64,7 @@ export async function POST(req: NextRequest) {
   ] as const;
   const deptReports = ["DAILY_SUMMARY", "DAILY_PRODUCTION_SHEET"] as const;
 
-  const allowed = (user.role === "ADMIN" || user.role === "SUPER_MANAGER")
+  const allowed = (user.role === "ADMIN" || user.role === "PRODUCTION_MANAGER")
     ? [...managerReports]
     : [...deptReports];
 
@@ -77,6 +77,6 @@ export async function POST(req: NextRequest) {
   // Remove the one-time code
   await db.appSetting.delete({ where: { key: `telegram_link_${code}` } });
 
-  await sendMessage(chatId, `✅ ተያይዟል! እንኳን ደስ አለዎ ${user.role === "SUPER_MANAGER" ? "ሱፐር ማኔጀር" : "አስተዳዳሪ"} 🎉`);
+  await sendMessage(chatId, `✅ ተያይዟል! እንኳን ደስ አለዎ ${user.role === "PRODUCTION_MANAGER" ? "ዋና ምርት አስኪያጅ" : "አስተዳዳሪ"} 🎉`);
   return NextResponse.json({ ok: true });
 }

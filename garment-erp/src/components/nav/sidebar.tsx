@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
 import type { Role } from "@prisma/client";
 import { am } from "@/lib/i18n/am";
-import { hasPermission } from "@/lib/auth/permissions";
+import { getPageAccess } from "@/lib/auth/permissions";
 import {
   LayoutDashboard, Users, Clock, ClipboardList, CheckSquare,
   Package, Scissors, Factory, Shield, TrendingUp, FileText,
@@ -18,7 +18,7 @@ interface NavItem {
   label: string;
   href: string;
   icon: React.ReactNode;
-  permission?: Parameters<typeof hasPermission>[1];
+  pagePath?: string; // Path to check permission for
   badge?: string | number;
   badgeColor?: string;
 }
@@ -51,39 +51,39 @@ export function Sidebar({
     {
       title: "ዋና ክፍል (Overview)",
       items: [
-        { label: am.nav.dashboard, href: "/dashboard", icon: <LayoutDashboard size={18} /> },
-        { label: am.nav.attendance, href: "/attendance", icon: <Clock size={18} />, permission: "attendance:view" },
-        { label: am.nav.counts, href: "/counts/enter", icon: <ClipboardList size={18} />, permission: "counts:enter" },
-        { label: am.counts.closeDay, href: "/counts/close", icon: <CheckSquare size={18} />, permission: "counts:verify" },
+        { label: am.nav.dashboard, href: "/dashboard", icon: <LayoutDashboard size={18} />, pagePath: "/dashboard" },
+        { label: am.nav.attendance, href: "/attendance", icon: <Clock size={18} />, pagePath: "/attendance" },
+        { label: am.nav.counts, href: "/counts/enter", icon: <ClipboardList size={18} />, pagePath: "/counts" },
+        { label: am.counts.closeDay, href: "/counts/close", icon: <CheckSquare size={18} />, pagePath: "/counts/close" },
       ],
     },
     {
       title: "የምርት ሂደት (Manufacturing)",
       items: [
-        { label: am.nav.cutting, href: "/cutting", icon: <Scissors size={18} />, permission: "cuts:view" },
-        { label: "የምርት ትዕዛዞች", href: "/production", icon: <Factory size={18} />, permission: "bundles:view" },
-        { label: "ባንድሎች (Bundles)", href: "/production/bundles", icon: <Layers size={18} />, permission: "bundles:view" },
-        { label: am.nav.quality, href: "/quality", icon: <CheckSquare size={18} />, permission: "qc:view" },
-        { label: am.nav.packing, href: "/packing", icon: <Package size={18} />, permission: "finished_goods:view" },
+        { label: am.nav.cutting, href: "/cutting", icon: <Scissors size={18} />, pagePath: "/cutting" },
+        { label: "የምርት ትዕዛዞች", href: "/production", icon: <Factory size={18} />, pagePath: "/production" },
+        { label: "ባንድሎች (Bundles)", href: "/production/bundles", icon: <Layers size={18} />, pagePath: "/production/bundles" },
+        { label: am.nav.quality, href: "/quality", icon: <CheckSquare size={18} />, pagePath: "/quality" },
+        { label: am.nav.packing, href: "/packing", icon: <Package size={18} />, pagePath: "/packing" },
       ],
     },
     {
       title: "ክምችትና አቅርቦት (Inventory)",
       items: [
-        { label: am.nav.materials, href: "/materials", icon: <Warehouse size={18} />, permission: "stock:view" },
-        { label: "አቅራቢ ድርጅቶች", href: "/suppliers", icon: <Building2 size={18} />, permission: "stock:view" },
+        { label: am.nav.materials, href: "/materials", icon: <Warehouse size={18} />, pagePath: "/materials" },
+        { label: "አቅራቢ ድርጅቶች", href: "/suppliers", icon: <Building2 size={18} />, pagePath: "/suppliers" },
       ],
     },
     {
       title: "ክፍያና የሰው ኃይል (HR & Payroll)",
       items: [
-        { label: am.employees.title, href: "/employees", icon: <Users size={18} />, permission: "employees:view" },
-        { label: am.nav.incentive, href: "/incentive", icon: <TrendingUp size={18} />, permission: "incentive:view" },
-        { label: am.nav.salary, href: "/salary", icon: <DollarSign size={18} />, permission: "salary:view" },
-        { label: "የወር ኢንሴንቲቭ ማጠቃለያ", href: "/payroll/monthly-incentive", icon: <TrendingUp size={18} />, permission: "incentive:view" },
-        { label: "የወር ደሞዝ ማጠቃለያ", href: "/payroll/monthly-salary", icon: <DollarSign size={18} />, permission: "incentive:view" },
-        { label: "የወር መገኘት ማጠቃለያ", href: "/payroll/monthly-attendance", icon: <Clock size={18} />, permission: "attendance:view" },
-        { label: "የወር ክፍያ ሪፖርት", href: "/payroll/monthly-report", icon: <FileText size={18} />, permission: "incentive:view" },
+        { label: am.employees.title, href: "/employees", icon: <Users size={18} />, pagePath: "/employees" },
+        { label: am.nav.incentive, href: "/incentive", icon: <TrendingUp size={18} />, pagePath: "/incentive" },
+        { label: am.nav.salary, href: "/salary", icon: <DollarSign size={18} />, pagePath: "/salary" },
+        { label: "የወር ኢንሴንቲቭ ማጠቃለያ", href: "/payroll/monthly-incentive", icon: <TrendingUp size={18} />, pagePath: "/payroll" },
+        { label: "የወር ደሞዝ ማጠቃለያ", href: "/payroll/monthly-salary", icon: <DollarSign size={18} />, pagePath: "/payroll" },
+        { label: "የወር መገኘት ማጠቃለያ", href: "/payroll/monthly-attendance", icon: <Clock size={18} />, pagePath: "/payroll" },
+        { label: "የወር ክፍያ ሪፖርት", href: "/payroll/monthly-report", icon: <FileText size={18} />, pagePath: "/payroll" },
       ],
     },
     {
@@ -93,14 +93,14 @@ export function Sidebar({
           label: "ማስጠንቀቂያዎች",
           href: "/alerts",
           icon: <AlertTriangle size={18} />,
-          permission: "reports:view",
+          pagePath: "/alerts",
           badge: openAlertsCount > 0 ? openAlertsCount : undefined,
           badgeColor: "bg-rose-500 text-white",
         },
-        { label: am.nav.reports, href: "/reports", icon: <FileText size={18} />, permission: "reports:view" },
-        { label: am.nav.users, href: "/users", icon: <Shield size={18} />, permission: "users:manage" },
-        { label: am.nav.settings, href: "/settings", icon: <Settings size={18} />, permission: "settings:manage" },
-        { label: am.nav.auditLog, href: "/audit", icon: <ClipboardList size={18} />, permission: "audit:view" },
+        { label: am.nav.reports, href: "/reports", icon: <FileText size={18} />, pagePath: "/reports" },
+        { label: am.nav.users, href: "/users", icon: <Shield size={18} />, pagePath: "/users" },
+        { label: am.nav.settings, href: "/settings", icon: <Settings size={18} />, pagePath: "/settings" },
+        { label: am.nav.auditLog, href: "/audit", icon: <ClipboardList size={18} />, pagePath: "/audit" },
       ],
     },
   ];
@@ -174,7 +174,7 @@ export function Sidebar({
         <nav className="flex-1 overflow-y-auto px-3 py-2 space-y-4">
           {NAV_GROUPS.map((group) => {
             const visibleItems = group.items.filter(
-              (item) => !item.permission || hasPermission(role, item.permission)
+              (item) => !item.pagePath || getPageAccess(role, item.pagePath) !== "none"
             );
 
             if (!visibleItems.length) return null;

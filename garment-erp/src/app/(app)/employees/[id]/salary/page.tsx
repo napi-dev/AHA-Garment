@@ -23,7 +23,7 @@ export default async function EmployeeSalaryPage({ params }: { params: Promise<{
   });
   if (!emp) notFound();
 
-  const canEdit = session.user.role === "ADMIN" || session.user.role === "SUPER_MANAGER";
+  const canEdit = session.user.role === "ADMIN" || session.user.role === "PRODUCTION_MANAGER";
   const current = emp.salaryRecords[0];
   const today = todayISOStringEAT();
 

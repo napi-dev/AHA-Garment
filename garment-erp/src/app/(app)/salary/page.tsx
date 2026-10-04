@@ -1,7 +1,7 @@
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { redirect } from "next/navigation";
-import { requirePermission } from "@/lib/auth/permissions";
+import { getPageAccess, canEditSalary } from "@/lib/auth/permissions";
 import { am } from "@/lib/i18n/am";
 import { ethMonthName } from "@/lib/ethiopian-calendar";
 import { getEffectiveDate, getEffectiveEthDate } from "@/lib/date-override/effective-date";
@@ -19,7 +19,9 @@ export default async function SalaryPage({
 }) {
   const session = await auth();
   if (!session?.user) redirect("/login");
-  requirePermission(session.user.role, "salary:view");
+  
+  const access = getPageAccess(session.user.role, "/salary");
+  if (access === "none") redirect("/dashboard");
 
   const params = await searchParams;
   const page = Math.max(1, parseInt(params.page ?? "1", 10));
@@ -44,13 +46,12 @@ export default async function SalaryPage({
           take: 1,
         },
       },
-      orderBy: [{ department: { sortOrder: "asc" } }, { serialNumber: "asc" }],
+      orderBy: [{ department: { flowOrder: "asc" } }, { serialNumber: "asc" }],
       skip,
       take: PAGE_SIZE,
     }),
     db.employee.count({ where }),
-    db.department.findMany({ orderBy: [{ isActive: "desc" }, { sortOrder: "asc" }], select: { id: true, nameAm: true, isActive: true } }),
-    // aggregate totals separately
+    db.department.findMany({ where: { isActive: true }, orderBy: { flowOrder: "asc" }, select: { id: true, nameAm: true } }),
     db.salaryRecord.aggregate({
       where: { effectiveTo: null, employee: { isActive: true } },
       _sum: { amount: true },
@@ -59,8 +60,8 @@ export default async function SalaryPage({
   ]);
 
   const totalPages = Math.ceil(totalCount / PAGE_SIZE);
-  const canEdit = session.user.role === "ADMIN" || session.user.role === "SUPER_MANAGER";
-  const canApprove = session.user.role === "SUPER_MANAGER";
+  const canEdit = canEditSalary(session.user.role);
+  const canApprove = canEditSalary(session.user.role);
 
   const totalSalary = Number(totals._sum.amount ?? 0);
   const missingSalariesCount = totalCount - (totals._count._all ?? 0);
@@ -159,16 +160,9 @@ export default async function SalaryPage({
             className="px-3 py-2 rounded-xl border border-slate-200 text-sm font-ethiopic focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
           >
             <option value="">ሁሉም ክፍሎች</option>
-            <optgroup label="── የምርት ክፍሎች ──">
-              {departments.filter((d) => d.isActive).map((d) => (
-                <option key={d.id} value={d.id}>{d.nameAm}</option>
-              ))}
-            </optgroup>
-            <optgroup label="── ቁጥጥርና አስተዳደር ──">
-              {departments.filter((d) => !d.isActive).map((d) => (
-                <option key={d.id} value={d.id}>{d.nameAm}</option>
-              ))}
-            </optgroup>
+            {departments.map((d) => (
+              <option key={d.id} value={d.id}>{d.nameAm}</option>
+            ))}
           </select>
           <button type="submit" className="px-4 py-2 bg-slate-100 text-slate-700 rounded-xl text-sm font-ethiopic hover:bg-slate-200 transition-colors font-semibold">
             ፈልግ

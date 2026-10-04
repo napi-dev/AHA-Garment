@@ -90,7 +90,7 @@ export const am = {
   // ── Roles ────────────────────────────────────────────────────────────────
   roles: {
     ADMIN: "አስተዳዳሪ (Admin)",
-    SUPER_MANAGER: "ዋና ሥራ አስኪያጅ (Super Manager)",
+    PRODUCTION_MANAGER: "ዋና ምርት ሥራ አስኪያጅ (Production Manager)",
     STORE_KEEPER: "የጥሬ ዕቃ መጋዘን ኃላፊ",
     CUTTING_MANAGER: "የቆረጣ ክፍል ኃላፊ",
     PRODUCTION_MANAGER: "የምርትና ስፌት ኃላፊ",

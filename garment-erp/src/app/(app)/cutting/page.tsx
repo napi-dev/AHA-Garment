@@ -36,7 +36,7 @@ export default async function CuttingPage() {
     ? jobs.reduce((sum, j) => sum + Number(j.wastagePct), 0) / jobs.length
     : 0;
 
-  const canEdit = session.user.role === "ADMIN" || session.user.role === "SUPER_MANAGER" || session.user.role === "CUTTING_MANAGER";
+  const canEdit = access === "full";
 
   return (
     <div className="space-y-6">

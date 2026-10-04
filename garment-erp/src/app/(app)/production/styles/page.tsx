@@ -17,7 +17,7 @@ export default async function StylesPage() {
     orderBy: { createdAt: "desc" },
   });
 
-  const canEdit = ["ADMIN","SUPER_MANAGER","CUTTING_MANAGER","PRODUCTION_MANAGER"].includes(session.user.role);
+  const canEdit = ["ADMIN","PRODUCTION_MANAGER","CUTTING_MANAGER","PRODUCTION_MANAGER"].includes(session.user.role);
 
   return (
     <div className="space-y-6">

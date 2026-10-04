@@ -8,7 +8,7 @@ import { ethToGregorian, todayEth, type EthDate } from "@/lib/ethiopian-calendar
 const OVERRIDE_KEY = "eth_date_override";
 
 /** Allowed roles that can set/clear the date override */
-const CAN_OVERRIDE_ROLES = new Set(["ADMIN", "SUPER_MANAGER"]);
+const CAN_OVERRIDE_ROLES = new Set(["ADMIN", "PRODUCTION_MANAGER"]);
 
 /**
  * Read the active date override from AppSetting.
@@ -37,7 +37,7 @@ export async function getEthDateOverride(): Promise<EthDate | null> {
   return overrideDate;
 }
 
-/** Set the active Ethiopian date override (ADMIN or SUPER_MANAGER only). */
+/** Set the active Ethiopian date override (ADMIN or PRODUCTION_MANAGER only). */
 export async function setEthDateOverride(
   ethYear: number,
   ethMonth: number,

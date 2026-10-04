@@ -35,7 +35,7 @@ export default async function SuppliersPage({
   ]);
 
   const totalPages = Math.ceil(total / PAGE_SIZE);
-  const canEdit = ["ADMIN", "SUPER_MANAGER", "STORE_KEEPER"].includes(session.user.role);
+  const canEdit = ["ADMIN", "PRODUCTION_MANAGER", "STORE_KEEPER"].includes(session.user.role);
 
   function buildHref(p: number) {
     return `/suppliers?page=${p}`;

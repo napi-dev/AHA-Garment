@@ -4,39 +4,41 @@ import { useState, useCallback } from "react";
 import { am } from "@/lib/i18n/am";
 import { formatAsEthDate } from "@/lib/ethiopian-calendar";
 import { calculateDailyCount } from "@/lib/incentive/engine";
-import { saveHourlyCounts } from "../actions";
-import { Check, Loader2, AlertCircle, Save, Target, Sparkles, Building2, Calendar, CheckCircle2, Lock } from "lucide-react";
+import { saveHourlyBox } from "../actions";
+import { Check, Loader2, AlertCircle, Save, Target, Briefcase, Calendar, CheckCircle2, Lock } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-interface ExistingLine {
+interface ExistingBox {
   id: string;
   h1: number | null; h2: number | null; h3: number | null; h4: number | null;
   h5: number | null; h6: number | null; h7: number | null; h8: number | null;
-  status: string;
+  totalProduced: number;
+  targetForDay: number;
+  plusPieces: number;
+  minusPieces: number;
   mistakes: number;
   mistakeReason: string | null;
+  isLocked: boolean;
 }
 
 interface EmployeeRow {
   id: string;
   serialNumber: number;
   nameAm: string;
-  existingLine: ExistingLine | null;
-}
-
-interface DeptGroup {
-  deptId: string;
-  deptNameAm: string;
-  targetPerHour: number;
-  employees: EmployeeRow[];
+  existingBox: ExistingBox | null;
 }
 
 interface HourlyCountFormProps {
-  deptWithEmployees: DeptGroup[];
+  jobId: string;
+  jobNameAm: string;
+  departmentId: string;
+  departmentNameAm: string;
+  targetPerHour: number;
+  employees: EmployeeRow[];
   date: string;
   supervisorId: string;
-  isReadOnly?: boolean; // True when day is closed
+  isReadOnly?: boolean;
 }
 
 type HourKey = "h1"|"h2"|"h3"|"h4"|"h5"|"h6"|"h7"|"h8";
@@ -60,44 +62,49 @@ function emptyRow(): RowState {
     mistakes:"0", mistakeReason:"", dirty:false, saving:false, saved:false, error:"" };
 }
 
-function lineToRow(line: ExistingLine): RowState {
+function boxToRow(box: ExistingBox): RowState {
   return {
-    h1: line.h1 != null ? String(line.h1) : "",
-    h2: line.h2 != null ? String(line.h2) : "",
-    h3: line.h3 != null ? String(line.h3) : "",
-    h4: line.h4 != null ? String(line.h4) : "",
-    h5: line.h5 != null ? String(line.h5) : "",
-    h6: line.h6 != null ? String(line.h6) : "",
-    h7: line.h7 != null ? String(line.h7) : "",
-    h8: line.h8 != null ? String(line.h8) : "",
-    mistakes: String(line.mistakes),
-    mistakeReason: line.mistakeReason ?? "",
-    // Mark as already saved so the row shows the green ✓ on load
+    h1: box.h1 != null ? String(box.h1) : "",
+    h2: box.h2 != null ? String(box.h2) : "",
+    h3: box.h3 != null ? String(box.h3) : "",
+    h4: box.h4 != null ? String(box.h4) : "",
+    h5: box.h5 != null ? String(box.h5) : "",
+    h6: box.h6 != null ? String(box.h6) : "",
+    h7: box.h7 != null ? String(box.h7) : "",
+    h8: box.h8 != null ? String(box.h8) : "",
+    mistakes: String(box.mistakes),
+    mistakeReason: box.mistakeReason ?? "",
     dirty: false, saving: false, saved: true, error: "",
   };
 }
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export function HourlyCountForm({ deptWithEmployees, date, supervisorId, isReadOnly = false }: HourlyCountFormProps) {
+export function HourlyCountForm({ 
+  jobId,
+  jobNameAm,
+  departmentId,
+  departmentNameAm,
+  targetPerHour, 
+  employees, 
+  date, 
+  supervisorId, 
+  isReadOnly = false 
+}: HourlyCountFormProps) {
   // Build initial state: { [employeeId]: RowState }
   const initialState: Record<string, RowState> = {};
-  for (const dept of deptWithEmployees) {
-    for (const emp of dept.employees) {
-      initialState[emp.id] = emp.existingLine
-        ? lineToRow(emp.existingLine)
-        : emptyRow();
-    }
+  for (const emp of employees) {
+    initialState[emp.id] = emp.existingBox
+      ? boxToRow(emp.existingBox)
+      : emptyRow();
   }
 
   const [rows, setRows] = useState<Record<string, RowState>>(initialState);
   const [activeEmpId, setActiveEmpId] = useState<string | null>(null);
 
-  // Count how many rows are already saved (had existing data)
   const totalRows    = Object.keys(initialState).length;
   const alreadySaved = Object.values(initialState).filter((r) => r.saved).length;
 
-  // Format the date nicely — use Ethiopian calendar formatter which is EAT-aware
   const dateObj = new Date(date);
   const dateDisplay = formatAsEthDate(dateObj);
 
@@ -113,7 +120,7 @@ export function HourlyCountForm({ deptWithEmployees, date, supervisorId, isReadO
 
   // Save a single row
   const saveRow = useCallback(
-    async (empId: string, deptId: string, targetPerHour: number) => {
+    async (empId: string) => {
       const row = rows[empId];
       if (!row.dirty) return;
 
@@ -127,7 +134,7 @@ export function HourlyCountForm({ deptWithEmployees, date, supervisorId, isReadO
         ...Object.fromEntries(HOUR_KEYS.map((k, i) => [k, hours[i]])),
       });
 
-      // Unusual count warning — above 150% of target
+      // Unusual count warning
       const THRESHOLD = 1.5;
       if (targetPerHour > 0 && daily.totalProduced > targetPerHour * 8 * THRESHOLD) {
         const confirm = window.confirm(
@@ -140,10 +147,10 @@ export function HourlyCountForm({ deptWithEmployees, date, supervisorId, isReadO
       }
 
       try {
-        const result = await saveHourlyCounts({
-          date,
+        const result = await saveHourlyBox({
+          date: date.split("T")[0],
           employeeId: empId,
-          departmentId: deptId,
+          jobId,
           supervisorId,
           hours,
           mistakes: parseInt(row.mistakes || "0", 10),
@@ -176,12 +183,12 @@ export function HourlyCountForm({ deptWithEmployees, date, supervisorId, isReadO
         }));
       }
     },
-    [rows, date, supervisorId]
+    [rows, date, jobId, supervisorId, targetPerHour]
   );
 
   return (
     <div className="space-y-6">
-      {/* Date header & saved count indicator */}
+      {/* Date header & job info */}
       <div className="erp-card p-5 flex items-center justify-between gap-4 flex-wrap border-blue-200 bg-gradient-to-r from-blue-50/50 to-indigo-50/30">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center shadow-sm">
@@ -199,118 +206,90 @@ export function HourlyCountForm({ deptWithEmployees, date, supervisorId, isReadO
           )}
         </div>
 
-        {alreadySaved > 0 && (
-          <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800">
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-white border border-blue-200">
+            <Briefcase size={16} className="text-blue-600" />
+            <div>
+              <p className="text-xs text-slate-500 font-ethiopic">ስራ</p>
+              <p className="text-sm font-bold text-slate-900 font-ethiopic">{jobNameAm}</p>
+            </div>
+          </div>
+
+          {targetPerHour > 0 && (
+            <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-emerald-50 border border-emerald-200">
+              <Target size={16} className="text-emerald-600" />
+              <div>
+                <p className="text-xs text-slate-500 font-ethiopic">በሰዓት ዒላማ</p>
+                <p className="text-sm font-bold text-emerald-700 font-mono">{targetPerHour} ፍሬ</p>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {alreadySaved > 0 && (
+        <div className="erp-card p-4 bg-emerald-50 border-emerald-200">
+          <div className="flex items-center gap-2 text-emerald-800">
             <CheckCircle2 size={16} className="text-emerald-600" />
             <span className="text-xs font-semibold font-ethiopic">
               {alreadySaved} ሠራተኞች ቁጥራቸውን አስቀድመዋል ({Math.round((alreadySaved / totalRows) * 100)}%)
             </span>
           </div>
-        )}
+        </div>
+      )}
 
-        {alreadySaved === 0 && !isReadOnly && (
-          <span className="text-xs text-slate-400 font-ethiopic">
-            ለዚህ ቀን ገና የተመዘገበ ቁጥር የለም
-          </span>
-        )}
-      </div>
-
-      {deptWithEmployees.map((dept) => (
-        <DeptSection
-          key={dept.deptId}
-          dept={dept}
-          rows={rows}
-          activeEmpId={activeEmpId}
-          setActiveEmpId={setActiveEmpId}
-          updateRow={updateRow}
-          saveRow={saveRow}
-          isReadOnly={isReadOnly}
-        />
-      ))}
-    </div>
-  );
-}
-
-// ─── Department section ───────────────────────────────────────────────────────
-
-interface DeptSectionProps {
-  dept: DeptGroup;
-  rows: Record<string, RowState>;
-  activeEmpId: string | null;
-  setActiveEmpId: (id: string | null) => void;
-  updateRow: (empId: string, field: keyof RowState, value: string) => void;
-  saveRow: (empId: string, deptId: string, targetPerHour: number) => Promise<void>;
-  isReadOnly?: boolean;
-}
-
-function DeptSection({ dept, rows, activeEmpId, setActiveEmpId, updateRow, saveRow, isReadOnly = false }: DeptSectionProps) {
-  return (
-    <div className="erp-card overflow-hidden shadow-sm">
-      {/* Dept header */}
-      <div className="px-6 py-4 bg-slate-50/80 border-b border-slate-200/80 flex items-center justify-between flex-wrap gap-3">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center font-bold">
-            <Building2 size={16} />
-          </div>
-          <div>
-            <h3 className="font-bold text-slate-900 font-ethiopic text-sm">
-              {dept.deptNameAm}
-            </h3>
-            <p className="text-xs text-slate-500 font-ethiopic">
-              {dept.employees.length} ሠራተኞች ተመድበዋል
-            </p>
-          </div>
+      <div className="erp-card overflow-hidden shadow-sm">
+        {/* Header */}
+        <div className="px-6 py-4 bg-slate-50/80 border-b border-slate-200/80">
+          <h3 className="font-bold text-slate-900 font-ethiopic text-sm">
+            {departmentNameAm} - {jobNameAm}
+          </h3>
+          <p className="text-xs text-slate-500 font-ethiopic mt-0.5">
+            {employees.length} ሠራተኞች በዚህ ስራ ተመድበዋል
+          </p>
         </div>
 
-        {dept.targetPerHour > 0 && (
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200/70 font-ethiopic">
-            <Target size={13} />
-            <span>በሰዓት የሚጠበቅ ዒላማ፦ <span className="font-bold font-mono">{dept.targetPerHour}</span> ፍሬ</span>
-          </span>
-        )}
-      </div>
-
-      {/* Table grid */}
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-slate-200/80 bg-white text-slate-500 font-ethiopic text-xs">
-              <th className="text-center p-3.5 font-medium w-12">{am.serialNumber}</th>
-              <th className="text-right p-3.5 font-medium min-w-[140px]">{am.employees.name}</th>
-              {HOUR_KEYS.map((h, i) => (
-                <th key={h} className="p-3.5 font-medium text-center w-14">
-                  {`ሰዓት ${i + 1}`}
+        {/* Table grid */}
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-slate-200/80 bg-white text-slate-500 font-ethiopic text-xs">
+                <th className="text-center p-3.5 font-medium w-12">{am.serialNumber}</th>
+                <th className="text-right p-3.5 font-medium min-w-[140px]">{am.employees.name}</th>
+                {HOUR_KEYS.map((h, i) => (
+                  <th key={h} className="p-3.5 font-medium text-center w-14">
+                    {`ሰዓት ${i + 1}`}
+                  </th>
+                ))}
+                <th className="p-3.5 text-center font-semibold text-emerald-700 w-16 bg-emerald-50/30">
+                  {am.counts.plus}
                 </th>
+                <th className="p-3.5 text-center font-semibold text-rose-700 w-16 bg-rose-50/30">
+                  {am.counts.minus}
+                </th>
+                <th className="p-3.5 text-center font-semibold text-amber-700 w-16 bg-amber-50/30">
+                  {am.counts.mistakes}
+                </th>
+                <th className="p-3.5 text-center font-medium w-24">ሁኔታ</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {employees.map((emp) => (
+                <EmployeeRow
+                  key={emp.id}
+                  emp={emp}
+                  targetPerHour={targetPerHour}
+                  row={rows[emp.id] ?? emptyRow()}
+                  isActive={activeEmpId === emp.id}
+                  onFocus={() => setActiveEmpId(emp.id)}
+                  updateRow={updateRow}
+                  saveRow={saveRow}
+                  isReadOnly={isReadOnly}
+                />
               ))}
-              <th className="p-3.5 text-center font-semibold text-emerald-700 w-16 bg-emerald-50/30">
-                {am.counts.plus}
-              </th>
-              <th className="p-3.5 text-center font-semibold text-rose-700 w-16 bg-rose-50/30">
-                {am.counts.minus}
-              </th>
-              <th className="p-3.5 text-center font-semibold text-amber-700 w-16 bg-amber-50/30">
-                {am.counts.mistakes}
-              </th>
-              <th className="p-3.5 text-center font-medium w-24">ሁኔታ</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100">
-            {dept.employees.map((emp) => (
-              <EmployeeRow
-                key={emp.id}
-                emp={emp}
-                deptId={dept.deptId}
-                targetPerHour={dept.targetPerHour}
-                row={rows[emp.id] ?? emptyRow()}
-                isActive={activeEmpId === emp.id}
-                onFocus={() => setActiveEmpId(emp.id)}
-                updateRow={updateRow}
-                saveRow={saveRow}
-                isReadOnly={isReadOnly}
-              />
-            ))}
-          </tbody>
-        </table>
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );
@@ -320,19 +299,17 @@ function DeptSection({ dept, rows, activeEmpId, setActiveEmpId, updateRow, saveR
 
 interface EmployeeRowProps {
   emp: EmployeeRow;
-  deptId: string;
   targetPerHour: number;
   row: RowState;
   isActive: boolean;
   onFocus: () => void;
   updateRow: (empId: string, field: keyof RowState, value: string) => void;
-  saveRow: (empId: string, deptId: string, targetPerHour: number) => Promise<void>;
+  saveRow: (empId: string) => Promise<void>;
   isReadOnly?: boolean;
 }
 
 function EmployeeRow({
   emp,
-  deptId,
   targetPerHour,
   row,
   isActive,
@@ -379,7 +356,7 @@ function EmployeeRow({
             value={row[hk]}
             onChange={(e) => updateRow(emp.id, hk, e.target.value)}
             onBlur={() => {
-              if (row.dirty && !isReadOnly) saveRow(emp.id, deptId, targetPerHour);
+              if (row.dirty && !isReadOnly) saveRow(emp.id);
             }}
             className="w-13 text-center rounded-xl border border-slate-200 py-1.5 text-xs font-bold
               focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 tabular-nums
@@ -419,7 +396,7 @@ function EmployeeRow({
           value={row.mistakes}
           onChange={(e) => updateRow(emp.id, "mistakes", e.target.value)}
           onBlur={() => {
-            if (row.dirty && !isReadOnly) saveRow(emp.id, deptId, targetPerHour);
+            if (row.dirty && !isReadOnly) saveRow(emp.id);
           }}
           className="w-12 text-center rounded-xl border border-amber-200 py-1.5 text-xs font-bold text-amber-900
             focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 tabular-nums bg-white"
@@ -440,7 +417,7 @@ function EmployeeRow({
           </span>
         ) : row.dirty && !isReadOnly ? (
           <button
-            onClick={() => saveRow(emp.id, deptId, targetPerHour)}
+            onClick={() => saveRow(emp.id)}
             className="inline-flex items-center gap-1 text-xs bg-blue-600 text-white px-2.5 py-1 rounded-lg hover:bg-blue-700 transition-colors font-ethiopic shadow-xs active:scale-95"
           >
             <Save size={12} />

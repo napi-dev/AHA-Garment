@@ -1,32 +1,43 @@
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { redirect, notFound } from "next/navigation";
-import { requirePermission, canViewSalary } from "@/lib/auth/permissions";
+import { getPageAccess, canEditSalary } from "@/lib/auth/permissions";
 import { am } from "@/lib/i18n/am";
 import { updateEmployee } from "../../actions";
 import Link from "next/link";
-import { Edit3, ArrowRight, Save, Banknote, ShieldAlert, CheckCircle2, User } from "lucide-react";
+import { Edit3, ArrowRight, Save, Banknote, ShieldAlert } from "lucide-react";
 
 export default async function EditEmployeePage({ params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
   if (!session?.user) redirect("/login");
-  requirePermission(session.user.role, "employees:edit");
+  
+  const access = getPageAccess(session.user.role, "/employees");
+  if (access !== "full") redirect("/dashboard");
 
   const { id } = await params;
   const emp = await db.employee.findUnique({
     where: { id },
-    include: { department: true },
+    include: { 
+      department: true,
+      job: true,
+    },
   });
   if (!emp) notFound();
 
+  // Load all departments with their jobs
   const departments = await db.department.findMany({
-    // Include ALL departments (active + inactive) so managers can be assigned to
-    // the "አስተዳደር" dept which is isActive:false (hidden from production selectors)
-    orderBy: [{ isActive: "desc" }, { sortOrder: "asc" }],
+    where: { isActive: true },
+    include: {
+      jobs: {
+        where: { isActive: true },
+        orderBy: { sortOrder: "asc" },
+      },
+    },
+    orderBy: { flowOrder: "asc" },
   });
 
   const action = updateEmployee.bind(null, id);
-  const userCanViewSalary = canViewSalary(session.user.role);
+  const userCanViewSalary = canEditSalary(session.user.role) || session.user.role === "PRODUCTION_MANAGER";
 
   return (
     <div className="max-w-xl mx-auto space-y-6">
@@ -68,12 +79,26 @@ export default async function EditEmployeePage({ params }: { params: Promise<{ i
         <h1 className="text-2xl font-bold text-slate-900 font-ethiopic mt-1">
           {emp.nameAm}
         </h1>
-        <p className="text-slate-500 text-sm mt-0.5 font-ethiopic flex items-center gap-2">
+        <p className="text-slate-500 text-sm mt-0.5 font-ethiopic flex items-center gap-2 flex-wrap">
           <span className="font-mono font-semibold text-slate-700 bg-slate-100 px-2 py-0.5 rounded text-xs">
-            {emp.employeeCode ?? emp.serialNumber}
+            {emp.employeeCode ?? `#${emp.serialNumber}`}
           </span>
           <span>·</span>
           <span>{emp.department.nameAm}</span>
+          {emp.job && (
+            <>
+              <span>·</span>
+              <span className="text-blue-600">{emp.job.nameAm}</span>
+            </>
+          )}
+          {emp.lineNo && (
+            <>
+              <span>·</span>
+              <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded text-xs font-semibold">
+                መስመር {emp.lineNo}
+              </span>
+            </>
+          )}
         </p>
       </div>
 
@@ -110,19 +135,70 @@ export default async function EditEmployeePage({ params }: { params: Promise<{ i
             name="departmentId"
             defaultValue={emp.departmentId}
             required
+            id="dept-select"
             className="input-field font-ethiopic text-slate-800"
           >
-            <optgroup label="── የምርት ክፍሎች ──">
-              {departments.filter((d) => d.isActive).map((d) => (
-                <option key={d.id} value={d.id}>{d.nameAm}</option>
-              ))}
-            </optgroup>
-            <optgroup label="── ቁጥጥርና አስተዳደር ──">
-              {departments.filter((d) => !d.isActive).map((d) => (
-                <option key={d.id} value={d.id}>{d.nameAm}</option>
-              ))}
-            </optgroup>
+            <option value="">የሥራ ክፍል ይምረጡ</option>
+            {departments.map((d) => (
+              <option key={d.id} value={d.id} data-jobs={JSON.stringify(d.jobs)}>
+                {d.nameAm}
+              </option>
+            ))}
           </select>
+        </div>
+
+        <div>
+          <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5 font-ethiopic">
+            ስራ (Job) <span className="text-rose-500">*</span>
+          </label>
+          <select
+            name="jobId"
+            defaultValue={emp.jobId ?? ""}
+            required
+            id="job-select"
+            className="input-field font-ethiopic text-slate-800"
+          >
+            <option value="">ስራ ይምረጡ</option>
+          </select>
+        </div>
+
+        <div>
+          <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5 font-ethiopic">
+            የመስመር ቁጥር (Line Number)
+          </label>
+          <select
+            name="lineNo"
+            defaultValue={emp.lineNo ?? ""}
+            className="input-field font-ethiopic text-slate-800"
+          >
+            <option value="">መስመር የለም</option>
+            <option value="1">መስመር 1</option>
+            <option value="2">መስመር 2</option>
+          </select>
+        </div>
+
+        <div>
+          <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5 font-ethiopic">
+            የቅጥር ቀን (Hire Date)
+          </label>
+          <input
+            name="hiredAt"
+            type="date"
+            defaultValue={emp.hiredAt ? emp.hiredAt.toISOString().split("T")[0] : ""}
+            className="input-field"
+          />
+        </div>
+
+        <div>
+          <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5 font-ethiopic">
+            ማስታወሻ (Notes)
+          </label>
+          <textarea
+            name="notes"
+            defaultValue={emp.notes ?? ""}
+            rows={3}
+            className="input-field font-ethiopic resize-none"
+          />
         </div>
 
         <div>
@@ -152,6 +228,39 @@ export default async function EditEmployeePage({ params }: { params: Promise<{ i
           </Link>
         </div>
       </form>
+
+      {/* Client-side script for job filtering */}
+      <script
+        dangerouslySetInnerHTML={{
+          __html: `
+            document.addEventListener('DOMContentLoaded', function() {
+              const deptSelect = document.getElementById('dept-select');
+              const jobSelect = document.getElementById('job-select');
+              const currentJobId = '${emp.jobId ?? ''}';
+              
+              function updateJobs() {
+                const selected = deptSelect.options[deptSelect.selectedIndex];
+                const jobs = selected.dataset.jobs ? JSON.parse(selected.dataset.jobs) : [];
+                
+                jobSelect.innerHTML = '<option value="">ስራ ይምረጡ</option>';
+                
+                jobs.forEach(job => {
+                  const option = document.createElement('option');
+                  option.value = job.id;
+                  option.textContent = job.nameAm;
+                  if (job.id === currentJobId) option.selected = true;
+                  jobSelect.appendChild(option);
+                });
+                
+                jobSelect.disabled = jobs.length === 0;
+              }
+              
+              deptSelect.addEventListener('change', updateJobs);
+              updateJobs(); // Initial load
+            });
+          `,
+        }}
+      />
     </div>
   );
 }

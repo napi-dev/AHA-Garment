@@ -14,7 +14,7 @@
 
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { requirePageAccess, canControl } from "@/lib/auth/permissions-v2";
+import { getPageAccess } from "@/lib/auth/permissions";
 import { revalidatePath } from "next/cache";
 import type { AttendanceStatus } from "@prisma/client";
 import { toDayKey } from "@/lib/date-helper";
@@ -39,7 +39,8 @@ export async function saveAttendance(input: SaveAttendanceInput) {
   const session = await auth();
   if (!session?.user) throw new Error("ተፈቅዶ አልነበረም - Not authenticated");
   
-  requirePageAccess(session.user.role, "/attendance");
+  const access = getPageAccess(session.user.role, "/attendance");
+  if (access === "none") throw new Error("የመዳረሻ ፍቃድ የለም");
   
   const date = new Date(input.date + "T00:00:00Z");
   const employee = await db.employee.findUnique({
@@ -105,6 +106,43 @@ export async function saveAttendance(input: SaveAttendanceInput) {
 }
 
 /**
+ * Submit attendance - creates submission record to lock the attendance
+ */
+export async function submitAttendance(input: { date: string; supervisorId: string }) {
+  const session = await auth();
+  if (!session?.user) throw new Error("ተፈቅዶ አልነበረም");
+  
+  if (session.user.id !== input.supervisorId) {
+    throw new Error("የመዳረሻ ፍቃድ የለም");
+  }
+  
+  const dateObj = new Date(input.date + "T00:00:00Z");
+  
+  // Check if already submitted
+  const existing = await db.attendanceSubmission.findFirst({
+    where: { 
+      date: dateObj, 
+      supervisorId: input.supervisorId 
+    },
+  });
+  
+  if (existing) {
+    throw new Error("ቀድሞ ተቆልፏል - Already submitted");
+  }
+  
+  // Create submission record
+  await db.attendanceSubmission.create({
+    data: {
+      date: dateObj,
+      supervisorId: input.supervisorId,
+    },
+  });
+  
+  revalidatePath("/attendance");
+  return { success: true };
+}
+
+/**
  * Bulk set attendance for multiple employees
  * v2: Per page or per department
  */
@@ -112,7 +150,8 @@ export async function bulkAttendance(input: BulkAttendanceInput) {
   const session = await auth();
   if (!session?.user) throw new Error("ተፈቅዶ አልነበረም");
   
-  requirePageAccess(session.user.role, "/attendance");
+  const access = getPageAccess(session.user.role, "/attendance");
+  if (access === "none") throw new Error("የመዳረሻ ፍቃድ የለም");
   
   const date = new Date(input.date + "T00:00:00Z");
   
@@ -142,7 +181,8 @@ export async function lockAttendance(date: string) {
   const session = await auth();
   if (!session?.user) throw new Error("ተፈቅዶ አልነበረም");
   
-  requirePageAccess(session.user.role, "/attendance");
+  const access = getPageAccess(session.user.role, "/attendance");
+  if (access === "none") throw new Error("የመዳረሻ ፍቃድ የለም");
   
   const dateObj = new Date(date + "T00:00:00Z");
   
@@ -226,7 +266,8 @@ export async function getAttendancePage(params: {
   const session = await auth();
   if (!session?.user) throw new Error("ተፈቅዶ አልነበረም");
   
-  requirePageAccess(session.user.role, "/attendance");
+  const access = getPageAccess(session.user.role, "/attendance");
+  if (access === "none") throw new Error("የመዳረሻ ፍቃድ የለም");
   
   const page = params.page || 1;
   const pageSize = 50;

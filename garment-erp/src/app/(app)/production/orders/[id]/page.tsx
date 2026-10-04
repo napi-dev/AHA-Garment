@@ -43,7 +43,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
   if (!order) notFound();
 
   const closeAction = closeOrder.bind(null, id);
-  const canEdit = ["ADMIN", "SUPER_MANAGER", "PRODUCTION_MANAGER"].includes(session.user.role);
+  const canEdit = ["ADMIN", "PRODUCTION_MANAGER", "PRODUCTION_MANAGER"].includes(session.user.role);
 
   // Stage distribution
   const stageCounts: Record<string, number> = {};

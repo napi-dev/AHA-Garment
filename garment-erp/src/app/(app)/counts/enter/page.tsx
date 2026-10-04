@@ -8,31 +8,37 @@ import { DateNavigator } from "./date-navigator";
 import { Clock, Lock, Briefcase } from "lucide-react";
 import { getEffectiveDate } from "@/lib/date-override/effective-date";
 
-// Type for existing hourly count line
-type ExistingLine = {
+// Type for existing hourly box
+type ExistingBox = {
   id: string;
   h1: number | null; h2: number | null; h3: number | null; h4: number | null;
   h5: number | null; h6: number | null; h7: number | null; h8: number | null;
-  status: string;
+  totalProduced: number;
+  targetForDay: number;
+  plusPieces: number;
+  minusPieces: number;
   mistakes: number;
   mistakeReason: string | null;
+  isLocked: boolean;
 };
 
 export default async function CountEntryPage({
   searchParams,
 }: {
-  searchParams: Promise<{ dept?: string; date?: string }>;
+  searchParams: Promise<{ job?: string; date?: string }>;
 }) {
   const session = await auth();
   if (!session?.user) redirect("/login");
 
-  const { role, employeeId } = session.user;
-  requirePermission(role, "counts:enter");
+  // Check page access
+  const access = getPageAccess(session.user.role, "/counts/enter");
+  if (access === "none") {
+    redirect("/dashboard");
+  }
 
   const params = await searchParams;
 
   // ─── Determine selected date ───────────────────────────────────────────────
-  // Use query param if provided, otherwise use effective date
   let selectedDate: Date;
   if (params.date) {
     selectedDate = new Date(params.date + "T00:00:00Z");
@@ -41,7 +47,7 @@ export default async function CountEntryPage({
   }
   selectedDate.setUTCHours(0, 0, 0, 0);
 
-  const selectedDateISO = selectedDate.toISOString().split("T")[0]; // YYYY-MM-DD
+  const selectedDateISO = selectedDate.toISOString().split("T")[0];
   const today = await getEffectiveDate();
   const todayISO = today.toISOString().split("T")[0];
   const isToday = selectedDateISO === todayISO;
@@ -50,158 +56,122 @@ export default async function CountEntryPage({
   const dayClose = await db.dayClose.findUnique({ where: { date: selectedDate } });
   const isDayClosed = !!dayClose;
 
-  // ─── Operator: restrict to own department ───────────────────────────────────
-  const isOperator = role === "OPERATOR";
-
-  if (isOperator && employeeId) {
-    const emp = await db.employee.findUnique({
-      where: { id: employeeId },
-      include: { department: true },
-    });
-    const dept = emp?.department;
-    if (!dept) {
-      return (
-        <div className="max-w-lg mx-auto mt-16 text-center erp-card p-10">
-          <p className="font-ethiopic text-slate-500">ለዚህ ሠራተኛ ክፍል አልተገኘም።</p>
-        </div>
-      );
-    }
-
-    const [employees, card] = await Promise.all([
-      db.employee.findMany({
-        where: { departmentId: dept.id, isActive: true },
-        include: {
-          hourlyCounts: {
-            where: { sheet: { date: selectedDate }, departmentId: dept.id },
-            orderBy: { updatedAt: "desc" },
-            take: 1,
-          },
-        },
-        orderBy: { serialNumber: "asc" },
-      }),
-      db.incentiveCard.findFirst({
+  // ─── Load all jobs (grouped by department) ──────────────────────────────────
+  const allJobs = await db.job.findMany({
+    where: { isActive: true },
+    include: { 
+      department: { select: { id: true, nameAm: true, flowOrder: true } },
+      incentiveCards: {
         where: {
-          departmentId: dept.id,
           effectiveFrom: { lte: selectedDate },
           OR: [{ effectiveTo: null }, { effectiveTo: { gte: selectedDate } }],
         },
         orderBy: { effectiveFrom: "desc" },
-      }),
-    ]);
-
-    return (
-      <div className="space-y-6">
-        <PageHeader />
-        <DateNavigator currentDate={selectedDateISO} isToday={isToday} deptId={dept.id} />
-        {isDayClosed && <DayClosedBanner closedAt={dayClose.closedAt} />}
-        <HourlyCountForm
-          key={`${selectedDateISO}-${dept.id}`}
-          deptWithEmployees={[{
-            deptId: dept.id,
-            deptNameAm: dept.nameAm,
-            targetPerHour: card?.targetPerHour ?? 0,
-            employees: employees.map((e) => ({
-              id: e.id,
-              serialNumber: e.serialNumber,
-              nameAm: e.nameAm,
-              existingLine: (e.hourlyCounts[0] ?? null) as ExistingLine | null,
-            })),
-          }]}
-          date={selectedDate.toISOString()}
-          supervisorId={session.user.id}
-          isReadOnly={isDayClosed}
-        />
-      </div>
-    );
-  }
-
-  // ─── Manager: department selector with date persistence ─────────────────────
-  const allDepts = await db.department.findMany({
-    where: { isActive: true },
-    orderBy: { sortOrder: "asc" },
-    select: { id: true, nameAm: true },
+        take: 1,
+      },
+    },
+    orderBy: [
+      { department: { flowOrder: "asc" } },
+      { sortOrder: "asc" },
+    ],
   });
 
-  const selectedDeptId = params.dept ?? allDepts[0]?.id ?? "";
+  // Group jobs by department for display
+  const jobsByDept = allJobs.reduce((acc, job) => {
+    const deptName = job.department.nameAm;
+    if (!acc[deptName]) acc[deptName] = [];
+    acc[deptName].push(job);
+    return acc;
+  }, {} as Record<string, typeof allJobs>);
 
-  // Load only the selected department's data for the selected date
-  const [employees, card] = selectedDeptId
-    ? await Promise.all([
-        db.employee.findMany({
-          where: { departmentId: selectedDeptId, isActive: true },
-          include: {
-            hourlyCounts: {
-              where: { sheet: { date: selectedDate }, departmentId: selectedDeptId },
-              orderBy: { updatedAt: "desc" },
-              take: 1,
-            },
-          },
-          orderBy: { serialNumber: "asc" },
-        }),
-        db.incentiveCard.findFirst({
-          where: {
-            departmentId: selectedDeptId,
-            effectiveFrom: { lte: selectedDate },
-            OR: [{ effectiveTo: null }, { effectiveTo: { gte: selectedDate } }],
-          },
-          orderBy: { effectiveFrom: "desc" },
-        }),
-      ])
-    : [[], null];
+  const selectedJobId = params.job ?? allJobs[0]?.id ?? "";
+  const selectedJob = allJobs.find((j) => j.id === selectedJobId);
 
-  const selectedDept = allDepts.find((d) => d.id === selectedDeptId);
+  // ─── Load employees for selected job ────────────────────────────────────────
+  const employees = selectedJobId
+    ? await db.employee.findMany({
+        where: { jobId: selectedJobId, isActive: true },
+        include: {
+          hourlyBoxes: {
+            where: { date: selectedDate },
+            take: 1,
+          },
+        },
+        orderBy: { serialNumber: "asc" },
+      })
+    : [];
+
+  const targetPerHour = selectedJob?.incentiveCards[0]?.targetPerHour ?? 0;
 
   return (
     <div className="space-y-6">
       <PageHeader />
-      <DateNavigator currentDate={selectedDateISO} isToday={isToday} deptId={selectedDeptId} />
+      <DateNavigator currentDate={selectedDateISO} isToday={isToday} jobId={selectedJobId} />
       {isDayClosed && <DayClosedBanner closedAt={dayClose.closedAt} />}
 
-      {/* Department selector - preserve date when changing */}
-      <div className="erp-card p-4">
-        <form method="GET" className="flex flex-wrap items-center gap-3">
+      {/* Job selector - grouped by department */}
+      <div className="erp-card p-5">
+        <form method="GET" className="space-y-4">
           <input type="hidden" name="date" value={selectedDateISO} />
-          <div className="flex items-center gap-2 text-xs font-semibold text-slate-600 font-ethiopic">
-            <Building2 size={14} className="text-blue-500" />
-            <span>የስራ ክፍል ምረጥ፦</span>
+          <div className="flex items-center gap-2 text-xs font-semibold text-slate-600 font-ethiopic mb-3">
+            <Briefcase size={14} className="text-blue-500" />
+            <span>ስራ ምረጥ (በክፍል የተደራጀ)፦</span>
           </div>
-          <div className="flex flex-wrap gap-2">
-            {allDepts.map((d) => (
-              <button
-                key={d.id}
-                type="submit"
-                name="dept"
-                value={d.id}
-                className={`px-3 py-1.5 rounded-xl text-xs font-semibold font-ethiopic transition-colors ${
-                  d.id === selectedDeptId
-                    ? "bg-blue-600 text-white shadow-sm"
-                    : "bg-slate-100 text-slate-700 hover:bg-slate-200"
-                }`}
-              >
-                {d.nameAm}
-              </button>
-            ))}
-          </div>
+          
+          {Object.entries(jobsByDept).map(([deptName, jobs]) => (
+            <div key={deptName} className="space-y-2">
+              <h3 className="text-xs font-bold text-slate-500 font-ethiopic uppercase tracking-wide">
+                {deptName}
+              </h3>
+              <div className="flex flex-wrap gap-2">
+                {jobs.map((job) => {
+                  const rate = job.incentiveCards[0];
+                  return (
+                    <button
+                      key={job.id}
+                      type="submit"
+                      name="job"
+                      value={job.id}
+                      className={`px-3 py-2 rounded-xl text-xs font-semibold font-ethiopic transition-all ${
+                        job.id === selectedJobId
+                          ? "bg-blue-600 text-white shadow-md"
+                          : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                      }`}
+                    >
+                      <div>{job.nameAm}</div>
+                      {rate && (
+                        <div className="text-[10px] opacity-75 mt-0.5">
+                          {rate.targetPerHour} ፍሬ/ሰዓት
+                        </div>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
         </form>
       </div>
 
-      <HourlyCountForm
-        key={`${selectedDateISO}-${selectedDeptId}`}
-        deptWithEmployees={selectedDept ? [{
-          deptId: selectedDept.id,
-          deptNameAm: selectedDept.nameAm,
-          targetPerHour: card?.targetPerHour ?? 0,
-          employees: employees.map((e) => ({
+      {selectedJob && (
+        <HourlyCountForm
+          key={`${selectedDateISO}-${selectedJobId}`}
+          jobId={selectedJob.id}
+          jobNameAm={selectedJob.nameAm}
+          departmentId={selectedJob.department.id}
+          departmentNameAm={selectedJob.department.nameAm}
+          targetPerHour={targetPerHour}
+          employees={employees.map((e) => ({
             id: e.id,
             serialNumber: e.serialNumber,
             nameAm: e.nameAm,
-            existingLine: (e.hourlyCounts[0] ?? null) as ExistingLine | null,
-          })),
-        }] : []}
-        date={selectedDate.toISOString()}
-        supervisorId={session.user.id}
-        isReadOnly={isDayClosed}
-      />
+            existingBox: (e.hourlyBoxes[0] ?? null) as ExistingBox | null,
+          }))}
+          date={selectedDate.toISOString()}
+          supervisorId={session.user.id}
+          isReadOnly={isDayClosed}
+        />
+      )}
     </div>
   );
 }
