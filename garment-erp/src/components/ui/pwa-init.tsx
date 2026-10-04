@@ -14,8 +14,16 @@ interface BeforeInstallPromptEvent extends Event {
 export function PwaInit() {
   const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [dismissed, setDismissed] = useState(false);
+  const [neverAsk, setNeverAsk] = useState(false);
 
   useEffect(() => {
+    // Check if user chose "never ask again"
+    const neverAskAgain = localStorage.getItem("pwa-never-ask");
+    if (neverAskAgain === "true") {
+      setNeverAsk(true);
+      return;
+    }
+
     // Register service worker
     if ("serviceWorker" in navigator) {
       navigator.serviceWorker
@@ -32,7 +40,7 @@ export function PwaInit() {
     return () => window.removeEventListener("beforeinstallprompt", handler);
   }, []);
 
-  if (!installPrompt || dismissed) return null;
+  if (!installPrompt || dismissed || neverAsk) return null;
 
   async function install() {
     if (!installPrompt) return;
@@ -42,22 +50,40 @@ export function PwaInit() {
     setDismissed(true);
   }
 
+  function handleNeverAsk() {
+    localStorage.setItem("pwa-never-ask", "true");
+    setNeverAsk(true);
+    setDismissed(true);
+  }
+
   return (
-    <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-40 bg-white shadow-xl rounded-2xl border border-gray-200 px-5 py-4 flex items-center gap-4 max-w-sm w-[calc(100%-2rem)]">
-      <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center text-xl font-bold flex-shrink-0">
-        ፋ
+    <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-40 bg-white shadow-xl rounded-2xl border border-gray-200 px-5 py-4 w-[calc(100%-2rem)] max-w-sm">
+      <div className="flex items-center gap-4 mb-3">
+        <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center text-xl font-bold flex-shrink-0">
+          ፋ
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="font-semibold text-gray-800 text-sm font-ethiopic">ያስጭኑ</p>
+          <p className="text-xs text-gray-500 font-ethiopic">ለፈጣን መዳረሻ ጫኑ</p>
+        </div>
       </div>
-      <div className="flex-1 min-w-0">
-        <p className="font-semibold text-gray-800 text-sm font-ethiopic">ያስጭኑ</p>
-        <p className="text-xs text-gray-500 font-ethiopic">ለፈጣን መዳረሻ ጫኑ</p>
-      </div>
-      <div className="flex gap-2 flex-shrink-0">
-        <button onClick={() => setDismissed(true)}
-          className="text-xs text-gray-400 hover:text-gray-600 px-2 py-1.5 font-ethiopic">
+      <div className="flex gap-2">
+        <button 
+          onClick={handleNeverAsk}
+          className="flex-1 text-xs text-gray-500 hover:text-gray-700 px-3 py-2 rounded-lg border border-gray-200 font-ethiopic transition-colors"
+        >
+          በቋሚነት አትጠይቅ
+        </button>
+        <button 
+          onClick={() => setDismissed(true)}
+          className="text-xs text-gray-400 hover:text-gray-600 px-3 py-2 font-ethiopic"
+        >
           ኋላ
         </button>
-        <button onClick={install}
-          className="text-xs bg-blue-600 text-white px-3 py-1.5 rounded-lg font-ethiopic hover:bg-blue-700 transition-colors">
+        <button 
+          onClick={install}
+          className="text-xs bg-blue-600 text-white px-4 py-2 rounded-lg font-ethiopic hover:bg-blue-700 transition-colors font-semibold"
+        >
           ጫን
         </button>
       </div>

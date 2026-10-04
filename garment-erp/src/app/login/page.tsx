@@ -127,16 +127,12 @@ function LoginForm() {
 
 export default function LoginPage() {
   const [imgError, setImgError] = useState(false);
-  const [imgSrc, setImgSrc] = useState("/ahalogo.png");
+  // Add timestamp to bust cache on every load
+  const [imgSrc] = useState("/ahalogo.png?t=" + Date.now());
 
   const handleImageError = () => {
     console.error("Failed to load image:", imgSrc);
-    if (imgSrc === "/ahalogo.png") {
-      // Try with explicit public path
-      setImgSrc("/ahalogo.png?v=" + Date.now());
-    } else {
-      setImgError(true);
-    }
+    setImgError(true);
   };
 
   return (
@@ -157,6 +153,7 @@ export default function LoginPage() {
                 className="w-full h-full object-cover"
                 loading="eager"
                 onError={handleImageError}
+                key={imgSrc} // Force re-render on src change
               />
             ) : (
               <div className="w-full h-full flex items-center justify-center bg-blue-600 text-white font-bold text-2xl">
