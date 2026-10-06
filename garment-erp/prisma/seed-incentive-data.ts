@@ -78,6 +78,8 @@ async function main() {
 
     // Create hourly boxes for production workers
     for (const emp of employees) {
+      if (!emp.job) continue;
+      
       const card = emp.job.incentiveCards[0];
       if (!card || card.targetPerHour === 0) continue;
 
