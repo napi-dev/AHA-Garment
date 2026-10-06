@@ -5,6 +5,7 @@
 
 ## 1. Where things stand
 
+
 The build can start now. This addendum records the answers given so far and, for every question still open, the default the system is built with until the client answers. Nothing here changes the incentive formula or the sample acceptance tests in the master plan.
 
 **Decided** means you or the client settled it. **Default** means it is open, and the system is built with the stated behaviour, kept in settings so a different answer changes a setting rather than code.
