@@ -127,6 +127,76 @@ export async function checkDelayedOrders() {
   }
 }
 
+// ── 72/48/24 Hour Countdown Alerts ───────────────────────────────────────────
+
+/**
+ * Checks active orders and fires alerts at 72h, 48h, and 24h before deadline.
+ * Should be called by a cron job every hour.
+ */
+export async function checkOrderCountdown() {
+  const now = new Date();
+  
+  // Get all active orders
+  const activeOrders = await db.prodOrder.findMany({
+    where: {
+      status: "ACTIVE",
+      deadlineAt: { gte: now }, // Only future deadlines
+    },
+    include: {
+      lines: true,
+      alerts: true, // Include existing alerts to avoid duplicates
+    },
+  });
+
+  for (const order of activeOrders) {
+    const hoursRemaining = (order.deadlineAt.getTime() - now.getTime()) / (1000 * 60 * 60);
+    
+    // Define thresholds: 72h, 48h, 24h
+    const thresholds = [
+      { hours: 72, emoji: "🟢", message: "ትዕዛዝ {orderNo} በ3 ቀን ይቀራል። የቆረጣ ዝግጅት ጀምር" },
+      { hours: 48, emoji: "🟡", message: "ትዕዛዝ {orderNo} በ2 ቀን ይቀራል። የስፌት መስመር ሂደት አረጋግጥ" },
+      { hours: 24, emoji: "🔴", message: "ትዕዛዝ {orderNo} በ1 ቀን ይቀራል! የፊኒሺንግ ፍጥነት ጨምር!" },
+    ];
+
+    for (const threshold of thresholds) {
+      // Check if we're within the threshold window (±1 hour to catch it reliably)
+      if (hoursRemaining <= threshold.hours && hoursRemaining > (threshold.hours - 1)) {
+        // Check if alert already fired for this threshold
+        const existingAlert = order.alerts.find(a => a.threshold === threshold.hours);
+        
+        if (!existingAlert) {
+          const msg = `${threshold.emoji} ${threshold.message.replace('{orderNo}', order.orderNo)}`;
+          
+          // Create OrderAlert record (prevents duplicate firing)
+          await db.orderAlert.create({
+            data: {
+              orderId: order.id,
+              threshold: threshold.hours,
+            },
+          });
+
+          // Create general Alert for display in alerts page
+          await db.alert.create({
+            data: {
+              type: "ORDER_COUNTDOWN",
+              message: msg,
+              reference: order.id,
+            },
+          });
+
+          // Send to production manager, order placer, and admin
+          await sendToManagerAndAdmin(msg);
+          
+          // For 24h alert, also send to department group (urgent!)
+          if (threshold.hours === 24 && CHATS.dept) {
+            await sendMessage(CHATS.dept, msg);
+          }
+        }
+      }
+    }
+  }
+}
+
 // ── Missing day-close alert ───────────────────────────────────────────────────
 
 /**
