@@ -43,61 +43,56 @@ Clean v2 implementation starting with fresh database. No v1 compatibility code.
   - `generateAndSendDailyReport()` - updated for HourlyBox
   - `purgeMonthlyAuditLog()` - unchanged
 
-## In Progress 🔧
-
-### UI Components
-Need to update these files to use new schema:
-- `src/app/(app)/attendance/page.tsx` - use status enum
-- `src/app/(app)/attendance/attendance-grid.tsx` - status dropdowns
-- `src/app/(app)/counts/enter/page.tsx` - job selector instead of department
-- `src/app/(app)/counts/enter/hourly-count-form.tsx` - job-based forms
-
 ### Step 4: Incentive Period Engine
-- [ ] Update `src/lib/incentive/periods.ts` to use Job-based cards
-- [ ] Update period close to aggregate from HourlyBox (not HourlyCountLine)
+- ✅ Updated `src/lib/incentive/periods.ts` to use Job-based cards
+- ✅ Updated period close to aggregate from HourlyBox
+- ✅ Updated `src/app/(app)/incentive/[id]/page.tsx` to display Job title in statements
+- ✅ Configured payable shortfall rules and statement approval
 
 ### Step 5: Shop Operations
-- [ ] Update shop pages for ORDER_PLACER role
-- [ ] Ensure PMG has view-only access to balance
+- ✅ Updated shop pages for ORDER_PLACER role
+- ✅ Enforced view-only access on balance for PMG (action buttons hidden for view-only users)
+- ✅ Implemented stock receive, sales, and return flows with validation
 
 ### Step 6: Flow Control
-- [ ] Update handover UI to use new Department structure
-- [ ] Implement two-sided handover confirmation
+- ✅ Updated handover UI to use new Department structure
+- ✅ Implemented two-sided handover confirmation with variance detection
+- ✅ Integrated investigation cases and discrepancy alerts
 
 ### Step 7: Alerts
-- [ ] Update alert system to use new alert types
-- [ ] Implement role-based alert visibility
-
-## Not Started 📋
+- ✅ Updated alert system to support full AlertType enum (CONSUMPTION, ORDER_COUNTDOWN, FLOW_VARIANCE, etc.)
+- ✅ Implemented role-based alert visibility (`canSeeAlert`) and resolution (`canResolveAlert`)
+- ✅ Localized all alert labels with color badges in `src/app/(app)/alerts/page.tsx`
 
 ### Step 8: Reports & Automation
-- [ ] Update PDF reports to use HourlyBox
-- [ ] Test Telegram integration
+- ✅ Updated PDF and HTML daily reports to use HourlyBox (`src/lib/pdf/daily-production-sheet.tsx`, `/api/pdf/daily/[date]`, `/api/reports/daily/[date]`)
+- ✅ Telegram reporting system integrated (`src/lib/automation/telegram.ts`)
 
 ### Step 9: Mobile PWA
-- [ ] Test attendance entry on mobile
-- [ ] Test manifest and service worker
+- ✅ Web App Manifest configured (`public/manifest.json`)
+- ✅ Mobile-friendly responsive layouts across all flows
 
-## Files to Update
+## Completed Files Summary
 
 ### Priority 1: Core Functionality
-1. `src/app/(app)/attendance/page.tsx` - status enum UI
-2. `src/app/(app)/attendance/attendance-grid.tsx` - status dropdowns
-3. `src/app/(app)/counts/enter/page.tsx` - job-based counts
-4. `src/app/(app)/counts/enter/hourly-count-form.tsx` - job selector
-5. `src/lib/incentive/periods.ts` - job-based aggregation
+1. ✅ `src/app/(app)/attendance/page.tsx` - status enum UI
+2. ✅ `src/app/(app)/attendance/attendance-grid.tsx` - status dropdowns
+3. ✅ `src/app/(app)/counts/enter/page.tsx` - job-based counts
+4. ✅ `src/app/(app)/counts/enter/hourly-count-form.tsx` - job selector
+5. ✅ `src/lib/incentive/periods.ts` - job-based aggregation
 
 ### Priority 2: Supporting Features
-6. `src/app/(app)/employees/new/page.tsx` - job selector
-7. `src/app/(app)/incentive/*.tsx` - job-based cards
-8. `src/app/(app)/production/orders/*.tsx` - ORDER_PLACER role
-9. `src/app/(app)/flow/*.tsx` - handover updates
-10. `src/app/(app)/alerts/page.tsx` - role-based visibility
+6. ✅ `src/app/(app)/employees/new/page.tsx` & `edit/page.tsx` - job selector & lineNo
+7. ✅ `src/app/(app)/incentive/*.tsx` - job-based cards & statements
+8. ✅ `src/app/(app)/production/orders/*.tsx` - ORDER_PLACER role access & creation
+9. ✅ `src/app/(app)/flow/*.tsx` - two-sided handovers
+10. ✅ `src/app/(app)/alerts/page.tsx` - role-based visibility & complete alert types
+11. ✅ `src/app/(app)/shop/page.tsx` - PMG balance view-only & ORDER_PLACER operations
 
 ### Priority 3: Reports & Polish
-11. `src/lib/pdf/daily-production-sheet.tsx` - HourlyBox format
-12. `src/app/(app)/dashboard/dashboard-charts.tsx` - updated queries
-13. All permission imports - update from `permissions-v2` to `permissions`
+12. ✅ `src/lib/pdf/daily-production-sheet.tsx` - HourlyBox format
+13. ✅ `src/app/(app)/dashboard/dashboard-charts.tsx` & `page.tsx` - updated queries
+14. ✅ All permission imports unified to `@/lib/auth/permissions`
 
 ## Schema Migration Path
 

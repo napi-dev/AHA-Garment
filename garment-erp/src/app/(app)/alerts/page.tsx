@@ -8,21 +8,35 @@ import { resolveAlertAction } from "./actions";
 import { Bell, BellOff, AlertTriangle, CheckCircle2 } from "lucide-react";
 
 const TYPE_LABELS: Record<string, string> = {
-  LOW_STOCK:      am.alerts.LOW_STOCK,
-  WASTAGE:        am.alerts.WASTAGE,
-  DELAYED_ORDER:  am.alerts.DELAYED_ORDER,
-  REPORT_FAILED:  am.alerts.REPORT_FAILED,
-  DAY_NOT_CLOSED: am.alerts.DAY_NOT_CLOSED,
-  UNUSUAL_COUNT:  am.alerts.UNUSUAL_COUNT,
+  LOW_STOCK:          am.alerts.LOW_STOCK,
+  WASTAGE:            am.alerts.WASTAGE,
+  CONSUMPTION:        am.alerts.CONSUMPTION,
+  DELAYED_ORDER:      am.alerts.DELAYED_ORDER,
+  ORDER_COUNTDOWN:    am.alerts.ORDER_COUNTDOWN,
+  FLOW_VARIANCE:      am.alerts.FLOW_VARIANCE,
+  SHOP_SOLD_OUT:      am.alerts.SHOP_SOLD_OUT,
+  ATTENDANCE_MISSING: am.alerts.ATTENDANCE_MISSING,
+  REPORT_FAILED:      am.alerts.REPORT_FAILED,
+  DAY_NOT_CLOSED:     am.alerts.DAY_NOT_CLOSED,
+  UNUSUAL_COUNT:      am.alerts.UNUSUAL_COUNT,
+  HR_CASE:            am.alerts.HR_CASE,
+  SALARY_CHANGED:     am.alerts.SALARY_CHANGED,
 };
 
 const TYPE_COLOR: Record<string, string> = {
-  LOW_STOCK:      "bg-orange-100 text-orange-700",
-  WASTAGE:        "bg-red-100 text-red-700",
-  DELAYED_ORDER:  "bg-yellow-100 text-yellow-700",
-  REPORT_FAILED:  "bg-red-200 text-red-800",
-  DAY_NOT_CLOSED: "bg-amber-100 text-amber-700",
-  UNUSUAL_COUNT:  "bg-purple-100 text-purple-700",
+  LOW_STOCK:          "bg-orange-100 text-orange-700",
+  WASTAGE:            "bg-red-100 text-red-700",
+  CONSUMPTION:        "bg-rose-100 text-rose-700",
+  DELAYED_ORDER:      "bg-yellow-100 text-yellow-700",
+  ORDER_COUNTDOWN:    "bg-amber-100 text-amber-700",
+  FLOW_VARIANCE:      "bg-blue-100 text-blue-700",
+  SHOP_SOLD_OUT:      "bg-orange-100 text-orange-700",
+  ATTENDANCE_MISSING: "bg-red-100 text-red-700",
+  REPORT_FAILED:      "bg-red-200 text-red-800",
+  DAY_NOT_CLOSED:     "bg-amber-100 text-amber-700",
+  UNUSUAL_COUNT:      "bg-purple-100 text-purple-700",
+  HR_CASE:            "bg-indigo-100 text-indigo-700",
+  SALARY_CHANGED:     "bg-emerald-100 text-emerald-700",
 };
 
 export default async function AlertsPage({

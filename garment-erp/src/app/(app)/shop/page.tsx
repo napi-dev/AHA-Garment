@@ -84,29 +84,37 @@ export default async function ShopPage() {
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
-          <Link
-            href="/shop/receive"
-            className="btn-primary py-2 px-3 text-xs flex items-center gap-1.5 shadow-sm"
-          >
-            <Package size={15} />
-            <span>እቃ ተቀበል</span>
-          </Link>
-          <Link
-            href="/shop/sale"
-            className="btn-secondary py-2 px-3 text-xs flex items-center gap-1.5 text-emerald-700 border-emerald-200 hover:bg-emerald-50 shadow-sm"
-          >
-            <ShoppingBag size={15} />
-            <span>ሽያጭ መዝግብ</span>
-          </Link>
-          <Link
-            href="/shop/return"
-            className="btn-secondary py-2 px-3 text-xs flex items-center gap-1.5 text-rose-700 border-rose-200 hover:bg-rose-50 shadow-sm"
-          >
-            <ArrowLeftRight size={15} />
-            <span>ተመላሽ ላክ</span>
-          </Link>
-        </div>
+        {session.user.role === "ADMIN" || session.user.role === "ORDER_PLACER" ? (
+          <div className="flex flex-wrap items-center gap-2">
+            <Link
+              href="/shop/receive"
+              className="btn-primary py-2 px-3 text-xs flex items-center gap-1.5 shadow-sm"
+            >
+              <Package size={15} />
+              <span>እቃ ተቀበል</span>
+            </Link>
+            <Link
+              href="/shop/sale"
+              className="btn-secondary py-2 px-3 text-xs flex items-center gap-1.5 text-emerald-700 border-emerald-200 hover:bg-emerald-50 shadow-sm"
+            >
+              <ShoppingBag size={15} />
+              <span>ሽያጭ መዝግብ</span>
+            </Link>
+            <Link
+              href="/shop/return"
+              className="btn-secondary py-2 px-3 text-xs flex items-center gap-1.5 text-rose-700 border-rose-200 hover:bg-rose-50 shadow-sm"
+            >
+              <ArrowLeftRight size={15} />
+              <span>ተመላሽ ላክ</span>
+            </Link>
+          </div>
+        ) : (
+          <div className="flex items-center">
+            <span className="text-xs bg-slate-100 text-slate-600 px-3 py-1.5 rounded-lg border border-slate-200 font-semibold">
+              የቀሪ እይታ ብቻ (View Only)
+            </span>
+          </div>
+        )}
       </div>
 
       {/* KPI Cards */}

@@ -24,6 +24,7 @@ export default async function IncentiveStatementPage({ params }: { params: Promi
         include: {
           employee: { include: { department: true } },
           card: true,
+          job: true,
         },
         orderBy: [{ employee: { department: { flowOrder: "asc" } } }, { employee: { serialNumber: "asc" } }],
       },
@@ -192,9 +193,16 @@ export default async function IncentiveStatementPage({ params }: { params: Promi
                       </div>
                     </td>
                     <td className="font-ethiopic text-slate-600 text-xs text-right py-3">
-                      <span className="bg-slate-100 text-slate-700 px-2 py-0.5 rounded">
-                        {line.employee.department.nameAm}
-                      </span>
+                      <div>
+                        <span className="bg-slate-100 text-slate-700 px-2 py-0.5 rounded font-medium">
+                          {line.employee.department.nameAm}
+                        </span>
+                      </div>
+                      {line.job && (
+                        <div className="text-blue-600 text-[11px] font-semibold mt-1">
+                          {line.job.nameAm}
+                        </div>
+                      )}
                     </td>
                     <td className="tabular-nums text-center text-slate-600 py-3">
                       {parseFloat(line.ratePerPiece.toString()).toFixed(2)}
