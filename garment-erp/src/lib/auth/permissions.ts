@@ -61,8 +61,8 @@ const PAGE_ACCESS: Record<string, PagePermission> = {
     PRODUCTION_MANAGER: "full", // all departments
     ORDER_PLACER: "none",
     LINE_SUPERVISOR: "own", // ስፌት + ቅንጨባ only
-    CUTTING_MANAGER: "own", // ቆራጭ only
-    QC_INSPECTOR: "own", // ጥራት only
+    CUTTING_MANAGER: "none",
+    QC_INSPECTOR: "none",
     STORE_KEEPER: "none",
   },
   

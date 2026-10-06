@@ -69,6 +69,9 @@ export default async function ShopPage() {
   const totalReceived = stockRows.reduce((sum, r) => sum + r.received, 0);
   const soldOutCount = stockRows.filter((r) => r.balance <= 0).length;
 
+  const canSeeMoney = session.user.role === "ADMIN" || session.user.role === "ORDER_PLACER";
+  const colSpanCount = canSeeMoney ? 8 : 6;
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -228,8 +231,12 @@ export default async function ShopPage() {
                 <th className="py-2.5 px-4 text-left">ዓይነት</th>
                 <th className="py-2.5 px-4 text-left">ስታይል / ቀለም / ሳይዝ</th>
                 <th className="py-2.5 px-4">ብዛት</th>
-                <th className="py-2.5 px-4">የፍሬ ዋጋ</th>
-                <th className="py-2.5 px-4">ጠቅላላ ገቢ</th>
+                {canSeeMoney && (
+                  <>
+                    <th className="py-2.5 px-4">የፍሬ ዋጋ</th>
+                    <th className="py-2.5 px-4">ጠቅላላ ገቢ</th>
+                  </>
+                )}
                 <th className="py-2.5 px-4 text-left">ገዥ / ማስታወሻ</th>
                 <th className="py-2.5 px-4 text-center">ሁኔታ</th>
               </tr>
@@ -263,12 +270,16 @@ export default async function ShopPage() {
                       {m.typeId} · {m.color} · <span className="font-mono">{m.size}</span>
                     </td>
                     <td className="py-2.5 px-4 font-mono font-bold text-slate-900">{m.qty}</td>
-                    <td className="py-2.5 px-4 font-mono">
-                      {m.unitPrice ? `${Number(m.unitPrice).toFixed(2)} ብር` : "—"}
-                    </td>
-                    <td className="py-2.5 px-4 font-mono font-bold text-emerald-800">
-                      {m.total ? `${Number(m.total).toFixed(2)} ብር` : "—"}
-                    </td>
+                    {canSeeMoney && (
+                      <>
+                        <td className="py-2.5 px-4 font-mono">
+                          {m.unitPrice ? `${Number(m.unitPrice).toFixed(2)} ብር` : "—"}
+                        </td>
+                        <td className="py-2.5 px-4 font-mono font-bold text-emerald-800">
+                          {m.total ? `${Number(m.total).toFixed(2)} ብር` : "—"}
+                        </td>
+                      </>
+                    )}
                     <td className="py-2.5 px-4 text-left text-slate-600">
                       {m.buyerName || m.voidReason || "—"}
                     </td>

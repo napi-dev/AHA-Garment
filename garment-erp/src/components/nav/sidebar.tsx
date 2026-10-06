@@ -53,7 +53,7 @@ export function Sidebar({
       items: [
         { label: am.nav.dashboard, href: "/dashboard", icon: <LayoutDashboard size={18} />, pagePath: "/dashboard" },
         { label: am.nav.attendance, href: "/attendance", icon: <Clock size={18} />, pagePath: "/attendance" },
-        { label: am.nav.counts, href: "/counts/enter", icon: <ClipboardList size={18} />, pagePath: "/counts" },
+        { label: am.nav.counts, href: "/counts/enter", icon: <ClipboardList size={18} />, pagePath: "/counts/enter" },
         { label: am.counts.closeDay, href: "/counts/close", icon: <CheckSquare size={18} />, pagePath: "/counts/close" },
       ],
     },
