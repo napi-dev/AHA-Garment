@@ -19,7 +19,39 @@ export async function createOrder(formData: FormData) {
   const deadlineAt = new Date(`${deadlineDate}T${deadlineTime}:00Z`);
 
   // Lines
-  const typeId = String(formData.get("typeId") ?? "ቲ-ሸርት").trim();
+  const rawTypeId = String(formData.get("typeId") ?? "ቲ-ሸርት").trim();
+  const customTypeName = String(formData.get("customTypeName") ?? "").trim();
+
+  let typeId = rawTypeId;
+  if (rawTypeId === "OTHER" || rawTypeId === "ሌላ") {
+    if (!customTypeName) {
+      throw new Error("እባክዎ አዲሱን የልብስ ዓይነት ስም ያስገቡ");
+    }
+    typeId = customTypeName;
+
+    // Save into AppSetting for future orders
+    try {
+      const existing = await db.appSetting.findUnique({ where: { key: "garment_types" } });
+      let list: string[] = ["ቲ-ሸርት", "ትራክ ሱሪ", "ፖሎ ሸሚዝ", "ጃኬት", "ሆዲ"];
+      if (existing?.value) {
+        try {
+          const parsed = JSON.parse(existing.value);
+          if (Array.isArray(parsed)) list = parsed;
+        } catch {}
+      }
+      if (!list.includes(typeId)) {
+        list.push(typeId);
+        await db.appSetting.upsert({
+          where: { key: "garment_types" },
+          update: { value: JSON.stringify(list), updatedBy: session.user.id },
+          create: { key: "garment_types", value: JSON.stringify(list), updatedBy: session.user.id },
+        });
+      }
+    } catch (e) {
+      console.error("Failed to persist custom garment type:", e);
+    }
+  }
+
   const color  = String(formData.get("color")  ?? "ነጭ").trim();
   const size   = (String(formData.get("size")   ?? "L").toUpperCase()) as Size;
   const qty    = parseInt(String(formData.get("qty") ?? "0"), 10);

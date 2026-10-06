@@ -1,13 +1,14 @@
 import { auth } from "@/lib/auth";
+import { db } from "@/lib/db";
 import { redirect } from "next/navigation";
 import { requirePermission } from "@/lib/auth/permissions";
 import { am } from "@/lib/i18n/am";
 import { todayISOStringEAT } from "@/lib/ethiopian-calendar";
 import { createOrder } from "../../actions";
 import Link from "next/link";
-import { Factory, ArrowRight, Save } from "lucide-react";
+import { Factory, ArrowRight, Save, PlusCircle } from "lucide-react";
 
-const GARMENT_TYPES = ["ቲ-ሸርት", "ትራክ ሱሪ", "ፖሎ ሸሚዝ", "ጃኬት", "ሆዲ", "ሌላ"];
+const DEFAULT_GARMENT_TYPES = ["ቲ-ሸርት", "ትራክ ሱሪ", "ፖሎ ሸሚዝ", "ጃኬት", "ሆዲ"];
 const COMMON_COLORS = ["ነጭ", "ጥቁር", "ግራጫ", "ሰማያዊ", "ቀይ", "አረንጓዴ", "ቢጫ"];
 const SIZES = ["S", "M", "L", "XL", "XXL"] as const;
 
@@ -17,6 +18,32 @@ export default async function NewOrderPage() {
   requirePermission(session.user.role, "/production/orders");
 
   const today = todayISOStringEAT();
+
+  // Load custom garment types saved in settings
+  const typeSetting = await db.appSetting.findUnique({
+    where: { key: "garment_types" },
+  });
+  let savedTypes: string[] = [];
+  if (typeSetting?.value) {
+    try {
+      const parsed = JSON.parse(typeSetting.value);
+      if (Array.isArray(parsed)) savedTypes = parsed;
+    } catch {}
+  }
+
+  // Also query any previously used distinct order types
+  const usedTypes = await db.orderLine.findMany({
+    select: { typeId: true },
+    distinct: ["typeId"],
+  });
+
+  const allGarmentTypes = Array.from(
+    new Set([
+      ...DEFAULT_GARMENT_TYPES,
+      ...savedTypes,
+      ...usedTypes.map((u) => u.typeId).filter(Boolean),
+    ])
+  );
 
   return (
     <div className="max-w-xl mx-auto space-y-6">
@@ -61,17 +88,41 @@ export default async function NewOrderPage() {
         </div>
 
         {/* Type */}
-        <div>
-          <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5 font-ethiopic">
-            የልብስ ዓይነት (Type) <span className="text-rose-500">*</span>
-          </label>
-          <select name="typeId" required className="input-field font-ethiopic text-slate-800">
-            {GARMENT_TYPES.map((t) => (
-              <option key={t} value={t}>
-                {t}
-              </option>
-            ))}
-          </select>
+        <div className="space-y-3">
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5 font-ethiopic">
+              የልብስ ዓይነት (Type) <span className="text-rose-500">*</span>
+            </label>
+            <select
+              name="typeId"
+              id="garment-type-select"
+              required
+              className="input-field font-ethiopic text-slate-800"
+            >
+              {allGarmentTypes.map((t) => (
+                <option key={t} value={t}>
+                  {t}
+                </option>
+              ))}
+              <option value="ሌላ">✨ ሌላ (አዲስ ዓይነት)...</option>
+            </select>
+          </div>
+
+          {/* Conditional input for 'ሌላ' */}
+          <div id="custom-type-container" className="hidden p-3.5 bg-blue-50/70 border border-blue-200 rounded-xl space-y-1.5">
+            <label className="block text-xs font-bold text-blue-900 font-ethiopic">
+              አዲስ የልብስ ዓይነት ስም ይጻፉ (New Type Name) <span className="text-rose-500">*</span>
+            </label>
+            <input
+              name="customTypeName"
+              id="custom-type-input"
+              placeholder="ምሳሌ፦ ሹራብ፣ ቁምጣ፣ ጋዋን፣ ካፖርት..."
+              className="input-field font-ethiopic bg-white border-blue-300 focus:border-blue-600 focus:ring-blue-200"
+            />
+            <p className="text-xs text-blue-700 font-ethiopic">
+              💡 ይህ አዲስ ዓይነት ለቀጣይ ትዕዛዞች በምርጫ ዝርዝሩ (dropdown) ውስጥ በቋሚነት ይቀመጣል።
+            </p>
+          </div>
         </div>
 
         {/* Color */}
@@ -157,6 +208,37 @@ export default async function NewOrderPage() {
           </button>
         </div>
       </form>
+
+      {/* Client-side script to toggle custom garment type input */}
+      <script
+        dangerouslySetInnerHTML={{
+          __html: `
+            document.addEventListener('DOMContentLoaded', function() {
+              const typeSelect = document.getElementById('garment-type-select');
+              const customContainer = document.getElementById('custom-type-container');
+              const customInput = document.getElementById('custom-type-input');
+
+              function handleTypeChange() {
+                if (typeSelect && customContainer && customInput) {
+                  if (typeSelect.value === 'ሌላ') {
+                    customContainer.classList.remove('hidden');
+                    customInput.required = true;
+                    customInput.focus();
+                  } else {
+                    customContainer.classList.add('hidden');
+                    customInput.required = false;
+                  }
+                }
+              }
+
+              if (typeSelect) {
+                typeSelect.addEventListener('change', handleTypeChange);
+                handleTypeChange();
+              }
+            });
+          `,
+        }}
+      />
     </div>
   );
 }
