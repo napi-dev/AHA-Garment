@@ -198,6 +198,90 @@ async function main() {
   }
   console.log(`    ✓ ${deptIds.length} departments`);
 
+  // ── Jobs (one per department for now) ────────────────────────────────────
+  console.log("  Creating jobs...");
+  const jobIds: string[] = [];
+  
+  const JOBS_TO_CREATE = [
+    { deptIndex: 0, nameAm: "ትከሻ ስፌት", targetPerHour: 25, ratePerPiece: 1.00 },
+    { deptIndex: 1, nameAm: "ወገብ መቀምቀም ስፌት", targetPerHour: 30, ratePerPiece: 1.00 },
+    { deptIndex: 2, nameAm: "እጅ/ሳይድ ስፔሻሊስት", targetPerHour: 28, ratePerPiece: 1.00 },
+    { deptIndex: 3, nameAm: "ኪስ አለጣ", targetPerHour: 35, ratePerPiece: 0.90 },
+    { deptIndex: 4, nameAm: "ሳይድ ስፔሻሊስት", targetPerHour: 30, ratePerPiece: 1.00 },
+    { deptIndex: 5, nameAm: "እጃት ስፔሻሊስት", targetPerHour: 28, ratePerPiece: 1.00 },
+    { deptIndex: 6, nameAm: "እጅት ደርዝ", targetPerHour: 32, ratePerPiece: 0.90 },
+    { deptIndex: 7, nameAm: "Interlock ማጠፊያ", targetPerHour: 25, ratePerPiece: 1.20 },
+    { deptIndex: 8, nameAm: "ወገብ አለጣ", targetPerHour: 32, ratePerPiece: 0.90 },
+    { deptIndex: 9, nameAm: "ካንሻይ ዝጅታ", targetPerHour: 38, ratePerPiece: 0.80 },
+    { deptIndex: 10, nameAm: "ሂትፕረስ ማሰሪያ", targetPerHour: 38, ratePerPiece: 0.80 },
+    { deptIndex: 11, nameAm: "ካውያ ስፔሻሊስት", targetPerHour: 40, ratePerPiece: 0.80 },
+    { deptIndex: 12, nameAm: "ክር ለቃሚ", targetPerHour: 45, ratePerPiece: 0.70 },
+    { deptIndex: 13, nameAm: "ማሸጊያ ስፔሻሊስት", targetPerHour: 50, ratePerPiece: 0.60 },
+    { deptIndex: 14, nameAm: "ስቲከር መቁረጫ", targetPerHour: 40, ratePerPiece: 0.80 },
+    { deptIndex: 15, nameAm: "ዳሜጅ መጠገኛ", targetPerHour: 35, ratePerPiece: 0.80 },
+    { deptIndex: 16, nameAm: "ረዳት ቆራጭ", targetPerHour: 0, ratePerPiece: 0.80 },
+    { deptIndex: 17, nameAm: "ጨርቅ ቆራጭ", targetPerHour: 30, ratePerPiece: 0.90 },
+    { deptIndex: 18, nameAm: "ረዳት ቆራጭ 2", targetPerHour: 35, ratePerPiece: 0.90 },
+    { deptIndex: 19, nameAm: "ጥራት ተቆጣጣሪ", targetPerHour: 0, ratePerPiece: 0.60 },
+    { deptIndex: 20, nameAm: "ረዳት ስራ", targetPerHour: 0, ratePerPiece: 0.60 },
+    { deptIndex: 21, nameAm: "የመስመር ረዳት", targetPerHour: 0, ratePerPiece: 0.60 },
+    { deptIndex: 22, nameAm: "መስመር ኦፕሬተር", targetPerHour: 0, ratePerPiece: 0.00 },
+    { deptIndex: 23, nameAm: "የቁጥጥር ስራ", targetPerHour: 0, ratePerPiece: 0.00 },
+  ];
+
+  const effectiveDate = new Date("2019-01-01T00:00:00Z"); // Ethiopian calendar date
+
+  for (const jobDef of JOBS_TO_CREATE) {
+    const deptId = deptIds[jobDef.deptIndex];
+    
+    // Create or update job
+    const job = await db.job.upsert({
+      where: { 
+        departmentId_nameAm: {
+          departmentId: deptId,
+          nameAm: jobDef.nameAm,
+        },
+      },
+      update: {
+        isActive: true,
+        sortOrder: jobDef.deptIndex,
+      },
+      create: {
+        nameAm: jobDef.nameAm,
+        departmentId: deptId,
+        isActive: true,
+        sortOrder: jobDef.deptIndex,
+      },
+    });
+    
+    jobIds.push(job.id);
+    
+    // Create incentive card for this job (if has a rate)
+    if (jobDef.ratePerPiece > 0) {
+      await db.incentiveCard.upsert({
+        where: {
+          jobId_effectiveFrom: {
+            jobId: job.id,
+            effectiveFrom: effectiveDate,
+          },
+        },
+        update: {
+          targetPerHour: jobDef.targetPerHour,
+          ratePerPiece: new Decimal(jobDef.ratePerPiece),
+        },
+        create: {
+          jobId: job.id,
+          targetPerHour: jobDef.targetPerHour,
+          ratePerPiece: new Decimal(jobDef.ratePerPiece),
+          effectiveFrom: effectiveDate,
+          setByUserId: "seed",
+        },
+      });
+    }
+  }
+  
+  console.log(`    ✓ ${jobIds.length} jobs with incentive cards`);
+
   // ── Employees ────────────────────────────────────────────────────────────
   console.log("  Creating sample employees...");
   const empIds: string[] = [];
@@ -205,12 +289,18 @@ async function main() {
 
   for (const emp of SAMPLE_EMPLOYEES) {
     const deptId = deptIds[emp.deptIndex];
+    const jobId = jobIds[emp.deptIndex]; // Assign to job in same department
     const existing = await db.employee.findFirst({
       where: { nameAm: emp.nameAm, departmentId: deptId },
     });
 
     let id: string;
     if (existing) {
+      // Update existing employee with job assignment
+      await db.employee.update({
+        where: { id: existing.id },
+        data: { jobId },
+      });
       id = existing.id;
       // Track the highest serial number if employee already exists
       if (existing.serialNumber >= serial) {
@@ -222,6 +312,7 @@ async function main() {
           serialNumber: serial,
           nameAm: emp.nameAm,
           departmentId: deptId,
+          jobId,
         },
       });
       id = created.id;

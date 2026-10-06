@@ -127,8 +127,8 @@ function LoginForm() {
 
 export default function LoginPage() {
   const [imgError, setImgError] = useState(false);
-  // Add timestamp to bust cache on every load
-  const [imgSrc] = useState("/ahalogo.png?t=" + Date.now());
+  // Use a static version number instead of Date.now() to avoid hydration mismatch
+  const imgSrc = "/ahalogo.png?v=2";
 
   const handleImageError = () => {
     console.error("Failed to load image:", imgSrc);
@@ -153,7 +153,6 @@ export default function LoginPage() {
                 className="w-full h-full object-cover"
                 loading="eager"
                 onError={handleImageError}
-                key={imgSrc} // Force re-render on src change
               />
             ) : (
               <div className="w-full h-full flex items-center justify-center bg-blue-600 text-white font-bold text-2xl">
