@@ -85,7 +85,7 @@ export default async function DashboardPage() {
   }
 
   // ── Remaining queries — all parallel ──────────────────────────────────────
-  const [currentPeriod, deptStatsRaw, [openOrders, overdueOrders]] =
+  const [currentPeriod, deptStatsRaw, [openOrders, overdueOrders], upcomingDeadlines] =
     await Promise.all([
       canCloseIncentive(role) || canApproveIncentive(role)
         ? db.incentivePeriod.findFirst({
@@ -102,6 +102,17 @@ export default async function DashboardPage() {
         db.prodOrder.count({ where: { status: "ACTIVE" } }),
         db.prodOrder.count({ where: { status: "ACTIVE", deadlineAt: { lt: today } } }),
       ]),
+      // Get orders with upcoming deadlines (3 days, 2 days, 1 day)
+      ["ADMIN", "PRODUCTION_MANAGER", "ORDER_PLACER"].includes(role)
+        ? db.prodOrder.findMany({
+            where: {
+              status: "ACTIVE",
+              deadlineAt: { gte: today },
+            },
+            select: { id: true, orderNo: true, deadlineAt: true },
+            orderBy: { deadlineAt: "asc" },
+          })
+        : Promise.resolve([]),
     ]);
 
   // ── Incentive cost ────────────────────────────────────────────────────────
@@ -140,8 +151,27 @@ export default async function DashboardPage() {
     .sort((a, b) => b.produced - a.produced)
     .slice(0, 10);
 
+  // ── Calculate order deadlines (3/2/1 days) ───────────────────────────────
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+  
+  let orders3Days = 0;
+  let orders2Days = 0;
+  let orders1Day = 0;
+  
+  for (const order of upcomingDeadlines) {
+    const deadline = new Date(order.deadlineAt);
+    deadline.setHours(0, 0, 0, 0);
+    const daysRemaining = Math.ceil((deadline.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+    
+    if (daysRemaining === 3) orders3Days++;
+    else if (daysRemaining === 2) orders2Days++;
+    else if (daysRemaining === 1) orders1Day++;
+  }
+
   const totalWorkersAttended = countStats._count._all;
   const canCloseDay = !dayClose && getPageAccess(role, "/counts/close") !== "none";
+  const showOrderCountdown = ["ADMIN", "PRODUCTION_MANAGER", "ORDER_PLACER"].includes(role);
 
   return (
     <div className="space-y-8">
@@ -263,6 +293,55 @@ export default async function DashboardPage() {
           </div>
         </div>
       </div>
+
+      {/* Order Countdown Warnings (Admin, Production Manager, Order Placer) */}
+      {showOrderCountdown && (orders3Days > 0 || orders2Days > 0 || orders1Day > 0) && (
+        <div className="erp-card p-6 border-l-4 border-amber-500 bg-gradient-to-r from-amber-50/50 to-orange-50/30">
+          <div className="flex items-center gap-2 mb-4">
+            <Clock size={18} className="text-amber-600" />
+            <h3 className="text-base font-bold text-slate-900 font-ethiopic">
+              የትዕዛዝ ማጠናቀቂያ ማስታወሻዎች
+            </h3>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {orders3Days > 0 && (
+              <div className="flex items-center gap-3 p-4 rounded-xl bg-white border border-green-200">
+                <div className="text-3xl">🟢</div>
+                <div>
+                  <p className="text-2xl font-bold text-green-700 tabular-nums">{orders3Days}</p>
+                  <p className="text-xs text-slate-600 font-ethiopic font-medium">በ3 ቀናት ውስጥ</p>
+                  <p className="text-[10px] text-slate-400 font-ethiopic mt-0.5">የቆረጣ ዝግጅት ጀምር</p>
+                </div>
+              </div>
+            )}
+            {orders2Days > 0 && (
+              <div className="flex items-center gap-3 p-4 rounded-xl bg-white border border-yellow-300">
+                <div className="text-3xl">🟡</div>
+                <div>
+                  <p className="text-2xl font-bold text-yellow-700 tabular-nums">{orders2Days}</p>
+                  <p className="text-xs text-slate-600 font-ethiopic font-medium">በ2 ቀናት ውስጥ</p>
+                  <p className="text-[10px] text-slate-400 font-ethiopic mt-0.5">የስፌት መስመር አረጋግጥ</p>
+                </div>
+              </div>
+            )}
+            {orders1Day > 0 && (
+              <div className="flex items-center gap-3 p-4 rounded-xl bg-white border-2 border-red-400 shadow-sm animate-pulse">
+                <div className="text-3xl">🔴</div>
+                <div>
+                  <p className="text-2xl font-bold text-red-700 tabular-nums">{orders1Day}</p>
+                  <p className="text-xs text-red-600 font-ethiopic font-bold">በ1 ቀን ውስጥ!</p>
+                  <p className="text-[10px] text-red-500 font-ethiopic mt-0.5 font-semibold">የፊኒሺንግ ፍጥነት ጨምር!</p>
+                </div>
+              </div>
+            )}
+          </div>
+          <div className="mt-4 pt-3 border-t border-amber-200">
+            <Link href="/production/orders" className="text-xs text-amber-700 hover:text-amber-900 font-ethiopic font-semibold hover:underline inline-flex items-center gap-1">
+              ሁሉንም ትዕዛዞች ለማየት ይጫኑ <ArrowRight size={12} />
+            </Link>
+          </div>
+        </div>
+      )}
 
       {/* Incentive / pending KPIs */}
       {(canCloseIncentive(role) || canApproveIncentive(role) || pendingPeriods > 0) && (
