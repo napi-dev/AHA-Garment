@@ -18,6 +18,10 @@ interface Department {
 interface Order {
   id: string;
   orderNo: string;
+  totalQty: number;
+  types: string[];
+  colors: string[];
+  hasMore: boolean;
 }
 
 interface HandoverItem {
@@ -513,11 +517,11 @@ export function FlowClient({
                 <label className="font-semibold text-slate-700 block mb-1">
                   የምርት ትዕዛዝ (Order) *
                 </label>
-                <select name="orderId" required className="input-field font-mono">
+                <select name="orderId" required className="input-field font-ethiopic">
                   <option value="">ትዕዛዝ ይምረጡ...</option>
                   {orders.map((o) => (
                     <option key={o.id} value={o.id}>
-                      {o.orderNo}
+                      {o.orderNo} ({o.totalQty} ፍሬ) — {o.types.join(", ")}{o.hasMore ? "+" : ""} | {o.colors.join(", ")}{o.hasMore ? "+..." : ""}
                     </option>
                   ))}
                 </select>

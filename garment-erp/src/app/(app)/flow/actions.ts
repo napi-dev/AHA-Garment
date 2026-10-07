@@ -97,13 +97,20 @@ export async function receiveHandover(handoverId: string, receivedQty: number) {
       update: {},
     });
 
+    const msg = `⚠️ በርክክብ ወቅት ፍልልያ ተገኝቷል\nትዕዛዝ: ${handover.order.orderNo}\nየተላከ: ${sent} ${handover.unit} ← የተረከበ: ${receivedQty} ${handover.unit}\nፍልልያ: ${diff > 0 ? `+${diff}` : diff} ${handover.unit}`;
+
     await db.alert.create({
       data: {
         type: "FLOW_VARIANCE",
-        message: `በርክክብ ወቅት ፍልልያ ተገኝቷል: ${sent} ተልኮ ${receivedQty} ተረክቧል (ፍልልያ: ${diff})`,
+        message: msg,
         reference: handoverId,
       },
     });
+
+    // Send Telegram notification
+    const { sendToManagerAndAdmin, sendMessage, CHATS } = await import("@/lib/automation/telegram");
+    await sendToManagerAndAdmin(msg);
+    if (CHATS.dept) await sendMessage(CHATS.dept, msg);
   }
 
   revalidatePath("/flow");

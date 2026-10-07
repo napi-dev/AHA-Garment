@@ -62,13 +62,19 @@ export async function recordOffence(employeeId: string, formData: FormData) {
 
   if (level === "THIRD" || level === "FOURTH") {
     // Open an HR alert (notify Super Manager + Admin)
+    const msg = `⚠️ HR ጉዳይ — ${level === "THIRD" ? "3ኛ" : "4ኛ"} ጥፋት\nምክንያት: ${reason}\nሠራተኛ: ${employeeId}`;
+    
     await db.alert.create({
       data: {
-        type: "UNUSUAL_COUNT",
-        message: `HR ጉዳይ — ${level === "THIRD" ? "3ኛ" : "4ኛ"} ጥፋት: ${reason} (ሠራተኛ ID: ${employeeId})`,
+        type: "HR_CASE",
+        message: msg,
         reference: offence.id,
       },
     });
+
+    // Send Telegram notification to manager and admin
+    const { sendToManagerAndAdmin } = await import("@/lib/automation/telegram");
+    await sendToManagerAndAdmin(msg);
   }
 
   await db.auditLog.create({

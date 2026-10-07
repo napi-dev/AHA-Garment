@@ -13,10 +13,11 @@ export async function createOrder(formData: FormData) {
   requirePermission(session.user.role, "/production/orders");
 
   const deadlineDate = String(formData.get("deadlineDate") ?? "");
-  const deadlineTime = String(formData.get("deadlineTime") ?? "17:00");
   
   if (!deadlineDate) throw new Error("የማጠናቀቂያ ቀን ያስፈልጋል");
-  const deadlineAt = new Date(`${deadlineDate}T${deadlineTime}:00Z`);
+  
+  // Set deadline to end of day (23:59:59) in local time for day-based countdown
+  const deadlineAt = new Date(`${deadlineDate}T23:59:59`);
 
   // Lines
   const rawTypeId = String(formData.get("typeId") ?? "ቲ-ሸርት").trim();

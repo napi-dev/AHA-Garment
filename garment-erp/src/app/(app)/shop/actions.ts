@@ -119,12 +119,19 @@ export async function recordShopSale(formData: FormData) {
   // Check if balance reached 0 -> alert
   const remaining = currentBalance - qty;
   if (remaining === 0) {
+    const msg = `📦 የሱቅ እቃ አልቋል!\nዕቃ: ${typeId}\nቀለም/ሳይዝ: ${color} - ${size}\nቀሪው: 0 ደርሷል!`;
+    
     await db.alert.create({
       data: {
         type: "SHOP_SOLD_OUT",
-        message: `የሱቅ እቃ አልቋል: ${typeId} (${color} - ${size}) ቀሪው 0 ደርሷል!`,
+        message: msg,
       },
     });
+
+    // Send Telegram notification
+    const { sendToManagerAndAdmin, sendMessage, CHATS } = await import("@/lib/automation/telegram");
+    await sendToManagerAndAdmin(msg);
+    if (CHATS.dept) await sendMessage(CHATS.dept, msg);
   }
 
   revalidatePath("/shop");

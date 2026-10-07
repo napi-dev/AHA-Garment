@@ -36,11 +36,29 @@ export default async function FlowPage() {
     }),
     db.prodOrder.findMany({
       where: { status: "ACTIVE" },
-      select: { id: true, orderNo: true },
+      include: { lines: true },
       orderBy: { createdAt: "desc" },
     }),
     getControllableDepartments(session.user.role, db),
   ]);
+
+  // Prepare order display info with garment types and colors
+  const ordersWithDetails = orders.map((o) => {
+    const totalQty = o.lines.reduce((s, l) => s + l.qty, 0);
+    
+    // Get unique garment types and colors from lines
+    const types = [...new Set(o.lines.map(l => l.typeId))];
+    const colors = [...new Set(o.lines.map(l => l.color))];
+    
+    return {
+      id: o.id,
+      orderNo: o.orderNo,
+      totalQty,
+      types: types.slice(0, 2), // Show first 2 types
+      colors: colors.slice(0, 2), // Show first 2 colors
+      hasMore: types.length > 2 || colors.length > 2
+    };
+  });
 
   return (
     <div className="space-y-6">
@@ -63,7 +81,7 @@ export default async function FlowPage() {
       <FlowClient
         handovers={handovers as any}
         departments={departments as any}
-        orders={orders}
+        orders={ordersWithDetails}
         userRole={session.user.role}
         userId={session.user.id}
         controllableDeptIds={controllableDeptIds}

@@ -34,13 +34,19 @@ export async function setSalary(input: {
 
   // Notify Super Manager if Admin made the change
   if (session.user.role === "ADMIN") {
+    const msg = `⚠️ የደሞዝ ለውጥ ማስታወቂያ\nAdministrator: ${session.user.employeeCode}\nሠራተኛ: ${input.employeeId}\nአዲስ ደሞዝ: ${input.amount} ብር\nከ: ${input.effectiveFrom}`;
+    
     await db.alert.create({
       data: {
-        type: "UNUSUAL_COUNT", // reusing for system notifications
-        message: `Admin ${session.user.employeeCode} ደሞዝ ቀይሯል — ሠራተኛ ID: ${input.employeeId}. ጥቅምት ${input.amount} ብር ከ ${input.effectiveFrom}`,
+        type: "SALARY_CHANGED",
+        message: msg,
         reference: record.id,
       },
     });
+
+    // Send Telegram notification to manager and admin
+    const { sendToManagerAndAdmin } = await import("@/lib/automation/telegram");
+    await sendToManagerAndAdmin(msg);
   }
 
   await db.auditLog.create({

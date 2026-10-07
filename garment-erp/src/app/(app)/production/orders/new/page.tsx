@@ -174,31 +174,20 @@ export default async function NewOrderPage() {
           />
         </div>
 
-        {/* Deadline Date & Time */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5 font-ethiopic">
-              የማጠናቀቂያ ቀን <span className="text-rose-500">*</span>
-            </label>
-            <input
-              name="deadlineDate"
-              type="date"
-              required
-              className="input-field text-slate-800 font-mono"
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5 font-ethiopic">
-              የማጠናቀቂያ ሰዓት
-            </label>
-            <input
-              name="deadlineTime"
-              type="time"
-              defaultValue="17:00"
-              required
-              className="input-field text-slate-800 font-mono"
-            />
-          </div>
+        {/* Deadline Date */}
+        <div>
+          <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5 font-ethiopic">
+            የማጠናቀቂያ ቀን <span className="text-rose-500">*</span>
+          </label>
+          <input
+            name="deadlineDate"
+            type="date"
+            required
+            className="input-field text-slate-800 font-mono"
+          />
+          <p className="text-xs text-slate-400 font-ethiopic mt-1">
+            የቆጠራ ማጠናቀቂያ ቀን - 3፣ 2፣ 1 ቀን ቀሪ ሲሆን ማስጠንቀቂያ ይሰጣል
+          </p>
         </div>
 
         <div className="pt-2">

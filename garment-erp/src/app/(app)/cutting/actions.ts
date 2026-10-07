@@ -90,15 +90,10 @@ export async function createCutJob(formData: FormData) {
     },
   });
 
-  // 7. Check if consumption exceeds limit -> create Alert
+  // 7. Check if consumption exceeds limit -> send wastage alert via Telegram
   if (consumptionVal > limitUsed) {
-    await db.alert.create({
-      data: {
-        type:      "CONSUMPTION",
-        message:   `የጨርቅ ብክነት ማስጠንቀቂያ — ለትዕዛዝ ${order.orderNo} የተመዘገበው የጨርቅ ፍጆታ (${consumptionDec.toFixed(3)} ኪ.ግ/ፍሬ) ከተፈቀደው ወሰን (${limitDec.toFixed(2)}) በልጧል!`,
-        reference: job.id,
-      },
-    });
+    const { sendWastageAlert } = await import("@/lib/automation/alerts");
+    await sendWastageAlert(job.id);
   }
 
   // 8. Audit log
