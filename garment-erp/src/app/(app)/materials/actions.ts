@@ -74,13 +74,12 @@ export async function recordMovement(formData: FormData) {
     });
   }
 
-  // Handle lot number if provided
+  // Handle lot number if provided (only if supplier is also provided)
   let lotId: string | null = null;
-  if (lotNumber && type === "RECEIVE") {
+  if (lotNumber && type === "RECEIVE" && supplierId) {
     // Find or create lot
     let lot = await db.lot.findFirst({
       where: {
-        materialId: material.id,
         lotNumber,
       },
     });
@@ -88,9 +87,10 @@ export async function recordMovement(formData: FormData) {
     if (!lot) {
       lot = await db.lot.create({
         data: {
-          materialId: material.id,
           lotNumber,
           supplierId,
+          receivedAt: date,
+          notes: `Auto-created for ${materialName}`,
         },
       });
     }
