@@ -576,7 +576,7 @@ model OrderAlert {
   id          String   @id @default(cuid())
   orderId     String
   order       ProdOrder @relation(fields: [orderId], references: [id])
-  threshold   Int      // 72, 48, or 24 (hours)
+  threshold   Int      // 3, 2, or 1 (days remaining before deadline)
   firedAt     DateTime @default(now())
 
   @@unique([orderId, threshold])

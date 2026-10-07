@@ -127,42 +127,50 @@ export async function checkDelayedOrders() {
   }
 }
 
-// ── 72/48/24 Hour Countdown Alerts ───────────────────────────────────────────
+// ── 3/2/1 Day Countdown Alerts ───────────────────────────────────────────────
 
 /**
- * Checks active orders and fires alerts at 72h, 48h, and 24h before deadline.
- * Should be called by a cron job every hour.
+ * Checks active orders and fires alerts at 3 days, 2 days, and 1 day before deadline.
+ * Should be called by a cron job once per day (e.g., at 08:00 EAT).
  */
 export async function checkOrderCountdown() {
   const now = new Date();
+  now.setHours(0, 0, 0, 0); // Start of today
   
   // Get all active orders
   const activeOrders = await db.prodOrder.findMany({
     where: {
       status: "ACTIVE",
-      deadlineAt: { gte: now }, // Only future deadlines
-    },
-    include: {
-      lines: true,
-      alerts: true, // Include existing alerts to avoid duplicates
+      deadlineAt: { gte: now }, // Only future or today deadlines
     },
   });
 
   for (const order of activeOrders) {
-    const hoursRemaining = (order.deadlineAt.getTime() - now.getTime()) / (1000 * 60 * 60);
+    const deadline = new Date(order.deadlineAt);
+    deadline.setHours(0, 0, 0, 0); // Start of deadline day
     
-    // Define thresholds: 72h, 48h, 24h
+    // Calculate days remaining (difference in days)
+    const daysRemaining = Math.ceil((deadline.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+    
+    // Define thresholds: 3 days, 2 days, 1 day
     const thresholds = [
-      { hours: 72, emoji: "🟢", message: "ትዕዛዝ {orderNo} በ3 ቀን ይቀራል። የቆረጣ ዝግጅት ጀምር" },
-      { hours: 48, emoji: "🟡", message: "ትዕዛዝ {orderNo} በ2 ቀን ይቀራል። የስፌት መስመር ሂደት አረጋግጥ" },
-      { hours: 24, emoji: "🔴", message: "ትዕዛዝ {orderNo} በ1 ቀን ይቀራል! የፊኒሺንግ ፍጥነት ጨምር!" },
+      { days: 3, emoji: "🟢", message: "ትዕዛዝ {orderNo} በ3 ቀን ይቀራል። የቆረጣ ዝግጅት ጀምር" },
+      { days: 2, emoji: "🟡", message: "ትዕዛዝ {orderNo} በ2 ቀን ይቀራል። የስፌት መስመር ሂደት አረጋግጥ" },
+      { days: 1, emoji: "🔴", message: "ትዕዛዝ {orderNo} በ1 ቀን ይቀራል! የፊኒሺንግ ፍጥነት ጨምር!" },
     ];
 
     for (const threshold of thresholds) {
-      // Check if we're within the threshold window (±1 hour to catch it reliably)
-      if (hoursRemaining <= threshold.hours && hoursRemaining > (threshold.hours - 1)) {
-        // Check if alert already fired for this threshold
-        const existingAlert = order.alerts.find(a => a.threshold === threshold.hours);
+      // Check if we've reached this threshold exactly
+      if (daysRemaining === threshold.days) {
+        // Check if alert already fired for this threshold (using days not hours)
+        const existingAlert = await db.orderAlert.findUnique({
+          where: {
+            orderId_threshold: {
+              orderId: order.id,
+              threshold: threshold.days, // Store as days (3, 2, 1)
+            },
+          },
+        });
         
         if (!existingAlert) {
           const msg = `${threshold.emoji} ${threshold.message.replace('{orderNo}', order.orderNo)}`;
@@ -171,7 +179,7 @@ export async function checkOrderCountdown() {
           await db.orderAlert.create({
             data: {
               orderId: order.id,
-              threshold: threshold.hours,
+              threshold: threshold.days, // Store as days
             },
           });
 
@@ -187,8 +195,8 @@ export async function checkOrderCountdown() {
           // Send to production manager, order placer, and admin
           await sendToManagerAndAdmin(msg);
           
-          // For 24h alert, also send to department group (urgent!)
-          if (threshold.hours === 24 && CHATS.dept) {
+          // For 1-day alert, also send to department group (urgent!)
+          if (threshold.days === 1 && CHATS.dept) {
             await sendMessage(CHATS.dept, msg);
           }
         }

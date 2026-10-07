@@ -1,17 +1,17 @@
-# 🔔 Alert System Setup - 72/48/24 Hour Countdown
+# 🔔 Alert System Setup - 3/2/1 Day Countdown
 
 ## Overview
 
 The system automatically checks for order deadlines and fires alerts at:
-- **🟢 72 hours (3 days)** before deadline - "ትዕዛዝ በ3 ቀን ይቀራል። የቆረጣ ዝግጅት ጀምር"
-- **🟡 48 hours (2 days)** before deadline - "ትዕዛዝ በ2 ቀን ይቀራል። የስፌት መስመር ሂደት አረጋግጥ"
-- **🔴 24 hours (1 day)** before deadline - "ትዕዛዝ በ1 ቀን ይቀራል! የፊኒሺንግ ፍጥነት ጨምር!"
+- **🟢 3 days** before deadline - "ትዕዛዝ በ3 ቀን ይቀራል። የቆረጣ ዝግጅት ጀምር"
+- **🟡 2 days** before deadline - "ትዕዛዝ በ2 ቀን ይቀራል። የስፌት መስመር ሂደት አረጋግጥ"
+- **🔴 1 day** before deadline - "ትዕዛዝ በ1 ቀን ይቀራል! የፊኒሺንግ ፍጥነት ጨምር!"
 
 Alerts are sent to:
 - Admin (Owner)
 - Production Manager
 - Order Placer
-- Department Telegram group (24h only)
+- Department Telegram group (1 day only)
 
 ---
 
@@ -26,13 +26,13 @@ Create `vercel.json` in project root:
   "crons": [
     {
       "path": "/api/cron/check-alerts",
-      "schedule": "0 * * * *"
+      "schedule": "0 8 * * *"
     }
   ]
 }
 ```
 
-This runs the check every hour automatically.
+This runs the check once daily at 8:00 AM EAT.
 
 ### Option 2: External Cron Service (cron-job.org, EasyCron, etc.)
 
@@ -49,7 +49,7 @@ This runs the check every hour automatically.
 3. **Set up cron job**:
    - URL: `https://your-domain.com/api/cron/check-alerts`
    - Method: `GET` or `POST`
-   - Schedule: Every hour (`0 * * * *`)
+   - Schedule: Once daily at 8 AM (`0 8 * * *`)
    - Headers:
      ```
      Authorization: Bearer your-generated-secret-here
@@ -73,10 +73,10 @@ https://your-domain.com/api/cron/check-alerts
 
 ## How It Works
 
-1. **Every hour**, the cron job runs `/api/cron/check-alerts`
-2. System checks all `ACTIVE` orders with future deadlines
-3. Calculates hours remaining until deadline
-4. If within 72h, 48h, or 24h window (±1 hour):
+1. **Once daily** (at 8 AM), the cron job runs `/api/cron/check-alerts`
+2. System checks all `ACTIVE` orders with future or today deadlines
+3. Calculates days remaining until deadline
+4. If exactly 3, 2, or 1 day remains:
    - Creates `OrderAlert` record (prevents duplicates)
    - Creates `Alert` record (shows in /alerts page)
    - Sends Telegram notification
@@ -121,7 +121,7 @@ Alerts are sent based on role permissions (defined in `permissions.ts`):
 - **DELAYED_ORDER** → Admin, Production Manager, Order Placer
 - **DAY_NOT_CLOSED** → Admin, Production Manager
 
-The 24-hour alert also goes to the department Telegram group for maximum visibility.
+The 1-day alert also goes to the department Telegram group for maximum visibility.
 
 ---
 
@@ -132,7 +132,7 @@ model OrderAlert {
   id          String   @id @default(cuid())
   orderId     String
   order       ProdOrder @relation(...)
-  threshold   Int      // 72, 48, or 24 (hours)
+  threshold   Int      // 3, 2, or 1 (days remaining before deadline)
   firedAt     DateTime @default(now())
   
   @@unique([orderId, threshold]) // Prevents duplicate alerts
@@ -180,9 +180,9 @@ The system prevents duplicates using `OrderAlert` table with unique constraint o
 
 ### Missed alerts
 
-If cron doesn't run for several hours, alerts may be missed. The system checks for ±1 hour windows. Consider:
-- Running cron every 30 minutes instead of hourly
-- Adding alert recovery logic
+If cron doesn't run on a particular day, alerts may be missed. The system checks for exact day matches (3, 2, or 1 day remaining). Consider:
+- Setting up monitoring to ensure cron runs daily
+- Adding alert recovery logic if needed
 
 ---
 
@@ -198,9 +198,9 @@ If cron doesn't run for several hours, alerts may be missed. The system checks f
 
 ## Summary
 
-✅ **Implemented**: 72/48/24 hour countdown alerts
+✅ **Implemented**: 3/2/1 day countdown alerts
 ✅ **Endpoint**: `/api/cron/check-alerts`
-✅ **Schedule**: Every hour
+✅ **Schedule**: Once daily at 8 AM
 ✅ **Recipients**: Admin, Production Manager, Order Placer
 ✅ **Database**: `OrderAlert` + `Alert` tables
 ✅ **Notifications**: Telegram integration

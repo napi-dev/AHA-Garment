@@ -39,18 +39,67 @@ export async function recordMovement(formData: FormData) {
   if (!session?.user) throw new Error("ተፈቅዶ አልነበረም");
   requirePermission(session.user.role, "stock:edit");
 
-  const materialId = String(formData.get("materialId") ?? "");
-  const type       = String(formData.get("type") ?? "RECEIVE") as StockMovementType;
-  const quantity   = String(formData.get("quantity") ?? "0");
-  const lotId      = String(formData.get("lotId") ?? "") || null;
-  const reference  = String(formData.get("reference") ?? "") || null;
-  const notes      = String(formData.get("notes") ?? "") || null;
-  const dateStr    = String(formData.get("date") ?? new Date().toISOString().split("T")[0]);
-  const date       = new Date(dateStr + "T00:00:00Z");
+  const materialName = String(formData.get("materialName") ?? "").trim();
+  const unit        = String(formData.get("unit") ?? "").trim();
+  const type        = String(formData.get("type") ?? "RECEIVE") as StockMovementType;
+  const quantity    = String(formData.get("quantity") ?? "0");
+  const lotNumber   = String(formData.get("lotNumber") ?? "") || null;
+  const reference   = String(formData.get("reference") ?? "") || null;
+  const notes       = String(formData.get("notes") ?? "") || null;
+  const dateStr     = String(formData.get("date") ?? new Date().toISOString().split("T")[0]);
+  const date        = new Date(dateStr + "T00:00:00Z");
+  const supplierId  = String(formData.get("supplierId") ?? "") || null;
+
+  if (!materialName || !unit) {
+    throw new Error("የዕቃ ስም እና የመለኪያ ክፍል ያስፈልጋሉ");
+  }
+
+  // Find or create the material
+  let material = await db.material.findFirst({
+    where: { nameAm: materialName },
+  });
+
+  if (!material) {
+    // Auto-generate SKU: MAT-001, MAT-002 …
+    const count = await db.material.count();
+    const sku = `MAT-${String(count + 1).padStart(3, "0")}`;
+
+    material = await db.material.create({
+      data: {
+        nameAm: materialName,
+        unit,
+        sku,
+        minimumLevel: 0, // Default minimum level
+      },
+    });
+  }
+
+  // Handle lot number if provided
+  let lotId: string | null = null;
+  if (lotNumber && type === "RECEIVE") {
+    // Find or create lot
+    let lot = await db.lot.findFirst({
+      where: {
+        materialId: material.id,
+        lotNumber,
+      },
+    });
+
+    if (!lot) {
+      lot = await db.lot.create({
+        data: {
+          materialId: material.id,
+          lotNumber,
+          supplierId,
+        },
+      });
+    }
+    lotId = lot.id;
+  }
 
   await db.stockMovement.create({
     data: {
-      materialId,
+      materialId: material.id,
       type,
       quantity,
       lotId,
@@ -66,13 +115,13 @@ export async function recordMovement(formData: FormData) {
       userId:   session.user.id,
       action:   `STOCK_${type}`,
       entity:   "StockMovement",
-      entityId: materialId,
-      after:    { type, quantity, date: dateStr },
+      entityId: material.id,
+      after:    { type, quantity, date: dateStr, materialName },
     },
   });
 
   // Check and fire low-stock alert
-  await checkAndSendLowStockAlert(materialId);
+  await checkAndSendLowStockAlert(material.id);
 
   revalidatePath("/materials");
   redirect("/materials");

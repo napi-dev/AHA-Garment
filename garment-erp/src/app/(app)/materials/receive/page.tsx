@@ -54,14 +54,26 @@ export default async function ReceiveMaterialPage() {
           <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5 font-ethiopic">
             {am.materials.name} <span className="text-rose-500">*</span>
           </label>
-          <select name="materialId" required className="input-field font-ethiopic text-slate-800">
-            <option value="">የጥሬ ዕቃ አይነት ይምረጡ</option>
-            {materials.map((m) => (
-              <option key={m.id} value={m.id}>
-                {m.nameAm} ({m.sku}) — {m.unit}
-              </option>
-            ))}
-          </select>
+          <input
+            name="materialName"
+            type="text"
+            required
+            className="input-field font-ethiopic"
+            placeholder="የጥሬ ዕቃ ስም ያስገቡ (ምሳሌ: ጨርቅ, ክር, ቁልፍ)"
+          />
+        </div>
+
+        <div>
+          <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5 font-ethiopic">
+            የመለኪያ ክፍል <span className="text-rose-500">*</span>
+          </label>
+          <input
+            name="unit"
+            type="text"
+            required
+            className="input-field font-ethiopic"
+            placeholder="ምሳሌ: ኪ.ግ, ሜትር, ቁጥር"
+          />
         </div>
 
         <div>
