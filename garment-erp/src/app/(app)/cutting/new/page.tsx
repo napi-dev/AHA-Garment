@@ -27,6 +27,24 @@ export default async function NewCutJobPage({
     orderBy: { createdAt: "desc" },
   });
 
+  // Prepare order display info
+  const ordersWithDetails = orders.map((o) => {
+    const totalQty = o.lines.reduce((s, l) => s + l.qty, 0);
+    
+    // Get unique garment types and colors from lines
+    const types = [...new Set(o.lines.map(l => l.typeId))];
+    const colors = [...new Set(o.lines.map(l => l.color))];
+    
+    return {
+      id: o.id,
+      orderNo: o.orderNo,
+      totalQty,
+      types: types.slice(0, 2), // Show first 2 types
+      colors: colors.slice(0, 2), // Show first 2 colors
+      hasMore: types.length > 2 || colors.length > 2
+    };
+  });
+
   // Fabric materials from store with current stock
   const fabricMaterials = await db.material.findMany({
     where: { isActive: true },
@@ -48,6 +66,7 @@ export default async function NewCutJobPage({
     return {
       id: f.id,
       nameAm: f.nameAm,
+      nameEn: f.nameEn,
       sku: f.sku,
       unit: f.unit,
       stock: Math.max(0, stock),
@@ -103,14 +122,11 @@ export default async function NewCutJobPage({
             className="input-field font-ethiopic text-slate-800"
           >
             <option value="">የትዕዛዝ ቁጥር ይምረጡ</option>
-            {orders.map((o) => {
-              const totalQty = o.lines.reduce((s, l) => s + l.qty, 0);
-              return (
-                <option key={o.id} value={o.id}>
-                  {o.orderNo} ({totalQty} ፍሬ)
-                </option>
-              );
-            })}
+            {ordersWithDetails.map((o) => (
+              <option key={o.id} value={o.id}>
+                {o.orderNo} ({o.totalQty} ፍሬ) — {o.types.join(", ")}{o.hasMore ? "+" : ""} | {o.colors.join(", ")}{o.hasMore ? "+..." : ""}
+              </option>
+            ))}
           </select>
         </div>
 
@@ -127,7 +143,7 @@ export default async function NewCutJobPage({
             <option value="">የጨርቅ አይነት ይምረጡ</option>
             {fabricsWithStock.map((f) => (
               <option key={f.id} value={f.id}>
-                {f.nameAm} ({f.sku}) — በመጋዘን ያለው፦ {f.stock.toFixed(1)} {f.unit}
+                {f.nameAm} {f.nameEn ? `(${f.nameEn})` : ""} — {f.sku} | በመጋዘን: {f.stock.toFixed(1)} {f.unit}
               </option>
             ))}
           </select>
