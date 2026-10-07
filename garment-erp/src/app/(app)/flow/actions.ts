@@ -63,6 +63,7 @@ export async function receiveHandover(handoverId: string, receivedQty: number) {
     where: { id: handoverId },
     include: {
       toDept: { select: { controllers: true } },
+      order: { select: { orderNo: true } },
     },
   });
 
