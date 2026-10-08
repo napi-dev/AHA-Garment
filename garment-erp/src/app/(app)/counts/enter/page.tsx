@@ -171,7 +171,6 @@ export default async function CountEntryPage({
                 name="job"
                 id="job-select"
                 className="input-field font-ethiopic text-slate-800"
-                onChange={(e) => e.currentTarget.form?.submit()}
               >
                 <option value="">ስራ ይምረጡ...</option>
                 {Object.entries(jobsByDept).map(([deptName, jobs]) =>
@@ -193,6 +192,15 @@ export default async function CountEntryPage({
               </select>
             </div>
           </div>
+
+          <div className="mt-3">
+            <button
+              type="submit"
+              className="btn-primary py-2 px-4 text-xs"
+            >
+              ስራ ተግብር
+            </button>
+          </div>
         </form>
 
         <script
@@ -201,6 +209,7 @@ export default async function CountEntryPage({
               document.addEventListener('DOMContentLoaded', function() {
                 const deptSelect = document.getElementById('department-select');
                 const jobSelect = document.getElementById('job-select');
+                const form = jobSelect?.form;
                 
                 if (deptSelect && jobSelect) {
                   // Filter jobs based on department selection
@@ -231,6 +240,13 @@ export default async function CountEntryPage({
                       }
                     }
                   }
+                  
+                  // Auto-submit when job is selected
+                  jobSelect.addEventListener('change', function() {
+                    if (jobSelect.value && form) {
+                      form.submit();
+                    }
+                  });
                   
                   deptSelect.addEventListener('change', filterJobs);
                   filterJobs(); // Initial filter
