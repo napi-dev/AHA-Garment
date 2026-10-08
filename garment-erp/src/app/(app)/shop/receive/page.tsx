@@ -18,7 +18,7 @@ export default async function ShopReceivePage() {
   const [activeOrders, recentReceives] = await Promise.all([
     db.prodOrder.findMany({
       where: { status: "ACTIVE" },
-      select: { id: true, orderNo: true },
+      include: { lines: true },
       orderBy: { createdAt: "desc" },
     }),
     db.shopMovement.findMany({
@@ -28,6 +28,24 @@ export default async function ShopReceivePage() {
       take: 15,
     }),
   ]);
+
+  // Prepare order display info
+  const ordersWithDetails = activeOrders.map((o) => {
+    const totalQty = o.lines.reduce((s, l) => s + l.qty, 0);
+    
+    // Get unique garment types and colors from lines
+    const types = [...new Set(o.lines.map(l => l.typeId))];
+    const colors = [...new Set(o.lines.map(l => l.color))];
+    
+    return {
+      id: o.id,
+      orderNo: o.orderNo,
+      totalQty,
+      types: types.slice(0, 2), // Show first 2 types
+      colors: colors.slice(0, 2), // Show first 2 colors
+      hasMore: types.length > 2 || colors.length > 2
+    };
+  });
 
   const todayStr = new Date().toISOString().split("T")[0];
 
@@ -85,11 +103,11 @@ export default async function ShopReceivePage() {
               <label className="font-semibold text-slate-700 block mb-1">
                 የምርት ትዕዛዝ (ከፋብሪካ ከሆነ)
               </label>
-              <select name="orderId" className="input-field font-mono">
+              <select name="orderId" className="input-field font-ethiopic">
                 <option value="">ትዕዛዝ የለውም / አጠቃላይ</option>
-                {activeOrders.map((o) => (
+                {ordersWithDetails.map((o) => (
                   <option key={o.id} value={o.id}>
-                    {o.orderNo}
+                    {o.orderNo} ({o.totalQty} ፍሬ) — {o.types.join(", ")}{o.hasMore ? "+" : ""} | {o.colors.join(", ")}{o.hasMore ? "+..." : ""}
                   </option>
                 ))}
               </select>

@@ -127,49 +127,118 @@ export default async function CountEntryPage({
       <DateNavigator currentDate={selectedDateISO} isToday={isToday} jobId={selectedJobId} />
       {isDayClosed && <DayClosedBanner closedAt={dayClose.closedAt} />}
 
-      {/* Job selector - grouped by department */}
+      {/* Job selector - two dropdowns: department then job */}
       <div className="erp-card p-5">
         <form method="GET" className="space-y-4">
-          <input type="hidden" name="date" value={selectedDateISO} />
           <input type="hidden" name="page" value="1" />
+          <input type="hidden" name="date" value={selectedDateISO} />
+          
           <div className="flex items-center gap-2 text-xs font-semibold text-slate-600 font-ethiopic mb-3">
             <Briefcase size={14} className="text-blue-500" />
             <span>ስራ ምረጥ (በክፍል የተደራጀ)፦</span>
           </div>
-          
-          {Object.entries(jobsByDept).map(([deptName, jobs]) => (
-            <div key={deptName} className="space-y-2">
-              <h3 className="text-xs font-bold text-slate-500 font-ethiopic uppercase tracking-wide">
-                {deptName}
-              </h3>
-              <div className="flex flex-wrap gap-2">
-                {jobs.map((job) => {
-                  const rate = job.incentiveCards[0];
-                  return (
-                    <button
-                      key={job.id}
-                      type="submit"
-                      name="job"
-                      value={job.id}
-                      className={`px-3 py-2 rounded-xl text-xs font-semibold font-ethiopic transition-all ${
-                        job.id === selectedJobId
-                          ? "bg-blue-600 text-white shadow-md"
-                          : "bg-slate-100 text-slate-700 hover:bg-slate-200"
-                      }`}
-                    >
-                      <div>{job.nameAm}</div>
-                      {rate && (
-                        <div className="text-[10px] opacity-75 mt-0.5">
-                          {rate.targetPerHour} ፍሬ/ሰዓት
-                        </div>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Department Dropdown */}
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1.5 font-ethiopic">
+                ክፍል ይምረጡ
+              </label>
+              <select
+                name="department"
+                id="department-select"
+                className="input-field font-ethiopic text-slate-800"
+              >
+                <option value="">ሁሉም ክፍሎች</option>
+                {Object.keys(jobsByDept).map((deptName) => (
+                  <option 
+                    key={deptName} 
+                    value={deptName}
+                    selected={selectedJob && jobsByDept[deptName].some(j => j.id === selectedJobId)}
+                  >
+                    {deptName}
+                  </option>
+                ))}
+              </select>
             </div>
-          ))}
+
+            {/* Job Dropdown */}
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1.5 font-ethiopic">
+                ስራ ይምረጡ
+              </label>
+              <select
+                name="job"
+                id="job-select"
+                className="input-field font-ethiopic text-slate-800"
+                onChange={(e) => e.currentTarget.form?.submit()}
+              >
+                <option value="">ስራ ይምረጡ...</option>
+                {Object.entries(jobsByDept).map(([deptName, jobs]) =>
+                  jobs.map((job) => {
+                    const rate = job.incentiveCards[0];
+                    return (
+                      <option
+                        key={job.id}
+                        value={job.id}
+                        data-department={deptName}
+                        selected={job.id === selectedJobId}
+                      >
+                        {job.nameAm} — {deptName}
+                        {rate ? ` (${rate.targetPerHour} ፍሬ/ሰዓት)` : ""}
+                      </option>
+                    );
+                  })
+                )}
+              </select>
+            </div>
+          </div>
         </form>
+
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              document.addEventListener('DOMContentLoaded', function() {
+                const deptSelect = document.getElementById('department-select');
+                const jobSelect = document.getElementById('job-select');
+                
+                if (deptSelect && jobSelect) {
+                  // Filter jobs based on department selection
+                  function filterJobs() {
+                    const selectedDept = deptSelect.value;
+                    const allOptions = Array.from(jobSelect.options);
+                    
+                    allOptions.forEach((option) => {
+                      if (option.value === '') {
+                        option.style.display = 'block';
+                        return;
+                      }
+                      
+                      const optDept = option.getAttribute('data-department');
+                      if (!selectedDept || optDept === selectedDept) {
+                        option.style.display = 'block';
+                      } else {
+                        option.style.display = 'none';
+                      }
+                    });
+                    
+                    // Reset job selection if current job is not in filtered list
+                    const currentJob = jobSelect.value;
+                    if (currentJob) {
+                      const currentOption = jobSelect.querySelector('option[value="' + currentJob + '"]');
+                      if (currentOption && currentOption.style.display === 'none') {
+                        jobSelect.value = '';
+                      }
+                    }
+                  }
+                  
+                  deptSelect.addEventListener('change', filterJobs);
+                  filterJobs(); // Initial filter
+                }
+              });
+            `,
+          }}
+        />
       </div>
 
       {selectedJob && (
